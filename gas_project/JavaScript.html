@@ -59,7 +59,7 @@
     setTimeout(() => {
       toast.style.opacity = '0';
       setTimeout(() => toast.remove(), 300);
-    }, 4000);
+    }, 4500);
   }
 
   // Load Inventory from Google Apps Script Backend
@@ -71,17 +71,17 @@
         .withFailureHandler(onApiError)
         .getInventoryData();
     } else {
-      // Mock Data for local testing / preview if opened outside Google Apps Script
-      console.warn("Running in preview mode (no google.script.run)");
+      // Mock Data for local testing / preview outside Google Apps Script
+      console.warn("Running in preview mode (mock data with Brand & Price)");
       setTimeout(() => {
         onInventoryLoaded({
           success: true,
           items: [
-            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', isDonation: true, isZeroStock: false },
-            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', isDonation: false, isZeroStock: false },
-            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', isDonation: false, isZeroStock: false },
-            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', isDonation: false, isZeroStock: false },
-            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', isDonation: false, isZeroStock: true }
+            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', brandName: 'Tegretol', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 12.50, isDonation: true, isZeroStock: false },
+            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', brandName: 'Lexapro', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', acquisitionPrice: 28.00, isDonation: false, isZeroStock: false },
+            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, isDonation: false, isZeroStock: false },
+            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, isDonation: false, isZeroStock: false },
+            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, isDonation: false, isZeroStock: true }
           ]
         });
       }, 500);
@@ -129,7 +129,7 @@
     document.getElementById('stat-zero-count').textContent = zeroStock;
   }
 
-  // Filter and Search Logic
+  // Filter and Live Search Logic (Matches Code, Generic, Brand, Expiry)
   function applyFilter() {
     const query = (document.getElementById('search-input').value || '').toLowerCase().trim();
     const statusFilter = document.getElementById('filter-status').value;
@@ -138,6 +138,7 @@
       const matchQuery = !query || 
         item.itemCode.toLowerCase().includes(query) || 
         item.itemDesc.toLowerCase().includes(query) ||
+        (item.brandName && item.brandName.toLowerCase().includes(query)) ||
         item.expDate.toLowerCase().includes(query);
 
       let matchStatus = true;
@@ -154,13 +155,13 @@
     renderInventoryTable();
   }
 
-  // Render Main Inventory Table
+  // Render Main Inventory Table (Option A Layout: Code | Generic | Brand | Qty | Expiry | Price | Actions)
   function renderInventoryTable() {
     const tbody = document.getElementById('inventory-table-body');
     tbody.innerHTML = '';
 
     if (state.filteredItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>`;
       return;
     }
 
@@ -179,13 +180,21 @@
         badgeHtml = `<span class="badge badge-neutral">⚪ ${item.expDate}</span>`;
       }
 
-      let catBadge = item.isDonation 
+      const catBadge = item.isDonation 
         ? `<span class="badge badge-donation" style="margin-left:4px;">Donation</span>` 
         : '';
+
+      const brandBadge = item.brandName 
+        ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>`
+        : `<span style="color:#94a3b8; font-style:italic;">--</span>`;
 
       const qtyDisplay = item.isZeroStock 
         ? `<span class="qty-zero">0 (Out of Stock)</span>` 
         : `<span class="qty-display">${item.qty.toLocaleString()}</span>`;
+
+      const priceDisplay = (typeof item.acquisitionPrice === 'number' && item.acquisitionPrice > 0)
+        ? `<span class="price-display">₱${item.acquisitionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
+        : `<span style="color:#94a3b8;">₱0.00</span>`;
 
       tr.innerHTML = `
         <td style="font-family:monospace; font-weight:600; color:#1e293b;">${escapeHtml(item.itemCode)}</td>
@@ -193,8 +202,10 @@
           <div style="font-weight:600;">${escapeHtml(item.itemDesc)} ${catBadge}</div>
           <div style="font-size:11px; color:#64748b;">Row ${item.rowIndex} in Sheet</div>
         </td>
+        <td>${brandBadge}</td>
         <td style="text-align:right;">${qtyDisplay}</td>
         <td>${badgeHtml}</td>
+        <td style="text-align:right;">${priceDisplay}</td>
         <td style="text-align:right;">
           <div style="display:inline-flex; gap:6px;">
             <button class="btn btn-sm btn-danger" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
@@ -210,7 +221,7 @@
     });
   }
 
-  // --- STOCK OUT MODAL ACTIONS ---
+  // --- STOCK OUT MODAL ACTIONS (BRAND + FINANCIAL DEDUCTION) ---
   function openStockOutModal(rowIndex) {
     const item = state.items.find(i => i.rowIndex === rowIndex);
     if (!item) return;
@@ -218,12 +229,21 @@
     state.selectedRow = item;
     document.getElementById('so-code').textContent = item.itemCode;
     document.getElementById('so-desc').textContent = item.itemDesc;
+    
+    const brandEl = document.getElementById('so-brand-badge');
+    brandEl.textContent = item.brandName || 'Brand Batch';
+    
     document.getElementById('so-exp').textContent = item.expDate;
+    
+    const unitPrice = typeof item.acquisitionPrice === 'number' ? item.acquisitionPrice : 0;
+    document.getElementById('so-price').textContent = '₱' + unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
     document.getElementById('so-current-qty').textContent = item.qty.toLocaleString() + ' units';
     document.getElementById('so-input-qty').value = '';
     document.getElementById('so-input-qty').max = item.qty;
     document.getElementById('so-remarks').value = '';
-    document.getElementById('so-remaining-preview').textContent = item.qty.toLocaleString();
+    document.getElementById('so-remaining-preview').textContent = item.qty.toLocaleString() + ' units';
+    document.getElementById('so-cost-preview').textContent = '₱0.00';
 
     document.getElementById('modal-stock-out').style.display = 'flex';
     document.getElementById('so-input-qty').focus();
@@ -233,13 +253,20 @@
     if (!state.selectedRow) return;
     const outVal = parseFloat(document.getElementById('so-input-qty').value) || 0;
     const rem = state.selectedRow.qty - outVal;
-    const previewEl = document.getElementById('so-remaining-preview');
+    const price = typeof state.selectedRow.acquisitionPrice === 'number' ? state.selectedRow.acquisitionPrice : 0;
+    const totalCost = outVal > 0 ? (outVal * price) : 0;
+
+    const previewRem = document.getElementById('so-remaining-preview');
+    const previewCost = document.getElementById('so-cost-preview');
+
     if (rem < 0) {
-      previewEl.textContent = 'Invalid (Exceeds current stock)';
-      previewEl.style.color = '#dc2626';
+      previewRem.textContent = 'Invalid (Exceeds current stock)';
+      previewRem.style.color = '#dc2626';
+      previewCost.textContent = '₱0.00';
     } else {
-      previewEl.textContent = rem.toLocaleString() + ' units';
-      previewEl.style.color = '#16a34a';
+      previewRem.textContent = rem.toLocaleString() + ' units';
+      previewRem.style.color = '#0f172a';
+      previewCost.textContent = '₱' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
   }
 
@@ -287,9 +314,11 @@
       // Mock local update
       state.selectedRow.qty -= qtyOut;
       state.selectedRow.isZeroStock = state.selectedRow.qty <= 0;
+      const unitPrice = state.selectedRow.acquisitionPrice || 0;
+      const totalCost = qtyOut * unitPrice;
       setModalLoading('modal-stock-out', false);
       closeModal('modal-stock-out');
-      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} units!`, "success");
+      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} units of ${state.selectedRow.itemDesc} [${state.selectedRow.brandName}] (₱${totalCost.toFixed(2)})`, "success");
       renderStats();
       applyFilter();
     }
@@ -303,8 +332,10 @@
     state.selectedRow = item;
     document.getElementById('edit-code').value = item.itemCode;
     document.getElementById('edit-desc').value = item.itemDesc;
+    document.getElementById('edit-brand').value = item.brandName || '';
     document.getElementById('edit-qty').value = item.qty;
     document.getElementById('edit-exp').value = item.expDate === 'NO EXPIRY' ? '' : item.expDate;
+    document.getElementById('edit-price').value = item.acquisitionPrice || '';
     document.getElementById('edit-row-info').textContent = `Editing Google Sheet Row #${item.rowIndex}`;
 
     document.getElementById('modal-edit-batch').style.display = 'flex';
@@ -312,16 +343,25 @@
 
   function submitEditBatch() {
     if (!state.selectedRow) return;
+    const newDesc = document.getElementById('edit-desc').value.trim();
+    const newBrand = document.getElementById('edit-brand').value.trim();
     const newQty = parseFloat(document.getElementById('edit-qty').value) || 0;
     const newExp = document.getElementById('edit-exp').value.trim();
-    const newDesc = document.getElementById('edit-desc').value.trim();
+    const newPrice = parseFloat(document.getElementById('edit-price').value) || 0;
+
+    if (!newBrand) {
+      showToast("Brand Name is required.", "error");
+      return;
+    }
 
     const payload = {
       rowIndex: state.selectedRow.rowIndex,
       itemCode: state.selectedRow.itemCode,
       itemDesc: newDesc,
+      brandName: newBrand,
       newQty: newQty,
-      newExpDate: newExp
+      newExpDate: newExp,
+      acquisitionPrice: newPrice
     };
 
     setModalLoading('modal-edit-batch', true);
@@ -346,6 +386,8 @@
       state.selectedRow.qty = newQty;
       state.selectedRow.expDate = newExp;
       state.selectedRow.itemDesc = newDesc;
+      state.selectedRow.brandName = newBrand;
+      state.selectedRow.acquisitionPrice = newPrice;
       state.selectedRow.isZeroStock = newQty <= 0;
       setModalLoading('modal-edit-batch', false);
       closeModal('modal-edit-batch');
@@ -378,21 +420,23 @@
       const lastRow = Math.max(...existingBatches.map(b => b.rowIndex));
       
       let html = `<div style="color:#2563eb; font-weight:700; margin-bottom:4px;">
-        📌 Existing Medicine Found (${existingBatches.length} batch${existingBatches.length > 1 ? 'es' : ''} in stock):
+        📌 Existing DCI Code Found (${existingBatches.length} batch${existingBatches.length > 1 ? 'es' : ''} in inventory):
       </div>`;
-      html += `<ul style="padding-left:16px; margin-bottom:6px;">`;
+      html += `<ul style="padding-left:16px; margin-bottom:6px; line-height:1.6;">`;
       existingBatches.forEach(b => {
-        html += `<li>Row ${b.rowIndex}: Qty <strong>${b.qty.toLocaleString()}</strong> | Expiry: <strong>${b.expDate}</strong></li>`;
+        const brandStr = b.brandName ? `Brand: <strong>${escapeHtml(b.brandName)}</strong>` : 'Generic';
+        const priceStr = b.acquisitionPrice ? ` | Price: <strong>₱${Number(b.acquisitionPrice).toFixed(2)}</strong>` : '';
+        html += `<li>Row ${b.rowIndex}: ${brandStr} | Qty <strong>${b.qty.toLocaleString()}</strong> | Expiry <strong>${b.expDate}</strong>${priceStr}</li>`;
       });
       html += `</ul>`;
-      html += `<div style="background:#e0f2fe; padding:6px 10px; border-radius:6px; color:#0369a1; font-weight:600;">
-        ✨ Smart Insertion: This new batch will be automatically inserted at <strong>Row ${lastRow + 1}</strong> (directly below the last expiry batch).
+      html += `<div style="background:#e0f2fe; padding:8px 12px; border-radius:6px; color:#0369a1; font-weight:600;">
+        ✨ Smart Batch Grouping: This new brand delivery will be automatically inserted at <strong>Row ${lastRow + 1}</strong> (directly grouped below the last batch of this medicine).
       </div>`;
 
       previewContent.innerHTML = html;
       previewBox.style.display = 'block';
     } else {
-      previewContent.innerHTML = `<span style="color:#059669; font-weight:600;">✨ New Medicine: This item code is not in the system yet. It will be added to the bottom of the list.</span>`;
+      previewContent.innerHTML = `<span style="color:#059669; font-weight:600;">✨ New DCI Code: This medicine is not in the system yet. It will be added to the bottom of the inventory master list.</span>`;
       previewBox.style.display = 'block';
     }
   }
@@ -400,19 +444,28 @@
   function submitAddNew() {
     const code = document.getElementById('add-code').value.trim();
     const desc = document.getElementById('add-desc').value.trim();
+    const brand = document.getElementById('add-brand').value.trim();
     const qty = parseFloat(document.getElementById('add-qty').value) || 0;
     const exp = document.getElementById('add-exp').value.trim();
+    const price = parseFloat(document.getElementById('add-price').value) || 0;
 
     if (!code || !desc) {
-      showToast("Please enter both Item Code and Description.", "error");
+      showToast("Please enter both DCI Item Code and Generic Description.", "error");
+      return;
+    }
+
+    if (!brand) {
+      showToast("Brand Name is required for every batch delivery.", "error");
       return;
     }
 
     const payload = {
       itemCode: code,
       itemDesc: desc,
+      brandName: brand,
       qty: qty,
-      expDate: exp
+      expDate: exp,
+      acquisitionPrice: price
     };
 
     setLoading(true);
@@ -425,8 +478,10 @@
             // Clear form
             document.getElementById('add-code').value = '';
             document.getElementById('add-desc').value = '';
+            document.getElementById('add-brand').value = '';
             document.getElementById('add-qty').value = '';
             document.getElementById('add-exp').value = '';
+            document.getElementById('add-price').value = '';
             document.getElementById('add-batch-preview').style.display = 'none';
             // Switch to inventory tab and reload
             switchTab('tab-inventory');
@@ -442,7 +497,7 @@
         .addNewMedicineOrBatch(payload);
     } else {
       setLoading(false);
-      showToast(`[Mock] Successfully added ${code} - ${desc}`, "success");
+      showToast(`[Mock] Successfully saved ${code} - ${desc} [${brand}] (₱${price.toFixed(2)})`, "success");
       switchTab('tab-inventory');
     }
   }
@@ -454,20 +509,29 @@
     tbody.innerHTML = '';
 
     if (zeroItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:#16a34a; font-weight:600;">🎉 No 0-quantity items! All inventory lines currently have stock.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#16a34a; font-weight:600;">🎉 No 0-quantity items! All inventory lines currently have stock.</td></tr>`;
       return;
     }
 
     zeroItems.forEach(item => {
       const tr = document.createElement('tr');
+      const brandBadge = item.brandName 
+        ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>` 
+        : '<span style="color:#94a3b8;">--</span>';
+      const priceDisplay = (item.acquisitionPrice > 0)
+        ? `₱${item.acquisitionPrice.toFixed(2)}`
+        : '₱0.00';
+
       tr.innerHTML = `
         <td style="font-family:monospace; font-weight:600;">${escapeHtml(item.itemCode)}</td>
         <td><strong>${escapeHtml(item.itemDesc)}</strong></td>
+        <td>${brandBadge}</td>
         <td><span class="badge badge-neutral">${item.expDate}</span></td>
+        <td style="text-align:right; font-family:monospace;">${priceDisplay}</td>
         <td><span class="qty-zero">0 units</span></td>
         <td style="text-align:right;">
           <button class="btn btn-sm btn-primary" onclick="openEditBatchModal(${item.rowIndex})">
-            🔄 Restock / Set New Expiry
+            🔄 Restock & Update
           </button>
         </td>
       `;
@@ -478,7 +542,7 @@
   // --- STOCK OUT AUDIT LOGS ---
   function loadLogs() {
     const tbody = document.getElementById('logs-table-body');
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px;">Loading audit logs...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px;">Loading audit logs...</td></tr>`;
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run
@@ -486,17 +550,30 @@
           if (res.success) {
             renderLogsTable(res.logs || []);
           } else {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#dc2626;">${res.error}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#dc2626;">${res.error}</td></tr>`;
           }
         })
         .withFailureHandler(err => {
-          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
         })
         .getRecentLogs(50);
     } else {
       // Mock Logs
       renderLogsTable([
-        { timestamp: '2026-09-12 08:00:00', itemCode: 'DMR000730', itemDesc: 'MIDAZOLAM 1MG/ML', expDate: 'Aug-26', qtyOut: 100, previousQty: 4000, remainingBalance: 3900, remarks: 'OR Dispense', user: 'pharmacist@hospital.org' }
+        { 
+          timestamp: '2026-10-13 14:30:00', 
+          itemCode: 'DMR000451', 
+          itemDesc: 'FLUCONAZOLE 200MG CAPSULE', 
+          brandName: 'Diflucan', 
+          expDate: 'Jun-28', 
+          unitPrice: 125.00, 
+          qtyOut: 20, 
+          totalCost: 2500.00, 
+          previousQty: 200, 
+          remainingBalance: 180, 
+          remarks: 'ICU Dispense', 
+          user: 'pharmacist@armmc.gov.ph' 
+        }
       ]);
     }
   }
@@ -506,18 +583,33 @@
     tbody.innerHTML = '';
 
     if (logs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">No stock-out transactions recorded yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No stock-out transactions recorded yet.</td></tr>`;
       return;
     }
 
     logs.forEach(log => {
       const tr = document.createElement('tr');
+      const brandStr = log.brandName 
+        ? `<span class="badge badge-brand">${escapeHtml(log.brandName)}</span>` 
+        : '<span style="color:#94a3b8;">--</span>';
+      
+      const unitPriceFormatted = Number(log.unitPrice || 0) > 0 
+        ? `₱${Number(log.unitPrice).toFixed(2)}` 
+        : '₱0.00';
+
+      const totalValueFormatted = Number(log.totalCost || 0) > 0 
+        ? `₱${Number(log.totalCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+        : '₱0.00';
+
       tr.innerHTML = `
         <td style="font-size:11px; color:#64748b; white-space:nowrap;">${log.timestamp}</td>
         <td style="font-family:monospace; font-weight:600;">${escapeHtml(log.itemCode)}</td>
         <td>${escapeHtml(log.itemDesc)}</td>
+        <td>${brandStr}</td>
         <td><span class="badge badge-neutral">${log.expDate}</span></td>
+        <td style="text-align:right; font-family:monospace;">${unitPriceFormatted}</td>
         <td style="text-align:right; font-weight:700; color:#dc2626;">-${Number(log.qtyOut).toLocaleString()}</td>
+        <td style="text-align:right; font-family:monospace; font-weight:700; color:#047857;">${totalValueFormatted}</td>
         <td style="text-align:right; font-family:monospace;">${Number(log.remainingBalance).toLocaleString()}</td>
         <td style="font-size:12px; color:#475569;">${escapeHtml(log.remarks || '')}</td>
       `;
@@ -537,10 +629,8 @@
   }
 
   function setupAutocomplete() {
-    // Autocomplete for add form
     const codeInput = document.getElementById('add-code');
     if (!codeInput) return;
-
     codeInput.addEventListener('input', onAddCodeOrDescChange);
   }
 

@@ -16,7 +16,7 @@
         <div>
           <div class="header-institution">AMANG RODRIGUEZ MEMORIAL MEDICAL CENTER</div>
           <h1 class="header-title">Pharmacy Expiry Monitoring</h1>
-          <p class="header-subtitle">Hospital Storage Inventory, FEFO Expiry Tracking & Dispensing</p>
+          <p class="header-subtitle">Hospital Storage Inventory, FEFO Expiry Tracking, Brand Management & Dispensing</p>
         </div>
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
@@ -90,7 +90,7 @@
         <div class="filter-bar">
           <div class="search-box">
             <span class="search-icon-inside">🔍</span>
-            <input type="text" id="search-input" class="search-input" placeholder="Search by Item Code, Medicine Name, or Expiry (e.g. Feb-27)..." oninput="applyFilter()">
+            <input type="text" id="search-input" class="search-input" placeholder="Search by Item Code, Generic Name, Brand Name, or Expiry (e.g. Feb-27)..." oninput="applyFilter()">
           </div>
 
           <select id="filter-status" class="filter-select" onchange="applyFilter()">
@@ -119,10 +119,12 @@
           <table>
             <thead>
               <tr>
-                <th style="width:140px;">Item Code</th>
-                <th>Medicine Description</th>
-                <th style="width:130px; text-align:right;">Storage Qty</th>
-                <th style="width:160px;">Expiry Status</th>
+                <th style="width:120px;">Item Code</th>
+                <th>Generic Description</th>
+                <th style="width:140px;">Brand Name</th>
+                <th style="width:110px; text-align:right;">Storage Qty</th>
+                <th style="width:145px;">Expiry Status</th>
+                <th style="width:125px; text-align:right;">Acq. Price</th>
                 <th style="width:140px; text-align:right;">Quick Actions</th>
               </tr>
             </thead>
@@ -136,13 +138,13 @@
       <!-- TAB 2: ADD MEDICINE / SMART BATCH INSERTION -->
       <section id="tab-add" class="tab-pane">
         <div class="form-card">
-          <h2 class="form-title">Add Medicine or New Batch</h2>
+          <h2 class="form-title">Add Medicine or New Batch Delivery</h2>
           <p class="form-desc">
-            Enter the medicine details. If the Item Code already exists, the new batch will be <strong>automatically inserted directly below the last batch</strong> of that medicine in Google Sheets!
+            Enter the medicine details. For existing DCI Codes and Generic Names, the new batch (with its specific <strong>Brand Name</strong>, <strong>Expiry Date</strong>, and <strong>Acquisition Price</strong>) will be <strong>automatically grouped and inserted directly below the last batch</strong> in Google Sheets!
           </p>
 
           <div class="form-group" style="position:relative;">
-            <label class="form-label" for="add-code">Item Code (e.g., DMR000451, DMDON001151) *</label>
+            <label class="form-label" for="add-code">Item Code / DCI Code (e.g., DMR000451, DMDON001151) *</label>
             <input type="text" id="add-code" class="form-input" placeholder="Type or paste item code...">
           </div>
 
@@ -152,19 +154,29 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="add-desc">Medicine Description *</label>
+            <label class="form-label" for="add-desc">Generic Description & Strength *</label>
             <input type="text" id="add-desc" class="form-input" placeholder="e.g. FLUCONAZOLE 200MG CAPSULE">
           </div>
 
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+          <div class="form-group">
+            <label class="form-label" for="add-brand">Brand Name (Commercial / Trade Name) *</label>
+            <input type="text" id="add-brand" class="form-input" placeholder="e.g. Diflucan, Flucan, Pfizer, etc.">
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
             <div class="form-group">
-              <label class="form-label" for="add-qty">Initial Quantity in Storage *</label>
+              <label class="form-label" for="add-qty">Storage Quantity *</label>
               <input type="number" id="add-qty" class="form-input" placeholder="e.g. 500" min="0">
             </div>
 
             <div class="form-group">
-              <label class="form-label" for="add-exp">Expiry Date (e.g. Dec-28) *</label>
+              <label class="form-label" for="add-exp">Expiry Date *</label>
               <input type="text" id="add-exp" class="form-input" placeholder="MMM-YY (e.g. Dec-28)">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="add-price">Acq. Price (₱ / unit) *</label>
+              <input type="number" id="add-price" class="form-input" placeholder="e.g. 45.50" step="0.01" min="0">
             </div>
           </div>
 
@@ -180,7 +192,7 @@
         <div style="margin-bottom:16px;">
           <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Zero-Quantity Items Replenishment</h2>
           <p style="font-size:12px; color:var(--slate-500);">
-            Quickly update medicines that are currently out of stock. You can replace the old expiry date with the new batch expiry and enter the new incoming quantity.
+            Quickly replenish medicines that are currently out of stock. You can set the incoming Brand Name, new batch expiry date, updated acquisition price, and quantity.
           </p>
         </div>
 
@@ -188,11 +200,13 @@
           <table>
             <thead>
               <tr>
-                <th style="width:140px;">Item Code</th>
-                <th>Medicine Description</th>
-                <th style="width:140px;">Old Expiry</th>
-                <th style="width:120px;">Current Stock</th>
-                <th style="width:200px; text-align:right;">Action</th>
+                <th style="width:130px;">Item Code</th>
+                <th>Generic Description</th>
+                <th style="width:140px;">Brand Name</th>
+                <th style="width:120px;">Old Expiry</th>
+                <th style="width:120px; text-align:right;">Last Price</th>
+                <th style="width:110px;">Current Stock</th>
+                <th style="width:180px; text-align:right;">Action</th>
               </tr>
             </thead>
             <tbody id="restock-table-body">
@@ -207,7 +221,7 @@
         <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
           <div>
             <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Stock-Out Dispensing Log</h2>
-            <p style="font-size:12px; color:var(--slate-500);">Real-time audit record of all dispensed medicines.</p>
+            <p style="font-size:12px; color:var(--slate-500);">Real-time financial and batch audit record of all dispensed medicines.</p>
           </div>
           <button class="btn btn-outline btn-sm" onclick="loadLogs()">🔄 Refresh Log</button>
         </div>
@@ -217,11 +231,14 @@
             <thead>
               <tr>
                 <th style="width:150px;">Timestamp</th>
-                <th style="width:130px;">Item Code</th>
-                <th>Medicine Description</th>
-                <th style="width:110px;">Batch Expiry</th>
-                <th style="width:100px; text-align:right;">Qty Out</th>
-                <th style="width:120px; text-align:right;">Remaining</th>
+                <th style="width:120px;">Item Code</th>
+                <th>Generic Name</th>
+                <th style="width:130px;">Brand Name</th>
+                <th style="width:100px;">Batch Expiry</th>
+                <th style="width:110px; text-align:right;">Unit Price</th>
+                <th style="width:90px; text-align:right;">Qty Out</th>
+                <th style="width:120px; text-align:right;">Total Value (₱)</th>
+                <th style="width:100px; text-align:right;">Remaining</th>
                 <th>Remarks</th>
               </tr>
             </thead>
@@ -243,11 +260,16 @@
         <button class="btn btn-outline btn-sm" onclick="closeModal('modal-stock-out')">✕</button>
       </div>
       <div class="modal-body">
-        <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
-          <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;" id="so-code"></div>
-          <div style="font-size:14px; font-weight:700; color:#0f172a; margin:2px 0;" id="so-desc"></div>
-          <div style="font-size:12px; color:#475569;">
-            Batch Expiry: <strong id="so-exp"></strong> &nbsp;|&nbsp; Current Stock: <strong id="so-current-qty" style="color:#2563eb;"></strong>
+        <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; font-weight:700; color:#64748b; font-family:monospace;" id="so-code"></span>
+            <span id="so-brand-badge" class="badge badge-brand"></span>
+          </div>
+          <div style="font-size:14px; font-weight:700; color:#0f172a; margin:4px 0;" id="so-desc"></div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:#475569; margin-top:6px; border-top:1px dashed #e2e8f0; padding-top:6px;">
+            <span>Batch Expiry: <strong id="so-exp"></strong></span>
+            <span>Unit Price: <strong id="so-price" style="color:#047857;">₱0.00</strong></span>
+            <span>Current Stock: <strong id="so-current-qty" style="color:#2563eb;"></strong></span>
           </div>
         </div>
 
@@ -261,8 +283,15 @@
           <input type="text" id="so-remarks" class="form-input" placeholder="e.g. OR / ICU / Ward 3 / Outpatient">
         </div>
 
-        <div style="font-size:12px; color:#475569; margin-top:8px;">
-          New Balance in Storage: <strong id="so-remaining-preview">--</strong>
+        <div class="cost-callout">
+          <div>
+            <div style="font-size:11px; color:#64748b; font-weight:600;">NEW BALANCE IN STORAGE</div>
+            <div id="so-remaining-preview" style="font-size:14px; font-weight:700; color:#0f172a;">--</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:#047857; font-weight:600;">TOTAL DISPENSED VALUE</div>
+            <div id="so-cost-preview" style="font-size:16px; font-weight:800; color:#047857;">₱0.00</div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -283,24 +312,34 @@
         <div id="edit-row-info" style="font-size:11px; color:#64748b; margin-bottom:12px; font-weight:600;"></div>
 
         <div class="form-group">
-          <label class="form-label">Item Code</label>
+          <label class="form-label">Item Code (DCI)</label>
           <input type="text" id="edit-code" class="form-input" readonly style="background:#f1f5f9;">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Medicine Description</label>
+          <label class="form-label">Generic Description</label>
           <input type="text" id="edit-desc" class="form-input">
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+        <div class="form-group">
+          <label class="form-label">Brand Name *</label>
+          <input type="text" id="edit-brand" class="form-input" placeholder="e.g. Diflucan, Tegretol...">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
           <div class="form-group">
-            <label class="form-label">Quantity in Storage</label>
+            <label class="form-label">Storage Qty</label>
             <input type="number" id="edit-qty" class="form-input" min="0">
           </div>
 
           <div class="form-group">
             <label class="form-label">Expiry Date</label>
             <input type="text" id="edit-exp" class="form-input" placeholder="e.g. Feb-28">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Price (₱)</label>
+            <input type="number" id="edit-price" class="form-input" step="0.01" min="0" placeholder="0.00">
           </div>
         </div>
       </div>
