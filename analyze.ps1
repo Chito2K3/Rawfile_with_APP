@@ -1,10 +1,10 @@
 $csv = Import-Csv -Path 'sheet_1609045579.csv'
 $propNames = @($csv[0].psobject.Properties | ForEach-Object { $_.Name })
 
-$codeCol = ($propNames | Where-Object { $_ -match 'CODE' })[0]
-$descCol = ($propNames | Where-Object { $_ -match 'DESC' })[0]
-$qtyCol  = ($propNames | Where-Object { $_ -match 'QTY' })[0]
-$expCol  = ($propNames | Where-Object { $_ -match 'EXP' })[0]
+$codeCol = @($propNames | Where-Object { $_ -match 'CODE' })[0]
+$descCol = @($propNames | Where-Object { $_ -match 'DESC' })[0]
+$qtyCol  = @($propNames | Where-Object { $_ -match 'QTY' })[0]
+$expCol  = @($propNames | Where-Object { $_ -match 'EXP' })[0]
 
 Write-Host "Matched column names:"
 Write-Host "  Code: '$codeCol'"
@@ -82,7 +82,7 @@ $data | Group-Object {
 
 Write-Host "`n======================================================="
 Write-Host "6. ITEMS WITH MULTIPLE BATCHES / SPLIT EXPIRY DATES"
-Write-Object ""
+Write-Host ""
 $multiBatch = $data | Group-Object ItemCode | Where-Object { $_.Count -gt 1 }
 Write-Host "Found $($multiBatch.Count) items with multiple batches / entries in storage:"
 foreach ($item in $multiBatch) {

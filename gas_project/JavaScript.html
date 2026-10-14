@@ -3,15 +3,19 @@
   const state = {
     items: [],
     filteredItems: [],
+    masterCatalog: [], // Master DCI catalog from Sheet1
     logs: [],
     selectedRow: null,
     loading: false,
-    activeTab: 'tab-inventory'
+    activeTab: 'tab-inventory',
+    activeDropdown: null, // 'code' or 'desc' or null
+    focusedIndex: -1
   };
 
   // On DOM Ready
   document.addEventListener('DOMContentLoaded', () => {
     initTabs();
+    setupComboboxEvents();
     loadInventory();
   });
 
@@ -62,6 +66,9 @@
     }, 4500);
   }
 
+  // Default Master DCI Catalog (291 items from Sheet1)
+  const DEFAULT_MOCK_DCI_CATALOG = [{"code":"DMDON001151","desc":"(DON) CARBAMAZEPINE 200MG TABLET"},{"code":"DMDON000506","desc":"(DON) GABAPENTIN 300MG CAPSULE"},{"code":"DMDON000808","desc":"(DON) OSELTAMIVIR PHOSPHATE 75MG CAPSULE"},{"code":"DMDON000909","desc":"(DON) PRAZIQUANTEL 600MG TABLET (AVAILABLE UNDER DOH PROGRAM)"},{"code":"DMR000023","desc":"ACETYLCYSTEINE 600MG EFFERVESCENT TABLET"},{"code":"DMR000029","desc":"ACICLOVIR 400MG TABLET"},{"code":"DMR000030","desc":"ACICLOVIR 800MG TABLET"},{"code":"DMR000060","desc":"AMLODIPINE BESILATE 10MG TABLET"},{"code":"DMR000061","desc":"AMLODIPINE BESILATE 5MG TABLET"},{"code":"DMR000066","desc":"AMOXICILLIN TRIHYDRATE 500MG CAPSULE"},{"code":"DMR000079","desc":"APIXABAN 2.5MG TABLET"},{"code":"DMR000088","desc":"ASCORBIC ACID 500MG TABLET"},{"code":"DMR000099","desc":"ASPIRIN 80MG TABLET"},{"code":"DMR000113","desc":"AZITHROMYCIN DIHYDRATE 500MG TABLET"},{"code":"DMR000129","desc":"BETAHISTINE HYDROCHLORIDE 16MG TABLET"},{"code":"DMR000130","desc":"BETAHISTINE HYDROCHLORIDE 24MG TABLET"},{"code":"DMR000138","desc":"BISACODYL 10MG (ADULT) SUPPOSITORY"},{"code":"DMR000148","desc":"BUDESONIDE + FORMOTEROL FUMARATE DIHYDRATE (160 MICROGRAMS BUDESONIDE + 4.5 MICROGRAMS FORMOTEROL) X 60 DOSES WITH APPROPRIATE ACCOMPANYING DISPENSER"},{"code":"DMR000150","desc":"BUDESONIDE 200MCG/DOSE X 200 DOSES DPI"},{"code":"DMR000151","desc":"BUDESONIDE 250MCG/ML,2ML RESPIRATORY SOLUTION FOR NEBULIZATION"},{"code":"DMR000198","desc":"CARVEDILOL 25MG TABLET"},{"code":"DMR000205","desc":"CEFALEXIN MONOHYDRATE 500MG CAPSULE"},{"code":"DMR000212","desc":"CEFIXIME 200MG CAPSULE"},{"code":"DMR000229","desc":"CEFUROXIME AXETIL 500MG TABLET"},{"code":"DMR000234","desc":"CELECOXIB 200MG CAPSULE"},{"code":"DMR000237","desc":"CETIRIZINE DIHYDROCHLORIDE 10MG TABLET"},{"code":"DMR000255","desc":"CICLOSPORIN 100MG CAPSULE"},{"code":"DMR000258","desc":"CICLOSPORIN 25MG CAPSULE"},{"code":"DMR000283","desc":"CLINDAMYCIN HYDROCHLORIDE 300MG CAPSULE"},{"code":"DMR000293","desc":"CLONIDINE HYDROCHLORIDE 75MCG TABLET"},{"code":"DMR000294","desc":"CLOPIDOGREL 75 MG TABLET"},{"code":"DMR000300","desc":"CLOXACILLIN SODIUM 500MG CAPSULE"},{"code":"DMR000301","desc":"CLOZAPINE 100 MG TABLET"},{"code":"DMR000303","desc":"CO-AMOXICLAV (AMOXICILLIN + POTASSIUM CLAVULANATE) 875MG AMOXICILLIN TRIHYDRATE + 125MG POTASSIUM CLAVULANATE TABLET"},{"code":"DMR000306","desc":"CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 500 MG AMOXICILLIN TRIHYDRATE + 125 MG POTASSIUM CLAVULANATE PER TABLET"},{"code":"DMR000319","desc":"COTRIMOXAZOLE (SULFAMETHOXAZOLE + TRIMETHOPRIM) 800 MG SULFAMETHOXAZOLE + 160 MG TRIMETHOPRIM TABLET"},{"code":"DMR000333","desc":"DAPAGLIFLOZIN 10MG TABLET"},{"code":"DMR000340","desc":"DEXAMETHASONE 4MG TABLET"},{"code":"DMR000352","desc":"DICLOFENAC SODIUM 50MG TABLET/CAPSULE/ENTERIC COATED TABLET/MR TABLET"},{"code":"DMR000360","desc":"DIGOXIN 250MCG TABLET"},{"code":"DMR000363","desc":"DIGOXIN 50MCG/ML ELIXIR, 60ML BOTTLE"},{"code":"DMR000394","desc":"DOXYCYCLINE HYCLATE 100MG CAPSULE"},{"code":"DMR000422","desc":"ESCITALOPRAM 10 MG TABLET"},{"code":"DMR000450","desc":"FLUCONAZOLE 150MG CAPSULE"},{"code":"DMR000451","desc":"FLUCONAZOLE 200MG CAPSULE"},{"code":"DMR000505","desc":"GABAPENTIN 100MG CAPSULE"},{"code":"DMR000506","desc":"GABAPENTIN 300MG CAPSULE"},{"code":"DMR000548","desc":"HYOSCINE N-BUTYL BROMIDE 10MG TABLET"},{"code":"DMR000562","desc":"INDACATEROL MALEATE + GLYCOPYRRONIUM BROMIDE 110 MCG + 50 MCG INHALATION POWDER IN HARD CAPSULES"},{"code":"DMR000589","desc":"IRBESARTAN + HYDROCHLOROTHIAZIDE 150MG IRBESARTAN + 12.5MG HYDROCHLOROTHIAZIDE TABLET"},{"code":"DMR000590","desc":"IRBESARTAN 150MG TABLET"},{"code":"DMR000607","desc":"ISOXSUPRINE HYDROCHLORIDE 10MG TABLET"},{"code":"DMR000634","desc":"LEVETIRACETAM 250MG FILM COATED TABLET"},{"code":"DMR000644","desc":"LEVOFLOXACIN 500MG TABLET"},{"code":"DMR000660","desc":"LINEZOLID 600MG TABLET/FILM-COATED TABLET"},{"code":"DMR000673","desc":"LORATIDINE 10MG TABLET/FILM COATED TABLET"},{"code":"DMR000689","desc":"MEFENAMIC ACID 500MG CAPSULE/TABLET"},{"code":"DMR000700","desc":"METHIMAZOLE (THIAMAZOLE) 5MG TABLET"},{"code":"DMR000722","desc":"METRONIDAZOLE 500MG TABLET"},{"code":"DMR000740","desc":"MONTELUKAST SODIUM 10MG TABLET"},{"code":"DMR000741","desc":"MONTELUKAST SODIUM 4MG CHEWABLE TABLET"},{"code":"DMR000751","desc":"MULTIVITAMINS ADULTS CAPSULE/TABLET"},{"code":"DMR000780","desc":"NIFEDIPINE 10MG CAPSULE"},{"code":"DMR000798","desc":"OLANZAPINE 10MG TABLET"},{"code":"DMR000799","desc":"OMEPRAZOLE 20MG CAPSULE"},{"code":"DMR000806","desc":"ORAL REHYDRATION SALTS (ORS-75 REPLACEMENT) 20.5G SACHET"},{"code":"DMR000844","desc":"PARACETAMOL 250MG SUPPOSITORY"},{"code":"DMR000846","desc":"PARACETAMOL 500MG TABLET"},{"code":"DMR000877","desc":"PHENOXYMETHYL PENICILIN 250MG TABLET/CAPSULE"},{"code":"DMR000905","desc":"POTASSIUM CHLORIDE 600MG TABLET"},{"code":"DMR000937","desc":"QUETIAPINE FUMARATE 25MG TABLET"},{"code":"DMR000966","desc":"RISPERIDONE 2MG TABLET"},{"code":"DMR000973","desc":"ROSUVASTATIN CALCIUM 10MG TABLET"},{"code":"DMR000975","desc":"ROSUVASTATIN CALCIUM 20MG TABLET"},{"code":"DMR000976","desc":"SACUBITRIL/VALSARTAN 100MG TABLET"},{"code":"DMR000977","desc":"SACUBITRIL/VALSARTAN 200MG TABLET"},{"code":"DMR000978","desc":"SACUBITRIL/VALSARTAN 50MG TABLET"},{"code":"DMR000981","desc":"SALBUTAMOL SULFATE MDI 100MCG/DOSE X 200 ACTUATIONS"},{"code":"DMR000986","desc":"SEVELAMER CARBONATE 800MG TABLET"},{"code":"DMR000998","desc":"SODIUM BICARBONATE 325MG TABLET"},{"code":"DMR001000","desc":"SODIUM BICARBONATE 650 MG TABLET"},{"code":"DMR001008","desc":"SPIRONOLACTONE 25MG TABLET"},{"code":"DMR001011","desc":"SPIRONOLACTONE 50MG TABLET"},{"code":"DMR001022","desc":"SUCRALFATE 1G TABLET"},{"code":"DMR001057","desc":"TOLVAPTAN 15MG TABLET"},{"code":"DMR001074","desc":"TRIMETAZIDINE HYDROCHLORIDE 35MG TABLET"},{"code":"DMR001095","desc":"VALGANCICLOVIR 450 MG TABLET"},{"code":"DMR000378","desc":"DIVALPROEX SODIUM 250 MG TABLET"},{"code":"DMR000379","desc":"DIVALPROEX SODIUM 500MG CONTROLLED RELEASE TABLET"},{"code":"DMR001102","desc":"VALSARTAN 80MG TABLET/FILM COATED TABLET"},{"code":"DMR001114","desc":"VITAMIN B COMPLEX (VITAMIN B1 B6 B12) 100 MG B1 + 5 MG B6 + 50 MCG B12 TABLET/CAPSULE"},{"code":"DMR001119","desc":"WARFARIN SODIUM 2.5MG TABLET"},{"code":"DMDON000652","desc":"(DON) LIDOCAINE HYDROCHLORIDE 2% (20MG/ML) 50ML AMPULE/VIAL (IM/IV)"},{"code":"DMDON000803","desc":"(DON) ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMCSP000002","desc":"(DONCSP) CISPLATIN 1MG/ML, 50ML VIAL (IV)"},{"code":"DMR000028","desc":"ACICLOVIR 25MG/ML, 10ML VIAL (IV INFUSION)"},{"code":"DMR000048","desc":"AMIKACIN SULFATE 125MG/ML,2ML VIAL"},{"code":"DMR000049","desc":"AMIKACIN SULFATE 250MG/ML, 2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000050","desc":"AMIKACIN SULFATE 50MG/ML, 2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000087","desc":"ASCORBIC ACID 250MG/ML, 2ML AMPULE (IV)"},{"code":"DMR000109","desc":"ATROPINE SULFATE 1MG/ML, 1ML AMPULE (IM,IV,SC)"},{"code":"DMR000112","desc":"AZITHROMYCIN DIHYDRATE 500MG POWDER, VIAL (IV INFUSION)"},{"code":"DMR000157","desc":"BUPIVACAINE HYDROCHLORIDE 0.5% + 8% DEXTROSE, 4ML AMPULE"},{"code":"DMR000155","desc":"BUPIVACAINE HYDROCHLORIDE 0.5%, 10ML AMPULE (ISOBARIC)"},{"code":"DMR000159","desc":"BUTORPHANOL TARTRATE 2MG/ML,1ML AMPULE/VIAL (IM,IV)."},{"code":"DMR000168","desc":"CALCIUM GLUCONATE 10%, 10ML VIAL/AMPULE (IV)"},{"code":"DMR000209","desc":"CEFEPIME HYDROCHLORIDE 2 G VIAL (IM,IV)"},{"code":"DMR001128","desc":"CLINDAMYCIN PHOSPHATE 150 MG/ML,2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000328","desc":"CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 1ML VIAL/AMPULE"},{"code":"DMR000380","desc":"DOBUTAMINE HYDROCHLORIDE 50MG/ML, 5ML AMPULE (IV INFUSION)"},{"code":"DMR000389","desc":"DOPAMINE HYDROCHLORIDE 40MG/ML, 5ML VIAL/AMPULE (IV)"},{"code":"DMR000401","desc":"ENOXAPARIN SODIUM 100MG/ML, 0.4ML PRE‐FILLED SYRINGE (SC)"},{"code":"DMR000411","desc":"EPINEPHRINE HYDROCHLORIDE 1MG/ML, 1ML AMPULE (IV, IM,SC)"},{"code":"DMR000489","desc":"FUROSEMIDE 10MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMR000511","desc":"GADOTERIC ACID, 0.5 MMOL/ML SOLUTION FOR INJECTION, 10 ML VIAL"},{"code":"DMR000522","desc":"GOSERELIN ACETATE 3.6 MG DEPOT SOLUTION, PRE‐FILLED SYRINGE (SC)"},{"code":"DMR000525","desc":"HEPARIN SODIUM 5000IU/ML,5ML VIAL"},{"code":"DMR000534","desc":"HYDRALAZINE HYDROCHLORIDE 20MG/ML, 1ML AMPULE (IM,IV)"},{"code":"DMR000541","desc":"HYDROCORTISONE SODIUM SUCCINATE POWDER 250MG VIAL (IV)"},{"code":"DMR000571","desc":"IOHEXOL 300MG IODINE/ML, 100 ML VIAL"},{"code":"DMR000573","desc":"IOHEXOL 350MG IODINE/ML, 100 ML VIAL"},{"code":"DMR000586","desc":"IPRATROPIUM + SALBUTAMOL (500MCG IPRATROPIUM BROMIDE + 2.5MG SALBUTAMOL), 2.5ML NEBULE"},{"code":"DMR000594","desc":"IRON SUCROSE 20MG/ML, 5ML AMPULE"},{"code":"DMR000595","desc":"ISOFLURANE INHALATION 100ML BOTTLE"},{"code":"DMR000602","desc":"ISOSORBIDE DINITRATE 1MG/ML, 10ML AMPULE (IV)"},{"code":"DMR000630","desc":"LEUPRORELINE ACETATE 11.25 MG DEPOT SOLUTION, VIAL WITH SYRINGE (IM, SC)"},{"code":"DMR000631","desc":"LEUPRORELINE ACETATE 3.75 MG/ 2 ML VIAL WITH SYRINGE (IM, SC) POWDER"},{"code":"DMR000637","desc":"LEVETIRACETAM 500MG/5 ML (100 MG/ML) CONCENTRATE SOLUTION FOR IV INFUSION, 5 ML VIAL"},{"code":"DMR000643","desc":"LEVOFLOXACIN (0.5% W/V), 5MG/ML, OPHTHALMIC SOLUTION"},{"code":"DMR000675","desc":"LOSARTAN + HYDROCHLOROTHIAZIDE (50 MG LOSARTAN + 12.5 MG HYDROCHLOROTHIAZIDE) TABLET"},{"code":"DMR000715","desc":"METHYLPREDNISOLONE SODIUM SUCCINATE POWDER 1G/16ML + DILUENT VIAL (IM, IV, IV INFUSION)"},{"code":"DMR000716","desc":"METHYLPREDNISONLONE SODIUM SUCCINATE POWDER 500MG/8.0ML + DILUENT VIAL (IM, IV, IV INFUSION)"},{"code":"DMR000787","desc":"NOREPINEPHRINE BITARTRATE 1MG/ML, 2ML AMPULE (IV INFUSION)"},{"code":"DMR000789","desc":"NOREPINEPHRINE BITARTRATE 2MG/ML, 4ML AMPULE (8MG/4ML) SOLUTION FOR INJECTION"},{"code":"DMR000803","desc":"ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMR000826","desc":"OXYTOCIN 10 IU/ML, 1 ML AMPULE (IM,IV)"},{"code":"DMR000830","desc":"PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)"},{"code":"DMR000894","desc":"PHYTOMENADIONE 10MG/ML ,1ML AMPULE (IM,IV,SC)"},{"code":"DMR000902","desc":"POLYMYXIN B SULFATE 500,000 UNITS POWDER FOR SOLUTION FOR INJECTION (INTRATHECAL/IM/IV), 5ML VIAL"},{"code":"DMR000904","desc":"POTASSIUM CHLORIDE 2MEQ/ML, 20ML VIAL (IV INFUSION)"},{"code":"DMR000925","desc":"PROPRANOLOL HYDROCHLORIDE 40MG TABLET"},{"code":"DMR000948","desc":"RANITIDINE 300MG TABLET"},{"code":"DMR000972","desc":"ROPIVACAINE HYDROCHLORIDE 10MG/ML ,10ML AMPULE (IV)"},{"code":"DMR001001","desc":"SODIUM CHLORIDE 2.5MEQ/ML , 20ML VIAL"},{"code":"DMR001023","desc":"SUGAMMADEX 100MG/ML SOLUTION FOR INJECTION, 2ML VIAL (IV)"},{"code":"DMR001066","desc":"TRAMADOL HYDROCHLORIDE 50MG/ML,2ML AMPULE (IM,SC,IV)"},{"code":"DMR001068","desc":"TRANEXAMIC ACID 100MG/ML, 5ML AMPULE (IM,IV)"},{"code":"DMR001103","desc":"VANCOMYCIN HYDROCHLORIDE 1G VIAL (IV)"},{"code":"DMR001113","desc":"VITAMIN B COMPLEX (IV) (VITAMIN B1 B6 B12) 100 MG B1 + 100 MG B6 + 1 MG B12, 3 ML AMPULE (IV)"},{"code":"DMR001117","desc":"VORICONAZOLE 200MG LYOPHILIZED POWDER FOR SOLUTION FOR IV INFUSION, 30ML VIAL"},{"code":"DMC000861","desc":"(C) PHENOBARBITAL 15 MG TABLET"},{"code":"DMC000868","desc":"(C) PHENOBARBITAL 30 MG TABLET"},{"code":"DMC000871","desc":"(C) PHENOBARBITAL 60 MG TAB"},{"code":"DMC000873","desc":"(C) PHENOBARBITAL 90 MG TABLET"},{"code":"DMDON001127","desc":"(DON) OXYCODONE HYDROCHLORIDE 10MG/ML, 2ML AMPULE (IV INFUSION)"},{"code":"DMCSP000004","desc":"(DONCSP) FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)"},{"code":"DMR000348","desc":"DIAZEPAM 5MG/ML, 2ML AMPULE (IM, IV)"},{"code":"DMR000409","desc":"EPHEDRINE SULFATE 30MG/ML, 1ML AMPULE (IM, IV)"},{"code":"DMR000410","desc":"EPHEDRINE SULFATE 50MG/ML, 1ML AMPULE (IM, IV)"},{"code":"DMR000438","desc":"FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)"},{"code":"DMR000611","desc":"KETAMINE HYDROCHLORIDE 50MG/ML, 10ML VIAL (IM/IV)"},{"code":"DMR000730","desc":"MIDAZOLAM 1MG/ML, 5ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000731","desc":"MIDAZOLAM 5MG/ML, 1ML AMPULE (IM,IV)"},{"code":"DMR000732","desc":"MIDAZOLAM 5MG/ML, 3ML AMPULE (IM,IV)"},{"code":"DMR000746","desc":"MORPHINE SULFATE 10MG TABLET/CAPSULE"},{"code":"DMR000747","desc":"MORPHINE SULFATE 10MG/ML, 1ML AMPULE (IM,IV,SC)"},{"code":"DMR000764","desc":"NALBUPHINE HYDROCHLORIDE 10MG/ML, 1ML AMPULE (IM, IV, SC)"},{"code":"DMR000857","desc":"PETHIDINE (MEPERIDINE) HYDROCHLORIDE 50MG/ML, 2ML AMPULE (IM, IV, SC)"},{"code":"DMDON000412","desc":"(DON) EPIRUBICIN HCL 50MG VIAL CSPMAP"},{"code":"DMR000074","desc":"ANASTRAZOLE 1MG FILM COATED TABLET"},{"code":"DMR000174","desc":"CAPECITABINE 500MG TABLET"},{"code":"DMR000192","desc":"CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)"},{"code":"DMR000275","desc":"CISPLATIN 1MG/ML, 50ML VIAL (IV)"},{"code":"DMR000382","desc":"DOCETAXEL ANHYDROUS 20MG/0.5 ML, 0.5ML VIAL (IV INFUSION)"},{"code":"DMR000383","desc":"DOCETAXEL ANHYDROUS 40MG/ML, 2ML (80MG/2ML) VIAL (IV INFUSION)"},{"code":"DMR000412","desc":"EPIRUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)"},{"code":"DMR000546","desc":"HYDROXYUREA 500MG CAPSULE"},{"code":"DMR000557","desc":"IMATINIB 100MG TABLET"},{"code":"DMR000593","desc":"IRINOTECAN HYDROCHLORIDE 40MG/2ML VIAL, CONCENTRATE, VIAL (IV INFUSION)"},{"code":"DMR000628","desc":"LETROZOLE 2.5MG TABLET/FILM-COATED TABLET"},{"code":"DMR000696","desc":"MESNA (SODIUM-2- MERCAPTOETHANESULPHONATE) 100MG/ML, 4ML AMPULE"},{"code":"DMR001027","desc":"TAMOXIFEN CITRATE 20MG TABLET"},{"code":"DMR001125","desc":"ZOLEDRONIC ACID (4MG/5ML CONCENTRATED SOLUTION FOR IV INFUSION) VIAL"},{"code":"DMR000019","desc":"ACETYLCYSTEINE 100MG/ML, 3ML AMPULE SOLUTION FOR INHALATION"},{"code":"DMR000021","desc":"ACETYLCYSTEINE 200 MG/ML, 25 ML BOTTLE (IV INFUSION)"},{"code":"DMR000065","desc":"AMOXICILLIN TRIHYDRATE 250MG/5ML GRANULES/POWDER FOR SUSPENSION, 60ML BOTTLE"},{"code":"DMR000084","desc":"ASCORBIC ACID 100MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000110","desc":"AZITHROMYCIN DIHYDRATE 200MG/5ML POWDER FOR SUSPENSION, 15ML BOTTLE"},{"code":"DMR000236","desc":"CETIRIZINE DIHYDROCHLORIDE 10 MG/ML DROPS, 10 ML BOTTLE"},{"code":"DMR000239","desc":"CETIRIZINE DIHYDROCHLORIDE 1MG/ML SOLUTION 60 ML BOTTLE"},{"code":"DMR000240","desc":"CETIRIZINE DIHYDROCHLORIDE 2.5MG/ML SYRUP ORAL DROPS, 10ML BOTTLE"},{"code":"DMR000241","desc":"CETIRIZINE DIHYDROCHLORIDE 5MG/5ML SYRUP, 60 ML BOTTLE"},{"code":"DMR000305","desc":"CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 400 MG AMOXICILLIN TRIHYDRATE + 57 MG POTASSIUM CLAVULANATE PER 5 ML GRANULES/POWDER FOR SUSPENSION, 70 ML BOTTLE"},{"code":"DMR000371","desc":"DIPHENHYDRAMINE HYDROCHLORIDE 12.5MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000533","desc":"HUMAN RECOMBINANT TISSUE TYPE PLASMINOGEN ACTIVATOR (ALTEPLASE) 50MG POWDER FOR IV INFUSION"},{"code":"DMR000724","desc":"METRONIDAZOLE BENZOATE 125MG/5ML, SUSPENSION 60ML BOTTLE"},{"code":"DMR000750","desc":"MOXIFLOXACIN HYDROCHLORIDE 5MG/ML (0.5% W/V) STERILE OPHTHALMIC SOLUTION, 5 ML BOTTLE"},{"code":"DMR000754","desc":"MULTIVITAMINS PER 5ML,60ML SYRUP BOTTLE"},{"code":"DMR000760","desc":"MUPIROCIN OINTMENT 2% 5G TUBE"},{"code":"DMR000791","desc":"NYSTATIN 100,000 UNITS/ML, SUSPENSION 30ML BOTTLE"},{"code":"DMR000835","desc":"PARACETAMOL 100MG/ML DROPS, 15ML BOTTLE"},{"code":"DMR000843","desc":"PARACETAMOL 250MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000891","desc":"PHENYTOIN SODIUM 100MG CAPSULE"},{"code":"DMR000906","desc":"POTASSIUM CHLORIDE 750MG DURULES TABLET"},{"code":"DMR000988","desc":"SILVER SULFADIAZINE CREAM 1% ,15G TUBE"},{"code":"DMR000989","desc":"SILVER SULFADIAZINE CREAM 1% ,25G TUBE"},{"code":"DMR000990","desc":"SILVER SULFADIAZINE CREAM 1% ,500G JAR"},{"code":"DMR001002","desc":"SODIUM HYALURONATE OPHTHALMIC SOLUTION 0.1% (1MG/ML), 5ML BOTTLE"},{"code":"DMR001051","desc":"TOBRAMYCIN + DEXAMETHASONE EYE DROP SUSPENSION 0.3% + 0.1%, 5ML BOTTLE"},{"code":"DMR001075","desc":"TROPICAMIDE+ PHENYLEPHRINE HYDROCHLORIDE 5MG + 5MG/ML EYE DROPS FIXED DOSE COMBINATION, 10ML BOTTLE"},{"code":"DMDON000944","desc":"(DON) RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)"},{"code":"DMDON000943","desc":"(DON) VACCINE, RABIES (CHICK EMBRYO CELL) PURIFIED INACTIVATED 2.5 IU/ ML, 1 DOSE + 1 ML DILUENT VIAL ( WHO PRE-QUALIFIED)"},{"code":"DMR000067","desc":"AMPHOTERICIN B (LIPID COMPLEX) 50MG VIAL (IV INFUSION)"},{"code":"DMR000068","desc":"AMPHOTERICIN B (NON-LIPID COMPLEX) 50MG LYOPHILIZED POWDER,VIAL (IV INFUSION)"},{"code":"DMR000078","desc":"ANTI-TETANUS SERUM (EQUINE) 1500 IU/0.7ML SOLUTION FOR INJECTION AMPULE/VIAL (IM)"},{"code":"DMR000107","desc":"ATRACURIUM BESILATE 10MG/ML, 2.5ML AMPULE (IV)"},{"code":"DMR000123","desc":"BCG VACCINE 500MCG/ML VIAL + 1ML DILUENT IN AMPULE (ID) 20 DOSES"},{"code":"DMR000126","desc":"BERACTANT 25MG/ML SUSPENSION, 4ML VIAL (INTRATRACHEAL ADMINISTRATION)"},{"code":"DMR000127","desc":"BERACTANT 25MG/ML SUSPENSION, 8ML VIAL (INTRATRACHEAL ADMINISTRATION)"},{"code":"DMR000136","desc":"BIPHASIC ISOPHANE HUMAN INSULIN 70/30 (RECOMBINANT DNA) ,70% ISOPHANE SUSPENSION + 30% SOLUBLE INSULIN IN 100 IU/ML, 10ML VIAL (SC)"},{"code":"DMR000193","desc":"CARBOPROST 125MCG/ML, 0.5ML SOLUTION FOR INJECTION"},{"code":"DMR000194","desc":"CARBOPROST 250MCG/ML SOLUTION FOR INJECTION,1ML AMPULE/VIAL"},{"code":"DMR000413","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 10,000 IU/ML, PRE-FILLED SYRINGE (IV,SC)"},{"code":"DMR000415","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4,000 IU/0.4 ML, PRE‐FILLED SYRINGE (IV,SC)"},{"code":"DMR000445","desc":"FILGRASTIM (G-CSF) 300MCG/ML 0.5 ML SOLUTION FOR INJECTION IN PREFILLED SYRINGE (IV, SC)"},{"code":"DMR000448","desc":"FILGRASTIM 300MCG, 0.9ML PRE FILLED SYRINGE,"},{"code":"DMR000526","desc":"HEPATITIS A INACTIVATED VACCINE VIRAL ANTIGEN NOT LESS THAN 1440 EU IN 1.0 ML MONODOSE VIAL (IM) (ADULT)"},{"code":"DMR000527","desc":"HEPATITIS B IMMUNOGLOBULIN (HUMAN) 0.5ML VIAL (IM)"},{"code":"DMR000528","desc":"HEPATITIS B VACCINE (RECOMBINANT DNA) 20 MICROGRAMS/ML MONODOSE VIAL (IM) ADULT"},{"code":"DMR000529","desc":"HEPATITIS B VACCINE (RECOMBINANT DNA)10MCG/0.5ML MONODOSE VIAL (IM) (PEDIATRIC"},{"code":"DMR001133","desc":"IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 200ML VIAL (IV)"},{"code":"DMR000559","desc":"IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 100ML VIAL (IV)"},{"code":"DMR000563","desc":"INFLUENZA POLYVALENT VACCINE 0.5ML, SUSPENSION FOR INJECTION ( VAXIGRIP TETRA PRE-FILED SYRINGE)"},{"code":"DMR000600","desc":"ISOPHANE INSULIN HUMAN (RECOMBINANT DNA) 100IU/ML, 10ML VIAL (SC)"},{"code":"DMR000792","desc":"OCTREOTIDE ACETATE 100MCG/ML, 1 ML AMPULE (IV INFUSION)"},{"code":"DMR000943","desc":"RABIES VACCINE,CHICK EMBRYO CELL (PURIFIED INACTIVATED) LYOPHILIZED POWDER, 2.5 IU/ML, 1 DOSE VIAL + 1 ML DILUENT (ID, IM)"},{"code":"DMR000944","desc":"RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)"},{"code":"DMR000951","desc":"REGULAR, INSULIN (RECOMBINANT DNA HUMAN) 100 IU/ML, 10ML VIAL (SC, IV/IM)"},{"code":"DMR000971","desc":"ROCURONIUM BROMIDE 10MG/ML, 5ML AMPULE/VIAL (IV)"},{"code":"DMR001025","desc":"SUXAMETHONIUM (SUCCINYLCHOLINE) CHLORIDE 20MG/ML, 10ML VIAL (IV)"},{"code":"DMR001026","desc":"TAFLUPROST OPHTHALMIC SOLUTION 15MCG/ML, 0.3ML BOTTLE SINGLE DOSE"},{"code":"DMR001042","desc":"TETANUS IMMUNOGLOBULIN (HUMAN) 250 IU/ML, 1ML AMPULE (IM)"},{"code":"DMR001044","desc":"TETANUS TOXOID 0.5ML AMPULE (IM)"},{"code":"DMR001106","desc":"VASOPRESSIN 20IU/ML VIAL/AMPULE (IM, IV)"},{"code":"DMR000070","desc":"AMPICILLIN + SULBACTAM (500MG AMPICILLIN + 250MG SULBACTAM) VIAL (IM,IV)"},{"code":"DMR000071","desc":"AMPICILLIN SODIUM 1G VIAL (IM,IV)"},{"code":"DMR000072","desc":"AMPICILLIN SODIUM 250MG VIAL (IM,IV)"},{"code":"DMR000520","desc":"GLUCOSE (DEXTROSE) 50%, 50ML VIAL (IV)"},{"code":"DMR000577","desc":"IOPAMIDOL 755MG/ML EQUIV. TO 370 MG IODINE, 100 ML VIAL/BOTTLE"},{"code":"DMR000656","desc":"LIDOCAINE SPRAY 10%, 50ML BOTTLE"},{"code":"DMR000848","desc":"PENICILLIN G CRYSTALLINE SODIUM (BENZYLPENICILLIN) 1M UNITS VIAL (IM/IV)"},{"code":"DMR000849","desc":"PENICILLIN G CRYSTALLINE SODIUM 5M UNITS VIAL (IM,IV)"},{"code":"DMDON000719","desc":"(DON) (ACTU USE ONLY) METOCLOPRAMIDE HYDROCHLORIDE 5MG/ML, 2ML AMPULE (IM, IV)"},{"code":"DMDON000382","desc":"(DON) (ACTU USE) DOCETAXEL 20MG/0.5ML (40MG/ML),1ML CONCENTRATE FOR SOLUTION FOR INFUSION (AS TRIHYDRATE)"},{"code":"DMDON000804","desc":"(DON) (FOR ACTU USE ONLY) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMDON000329","desc":"(DON) CYTARABINE 100MG/ML, 5ML VIAL CSPMAP"},{"code":"DMDON000383","desc":"(DON) DOCETAXEL 40MG/ML (80MG/2ML), 2ML CONCENTRATE FOR SOLUTION FOR IV INFUSION"},{"code":"DMDON000393","desc":"(DON) DOXORUBICIN 50MG VIAL"},{"code":"DMDON000815","desc":"(DON) OXALIPLATIN 5 MG/ML CONCENTRATE SOLUTION 10 ML VIAL (IV INFUSION)"},{"code":"DMDON000830","desc":"(DON) PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)"},{"code":"DMCSP000012","desc":"(DONCSP)CAPECITABINE 500MG TABLET"},{"code":"DMCSP000014","desc":"(DONCSP) CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)"},{"code":"DMCSP000011","desc":"(DONCSP) LETROZOLE 2.5MG TABLET/FILM-COATED TABLET"},{"code":"DMCSP000005","desc":"(DONCSP) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMCSP000010","desc":"(DONCSP) TAMOXIFEN 20MG TABLET"},{"code":"DMDON000390","desc":"(DON) DOXORUBICIN HCL 10MG VIAL (DOANTION)-CSPMAP"},{"code":"DMDON000967","desc":"(DON) RITUXIMAB 10MG/ML, 10 ML VIAL (IV)"},{"code":"DMDON000968","desc":"(DON) RITUXIMAB 10MG/ML, 50 ML VIAL (IV)"},{"code":"DMCSP000008","desc":"(DONCSP) FILGRASTIM 300MCG/0.9ML SOLUTION (IV,SC), 0.9ML PRE-FILLED SYRINGE"},{"code":"DMR000392","desc":"DOXORUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)"},{"code":"DMR000967","desc":"RITUXIMAB 10MG/ML, 10 ML VIAL (IV)"},{"code":"DMR000968","desc":"RITUXIMAB 10MG/ML, 50 ML VIAL (IV)"},{"code":"DMR001071","desc":"TRASTUZUMAB 150 MG LYOPHILIZED POWDER (IV INFUSION) VIAL"},{"code":"DMR001072","desc":"TRASTUZUMAB 600MG/5ML (120MG/ML) SOLUTION FOR INJECTION, 5ML VIAL"},{"code":"DMR000037","desc":"ALBUMIN, HUMAN 25% 50ML BOTTLE (IV, IV INFUSION)"},{"code":"DMR000166","desc":"CALCIUM CARBONATE 500MG TABLET/CHEWABLE TABLET"},{"code":"DMR000248","desc":"CHLORHEXIDINE GLUCONATE 4% SOLUTION 500 ML BOTTLE"},{"code":"DMR000441","desc":"FERROUS SULFATE + FOLIC ACID 60 MG ELEMENTAL IRON + 400 MICROGRAM FOLIC ACID PER TABLET/CAPSULE/FILM COATED TABLET"},{"code":"DMR000572","desc":"IOHEXOL 300MG IODINE/ML, 50 ML VIAL"},{"code":"DMR000681","desc":"MAGNESIUM SULFATE HEPTAHYDRATE 250MG/ML, 20ML VIAL (IV)"},{"code":"DMDON000558","desc":"(DON) IMATINIB (as mesylate) 400MG TABLET"},{"code":"DMDON000631","desc":"(DON) LEUPRORELINE ACETATE 3.75MG PRE-FILLED SYRINGE"},{"code":"DMDON000829","desc":"(DON) PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL"},{"code":"DMCSP000003","desc":"(DONCSP) ANASTRAZOLE 1MG FILM COATED TABLET"},{"code":"DMR000326","desc":"CYCLOPHOSPHAMIDE POWDER 500MG VIAL (IV)"},{"code":"DMR000329","desc":"CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 5ML VIAL/AMPULE"},{"code":"DMR000804","desc":"ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMR000816","desc":"OXALIPLATIN POWDER 50MG VIAL (IV INFUSION)"},{"code":"DMR000829","desc":"PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL"},{"code":"DMR000416","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4000IU/ML SOLUTION FOR INJECTION, 1ML PREFILLED SYRINGE (IV, SC)"},{"code":"DMR000560","desc":"IMMUNOGLOBULIN NORMAL, HUMAN (IGIV) 50MG/ML, 50ML VIAL (IV)"}];
+
   // Load Inventory from Google Apps Script Backend
   function loadInventory() {
     setLoading(true);
@@ -72,7 +79,7 @@
         .getInventoryData();
     } else {
       // Mock Data for local testing / preview outside Google Apps Script
-      console.warn("Running in preview mode (mock data with Brand & Price)");
+      console.warn("Running in preview mode (mock data with Brand, Price & Sheet1 Master Catalog)");
       setTimeout(() => {
         onInventoryLoaded({
           success: true,
@@ -82,7 +89,8 @@
             { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, isDonation: false, isZeroStock: false },
             { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, isDonation: false, isZeroStock: false },
             { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, isDonation: false, isZeroStock: true }
-          ]
+          ],
+          catalog: DEFAULT_MOCK_DCI_CATALOG
         });
       }, 500);
     }
@@ -96,9 +104,15 @@
     }
 
     state.items = response.items || [];
+    if (response.catalog && Array.isArray(response.catalog) && response.catalog.length > 0) {
+      state.masterCatalog = response.catalog;
+    } else if (!state.masterCatalog || state.masterCatalog.length === 0) {
+      state.masterCatalog = DEFAULT_MOCK_DCI_CATALOG;
+    }
     renderStats();
     applyFilter();
-    setupAutocomplete();
+    populateCatalogDatalists();
+    setupComboboxEvents();
   }
 
   function onApiError(err) {
@@ -476,8 +490,7 @@
           if (res.success) {
             showToast(`${res.message} (${res.mode})`, "success");
             // Clear form
-            document.getElementById('add-code').value = '';
-            document.getElementById('add-desc').value = '';
+            resetDciSelection();
             document.getElementById('add-brand').value = '';
             document.getElementById('add-qty').value = '';
             document.getElementById('add-exp').value = '';
@@ -498,6 +511,11 @@
     } else {
       setLoading(false);
       showToast(`[Mock] Successfully saved ${code} - ${desc} [${brand}] (₱${price.toFixed(2)})`, "success");
+      resetDciSelection();
+      document.getElementById('add-brand').value = '';
+      document.getElementById('add-qty').value = '';
+      document.getElementById('add-exp').value = '';
+      document.getElementById('add-price').value = '';
       switchTab('tab-inventory');
     }
   }
@@ -628,10 +646,330 @@
     btns.forEach(b => b.disabled = isLoading);
   }
 
-  function setupAutocomplete() {
+  // --- MASTER DCI FORMULARY & SEARCHABLE COMBOBOX SYSTEM ---
+  function setupComboboxEvents() {
     const codeInput = document.getElementById('add-code');
-    if (!codeInput) return;
-    codeInput.addEventListener('input', onAddCodeOrDescChange);
+    const descInput = document.getElementById('add-desc');
+    if (!codeInput || !descInput) return;
+
+    // Reset previous listeners
+    codeInput.oninput = handleCodeInput;
+    codeInput.onfocus = () => {
+      renderDropdownItems('code', codeInput.value.trim());
+      openDropdown('code');
+    };
+    codeInput.onkeydown = (e) => handleComboboxKeydown(e, 'code');
+
+    descInput.oninput = handleDescInput;
+    descInput.onfocus = () => {
+      renderDropdownItems('desc', descInput.value.trim());
+      openDropdown('desc');
+    };
+    descInput.onkeydown = (e) => handleComboboxKeydown(e, 'desc');
+
+    // Global outside click listener to close dropdowns
+    document.addEventListener('click', (e) => {
+      const wrapperCode = document.getElementById('combobox-code-wrapper');
+      const wrapperDesc = document.getElementById('combobox-desc-wrapper');
+      const inCode = wrapperCode && wrapperCode.contains(e.target);
+      const inDesc = wrapperDesc && wrapperDesc.contains(e.target);
+
+      if (!inCode && !inDesc) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  function handleCodeInput(e) {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const q = codeInput.value.trim();
+    updateClearBtn('add-code', q);
+    renderDropdownItems('code', q);
+    openDropdown('code');
+
+    // Bi-directional Auto-Sync: Exact match on DCI Code immediately sets Generic Description
+    if (q && state.masterCatalog && state.masterCatalog.length > 0) {
+      const match = state.masterCatalog.find(item => item.code.toUpperCase() === q.toUpperCase());
+      if (match && match.desc) {
+        descInput.value = match.desc;
+        updateClearBtn('add-desc', match.desc);
+      }
+    }
+
+    onAddCodeOrDescChange();
+  }
+
+  function handleDescInput(e) {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const q = descInput.value.trim();
+    updateClearBtn('add-desc', q);
+    renderDropdownItems('desc', q);
+    openDropdown('desc');
+
+    // Bi-directional Auto-Sync: Exact match on Generic Description immediately sets DCI Code
+    if (q && state.masterCatalog && state.masterCatalog.length > 0) {
+      const match = state.masterCatalog.find(item => item.desc.toUpperCase() === q.toUpperCase());
+      if (match && match.code) {
+        codeInput.value = match.code;
+        updateClearBtn('add-code', match.code);
+      }
+    }
+
+    onAddCodeOrDescChange();
+  }
+
+  function toggleComboboxDropdown(type, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const dropdown = document.getElementById(`dropdown-${type}`);
+    if (!dropdown) return;
+
+    if (state.activeDropdown === type) {
+      closeAllDropdowns();
+    } else {
+      closeAllDropdowns();
+      const input = document.getElementById(type === 'code' ? 'add-code' : 'add-desc');
+      renderDropdownItems(type, input ? input.value.trim() : '');
+      openDropdown(type);
+      if (input) input.focus();
+    }
+  }
+
+  function openDropdown(type) {
+    closeAllDropdowns();
+    const dropdown = document.getElementById(`dropdown-${type}`);
+    if (dropdown) {
+      dropdown.style.display = 'block';
+      state.activeDropdown = type;
+      state.focusedIndex = -1;
+    }
+  }
+
+  function closeAllDropdowns() {
+    const dropCode = document.getElementById('dropdown-code');
+    const dropDesc = document.getElementById('dropdown-desc');
+    if (dropCode) dropCode.style.display = 'none';
+    if (dropDesc) dropDesc.style.display = 'none';
+    state.activeDropdown = null;
+    state.focusedIndex = -1;
+  }
+
+  function updateClearBtn(inputId, value) {
+    const btn = document.getElementById(inputId === 'add-code' ? 'btn-clear-code' : 'btn-clear-desc');
+    if (btn) {
+      btn.style.display = value ? 'flex' : 'none';
+    }
+  }
+
+  function renderDropdownItems(type, query) {
+    const listEl = document.getElementById(`list-${type}`);
+    const countEl = document.getElementById(`count-${type}-matches`);
+    if (!listEl) return;
+
+    const catalog = state.masterCatalog || [];
+    const qLower = (query || '').toLowerCase().trim();
+
+    let matches = [];
+    if (!qLower) {
+      matches = catalog;
+    } else {
+      matches = catalog.filter(item => {
+        const c = item.code.toLowerCase();
+        const d = item.desc.toLowerCase();
+        return c.includes(qLower) || d.includes(qLower);
+      }).sort((a, b) => {
+        const aCodeMatch = a.code.toLowerCase().startsWith(qLower);
+        const bCodeMatch = b.code.toLowerCase().startsWith(qLower);
+        const aDescMatch = a.desc.toLowerCase().startsWith(qLower);
+        const bDescMatch = b.desc.toLowerCase().startsWith(qLower);
+
+        if (type === 'code') {
+          if (aCodeMatch && !bCodeMatch) return -1;
+          if (!aCodeMatch && bCodeMatch) return 1;
+        } else {
+          if (aDescMatch && !bDescMatch) return -1;
+          if (!aDescMatch && bDescMatch) return 1;
+        }
+        return a.desc.localeCompare(b.desc);
+      });
+    }
+
+    if (countEl) {
+      countEl.textContent = `${matches.length} item${matches.length !== 1 ? 's' : ''}`;
+    }
+
+    if (matches.length === 0) {
+      listEl.innerHTML = `
+        <div class="dropdown-empty">
+          <div>🔍 No exact matches in Sheet1 Master Catalog.</div>
+          <div class="dropdown-empty-hint">You can still use this as a brand new medicine entry.</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Render top 60 matches for optimal scrolling performance
+    const displayList = matches.slice(0, 60);
+    listEl.innerHTML = displayList.map((item, idx) => {
+      const codeHtml = highlightText(item.code, qLower);
+      const descHtml = highlightText(item.desc, qLower);
+
+      if (type === 'code') {
+        return `
+          <div class="dropdown-item" data-index="${idx}" onclick="selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
+            <span class="dropdown-item-code">${codeHtml}</span>
+            <span class="dropdown-item-desc">${descHtml}</span>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="dropdown-item" data-index="${idx}" onclick="selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
+            <span class="dropdown-item-desc">${descHtml}</span>
+            <span class="dropdown-item-code">${codeHtml}</span>
+          </div>
+        `;
+      }
+    }).join('');
+  }
+
+  function handleComboboxKeydown(e, type) {
+    const dropdown = document.getElementById(`dropdown-${type}`);
+    if (!dropdown || dropdown.style.display === 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        openDropdown(type);
+        renderDropdownItems(type, e.target.value.trim());
+      }
+      return;
+    }
+
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    if (items.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      state.focusedIndex = (state.focusedIndex + 1) % items.length;
+      updateDropdownFocus(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      state.focusedIndex = (state.focusedIndex - 1 + items.length) % items.length;
+      updateDropdownFocus(items);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (state.focusedIndex >= 0 && state.focusedIndex < items.length) {
+        items[state.focusedIndex].click();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAllDropdowns();
+    }
+  }
+
+  function updateDropdownFocus(items) {
+    items.forEach((item, i) => {
+      if (i === state.focusedIndex) {
+        item.classList.add('focused');
+        item.scrollIntoView({ block: 'nearest' });
+      } else {
+        item.classList.remove('focused');
+      }
+    });
+  }
+
+  function selectDciItem(code, desc) {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const brandInput = document.getElementById('add-brand');
+
+    if (codeInput) {
+      codeInput.value = code;
+      updateClearBtn('add-code', code);
+    }
+    if (descInput) {
+      descInput.value = desc;
+      updateClearBtn('add-desc', desc);
+    }
+
+    closeAllDropdowns();
+    onAddCodeOrDescChange();
+
+    // Smooth workflow: focus brand name for incoming delivery
+    if (brandInput && !brandInput.value) {
+      setTimeout(() => brandInput.focus(), 60);
+    }
+  }
+
+  function clearAddInput(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.value = '';
+      updateClearBtn(inputId, '');
+      input.focus();
+      closeAllDropdowns();
+      onAddCodeOrDescChange();
+    }
+  }
+
+  function resetDciSelection() {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const previewBox = document.getElementById('add-batch-preview');
+
+    if (codeInput) {
+      codeInput.value = '';
+      updateClearBtn('add-code', '');
+    }
+    if (descInput) {
+      descInput.value = '';
+      updateClearBtn('add-desc', '');
+    }
+    if (previewBox) {
+      previewBox.style.display = 'none';
+    }
+
+    closeAllDropdowns();
+    if (codeInput) codeInput.focus();
+  }
+
+  function highlightText(text, query) {
+    if (!text) return '';
+    if (!query) return escapeHtml(text);
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    return escapeHtml(text).replace(regex, '<mark class="dropdown-highlight">$1</mark>');
+  }
+
+  function escapeJs(str) {
+    if (!str) return '';
+    return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  }
+
+  function populateCatalogDatalists() {
+    const codeList = document.getElementById('dci-codes-datalist');
+    const descList = document.getElementById('generic-names-datalist');
+    const badge = document.getElementById('catalog-count-badge');
+
+    if (!state.masterCatalog || state.masterCatalog.length === 0) return;
+
+    if (codeList) {
+      codeList.innerHTML = state.masterCatalog.map(item => 
+        `<option value="${escapeHtml(item.code)}">${escapeHtml(item.desc)}</option>`
+      ).join('');
+    }
+
+    if (descList) {
+      descList.innerHTML = state.masterCatalog.map(item => 
+        `<option value="${escapeHtml(item.desc)}">${escapeHtml(item.code)}</option>`
+      ).join('');
+    }
+
+    if (badge) {
+      badge.textContent = `📋 ${state.masterCatalog.length} in Sheet1`;
+      badge.style.display = 'inline-block';
+    }
   }
 
   function escapeHtml(text) {
@@ -644,3 +982,4 @@
       .replace(/'/g, "&#039;");
   }
 </script>
+

@@ -8,18 +8,21 @@ An automated Google Apps Script (GAS) application and data analysis suite for ma
 
 1. **Brand Name & Acquisition Price Batch Tracking**:
    - Every batch under a DCI Code and Generic Name is individually distinguished by its **Brand Name**, **Expiry Date**, and **Acquisition Price** (₱ / unit).
-2. **Smart Batch Grouping & Insertion (`sheet.insertRowAfter`)**:
+2. **Sheet1 Master Formulary Auto-Sync & Dual Comboboxes**:
+   - Bi-directional auto-sync between **DCI Item Code** and **Generic Description** sourced directly from the **`Sheet1`** master formulary catalog tab.
+   - Interactive searchable floating dropdowns with keyboard navigation, match highlighting, and 1-click field reset (`✕`).
+3. **Smart Batch Grouping & Insertion (`sheet.insertRowAfter`)**:
    - When registering a new delivery for an existing medicine (e.g., `DMR000451 FLUCONAZOLE`), the system detects existing batches and inserts the new row **directly below the latest batch** of that medicine in Google Sheets.
    - Brand new medicines are automatically appended to the inventory master list.
-3. **Stock-Out Dispensing & Real-Time Balance**:
+4. **Stock-Out Dispensing & Real-Time Balance**:
    - 1-click modal to deduct dispensed quantities from the specific brand batch with stock overdraft prevention.
    - Automatically computes total dispensed monetary valuation (`Qty Out × Acquisition Price`).
    - Instantly updates `QTY STORAGE` in Google Sheets.
-4. **Automated Financial Audit Logging (`STOCK_OUT_LOG`)**:
+5. **Automated Financial Audit Logging (`STOCK_OUT_LOG`)**:
    - Records every transaction with timestamps, DCI code, generic name, brand name, batch expiry, unit acquisition price, quantity deducted, total value dispensed, remaining balance, department/remarks, and user credentials.
-5. **Zero-Stock Replenishment & In-Place Editing**:
+6. **Zero-Stock Replenishment & In-Place Editing**:
    - Dedicated tab to review 0-quantity items, update the brand name, incoming expiry date, acquisition price, and replenish storage quantity.
-6. **FEFO Expiry Risk Classification**:
+7. **FEFO Expiry Risk Classification**:
    - 🔴 **2026 Critical / Immediate Risk** (FEFO priority dispensing)
    - 🟠 **2027 Near-Term Risk**
    - 🟢 **2028+ Safe Stock**

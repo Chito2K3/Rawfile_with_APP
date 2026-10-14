@@ -60,8 +60,13 @@ Inside the Apps Script editor, copy and paste the code from each of the files in
 
 ### 1. ➕ Adding a Medicine or New Batch Delivery
 * Go to the **Add Medicine / New Batch** tab.
-* Type the **Item Code (DCI)**:
-  * **If the medicine already exists** (e.g. `DMR000451` Fluconazole): The system automatically detects previous batches and shows existing brands, quantities, and prices. The new batch is **automatically inserted directly below the last batch** of that medicine!
+* **Master Formulary Dropdowns (`Sheet1` Sync)**:
+  * Both **Item Code (DCI)** and **Generic Description** are now **searchable dropdowns** dynamically populated from the **`Sheet1`** master catalog tab.
+  * Selecting or typing a **DCI Code** (e.g. `DMR000002`) immediately auto-fills the matching **Generic Description**.
+  * Selecting or typing a **Generic Description** immediately auto-fills the matching **DCI Code**.
+  * Click the **✕** button beside either input to quickly clear and pick another medicine.
+* **Smart Batch Grouping & Insertion**:
+  * **If the medicine already exists in storage** (e.g. `DMR000451` Fluconazole): The system automatically detects previous batches and shows existing brands, quantities, and prices. The new batch is **automatically inserted directly below the last batch** in Google Sheets!
   * **If brand new**: Appends to the master list.
 * Input the **Brand Name** (required), **Storage Quantity**, **Expiry Date**, and **Acquisition Price** (₱ / unit).
 * Click **Save & Insert into Sheet**.

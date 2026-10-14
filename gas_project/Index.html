@@ -138,24 +138,87 @@
       <!-- TAB 2: ADD MEDICINE / SMART BATCH INSERTION -->
       <section id="tab-add" class="tab-pane">
         <div class="form-card">
-          <h2 class="form-title">Add Medicine or New Batch Delivery</h2>
-          <p class="form-desc">
-            Enter the medicine details. For existing DCI Codes and Generic Names, the new batch (with its specific <strong>Brand Name</strong>, <strong>Expiry Date</strong>, and <strong>Acquisition Price</strong>) will be <strong>automatically grouped and inserted directly below the last batch</strong> in Google Sheets!
-          </p>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+            <div>
+              <h2 class="form-title" style="margin-bottom:4px;">Add Medicine or New Batch Delivery</h2>
+              <p class="form-desc" style="margin-bottom:0;">
+                Select from the <strong>Sheet1 Master Catalog</strong> or enter a new medicine. Deliveries for existing medicines are <strong>automatically grouped and inserted directly below the last batch</strong> in Google Sheets!
+              </p>
+            </div>
+            <span id="catalog-count-badge" class="badge badge-brand" style="font-size:11px; padding:6px 12px; white-space:nowrap; display:none;"></span>
+          </div>
 
-          <div class="form-group" style="position:relative;">
-            <label class="form-label" for="add-code">Item Code / DCI Code (e.g., DMR000451, DMDON001151) *</label>
-            <input type="text" id="add-code" class="form-input" placeholder="Type or paste item code...">
+          <!-- Master Sync Notice & Reset Bar -->
+          <div class="sync-banner">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="sync-banner-icon">⚡</span>
+              <span class="sync-banner-text">
+                <strong>Bi-Directional Auto-Sync:</strong> Selecting or typing either <strong>DCI Code</strong> or <strong>Generic Description</strong> automatically searches, matches, and fills the corresponding field from <strong>Sheet1</strong>.
+              </span>
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="resetDciSelection()" title="Clear and reset both fields">
+              ↺ Reset Fields
+            </button>
+          </div>
+
+          <!-- Dual Synchronized Searchable Comboboxes -->
+          <div class="form-grid-2">
+            <!-- 1. DCI Item Code Combobox -->
+            <div class="form-group" style="position:relative;">
+              <label class="form-label" for="add-code">
+                Item Code / DCI Code *
+                <span class="label-hint">(e.g. DMR000002, DMR000451)</span>
+              </label>
+              <div class="combobox-wrapper" id="combobox-code-wrapper">
+                <input type="text" id="add-code" class="form-input combobox-input" list="dci-codes-datalist" placeholder="Search or type DCI code..." autocomplete="off" spellcheck="false">
+                <div class="combobox-actions">
+                  <button type="button" class="combobox-btn btn-clear" id="btn-clear-code" onclick="clearAddInput('add-code')" title="Clear DCI Code" style="display:none;">✕</button>
+                  <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-code" onclick="toggleComboboxDropdown('code', event)" title="Browse Master Catalog">▼</button>
+                </div>
+                <!-- Custom Floating Dropdown Menu -->
+                <div class="combobox-dropdown" id="dropdown-code" style="display:none;">
+                  <div class="dropdown-header">
+                    <span class="dropdown-title">Sheet1 Master Catalog</span>
+                    <span class="dropdown-count" id="count-code-matches">0 items</span>
+                  </div>
+                  <div class="dropdown-list" id="list-code"></div>
+                </div>
+              </div>
+              <datalist id="dci-codes-datalist">
+                <!-- Dynamically populated fallback -->
+              </datalist>
+            </div>
+
+            <!-- 2. Generic Description Combobox -->
+            <div class="form-group" style="position:relative;">
+              <label class="form-label" for="add-desc">
+                Generic Description & Strength *
+                <span class="label-hint">(e.g. SODIUM CHLORIDE, FLUCONAZOLE)</span>
+              </label>
+              <div class="combobox-wrapper" id="combobox-desc-wrapper">
+                <input type="text" id="add-desc" class="form-input combobox-input" list="generic-names-datalist" placeholder="Search or type generic description..." autocomplete="off" spellcheck="false">
+                <div class="combobox-actions">
+                  <button type="button" class="combobox-btn btn-clear" id="btn-clear-desc" onclick="clearAddInput('add-desc')" title="Clear Generic Name" style="display:none;">✕</button>
+                  <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-desc" onclick="toggleComboboxDropdown('desc', event)" title="Browse Master Catalog">▼</button>
+                </div>
+                <!-- Custom Floating Dropdown Menu -->
+                <div class="combobox-dropdown" id="dropdown-desc" style="display:none;">
+                  <div class="dropdown-header">
+                    <span class="dropdown-title">Sheet1 Master Catalog</span>
+                    <span class="dropdown-count" id="count-desc-matches">0 items</span>
+                  </div>
+                  <div class="dropdown-list" id="list-desc"></div>
+                </div>
+              </div>
+              <datalist id="generic-names-datalist">
+                <!-- Dynamically populated fallback -->
+              </datalist>
+            </div>
           </div>
 
           <!-- Smart Batch Preview Box -->
           <div id="add-batch-preview" class="batch-preview-box" style="display:none; margin-bottom:16px;">
             <div id="add-batch-preview-content"></div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="add-desc">Generic Description & Strength *</label>
-            <input type="text" id="add-desc" class="form-input" placeholder="e.g. FLUCONAZOLE 200MG CAPSULE">
           </div>
 
           <div class="form-group">

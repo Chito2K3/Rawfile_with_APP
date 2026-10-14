@@ -1,0 +1,2262 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title>Pharmacy Expiry Monitoring - Amang Rodriguez Memorial Medical Center</title>
+  <style>
+  :root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --primary-light: #eff6ff;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --success: #16a34a;
+    --success-light: #f0fdf4;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+    --slate-900: #0f172a;
+    --slate-800: #1e293b;
+    --slate-700: #334155;
+    --slate-600: #475569;
+    --slate-500: #64748b;
+    --slate-400: #94a3b8;
+    --slate-200: #e2e8f0;
+    --slate-100: #f1f5f9;
+    --slate-50: #f8fafc;
+    --border-color: #e2e8f0;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-family);
+    background-color: #f8fafc;
+    color: var(--slate-800);
+    line-height: 1.5;
+    font-size: 14px;
+    padding: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Main Container */
+  .app-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 90vh;
+  }
+
+  /* Header */
+  .app-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: #ffffff;
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid #3b82f6;
+  }
+
+  .header-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .header-icon {
+    font-size: 28px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .header-institution {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #60a5fa;
+    margin-bottom: 2px;
+  }
+
+  .header-title {
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: #ffffff;
+  }
+
+  .header-subtitle {
+    font-size: 12px;
+    color: var(--slate-400);
+    font-weight: 400;
+  }
+
+  /* Stat Counters Banner */
+  .stats-banner {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    padding: 16px 24px;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .stat-card {
+    background: #ffffff;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s ease;
+  }
+  .stat-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .stat-card.total .stat-icon { background: var(--primary-light); color: var(--primary); }
+  .stat-card.critical .stat-icon { background: var(--danger-light); color: var(--danger); }
+  .stat-card.near .stat-icon { background: var(--warning-light); color: var(--warning); }
+  .stat-card.zero .stat-icon { background: var(--purple-light); color: var(--purple); }
+
+  .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--slate-900);
+    line-height: 1.2;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--slate-500);
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Tab Navigation */
+  .tab-nav {
+    display: flex;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 24px;
+    overflow-x: auto;
+  }
+
+  .tab-btn {
+    padding: 14px 20px;
+    border: none;
+    background: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--slate-600);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .tab-btn:hover {
+    color: var(--primary);
+    background: var(--slate-50);
+  }
+
+  .tab-btn.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    background: var(--primary-light);
+  }
+
+  /* Main Tab Content */
+  .tab-content-area {
+    padding: 24px;
+    flex: 1;
+  }
+
+  .tab-pane {
+    display: none;
+  }
+  .tab-pane.active {
+    display: block;
+    animation: fadeIn 0.2s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Control Bar (Search & Filter) */
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  .search-box {
+    flex: 1;
+    min-width: 250px;
+    position: relative;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 10px 14px 10px 38px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .search-icon-inside {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--slate-400);
+    font-size: 14px;
+  }
+
+  .filter-select {
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    background: #ffffff;
+    color: var(--slate-700);
+    outline: none;
+    cursor: pointer;
+  }
+  .filter-select:focus {
+    border-color: var(--primary);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: #ffffff;
+  }
+  .btn-primary:hover {
+    background: var(--primary-hover);
+  }
+  .btn-danger {
+    background: var(--danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+  .btn-outline {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    color: var(--slate-700);
+  }
+  .btn-outline:hover {
+    background: var(--slate-100);
+  }
+  .btn-sm {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Inventory Table */
+  .table-container {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    background: #ffffff;
+    box-shadow: var(--shadow-sm);
+    max-height: 520px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13px;
+  }
+
+  th {
+    background: #f8fafc;
+    color: var(--slate-600);
+    font-weight: 700;
+    padding: 12px 14px;
+    border-bottom: 2px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    white-space: nowrap;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+  }
+
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--slate-800);
+    vertical-align: middle;
+  }
+
+  tr:hover td {
+    background-color: #f1f5f9;
+  }
+
+  tr.zero-stock-row td {
+    background-color: #faf5ff;
+  }
+
+  /* Status Badges */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+  .badge-danger {
+    background: var(--danger-light);
+    color: var(--danger);
+    border: 1px solid #fecaca;
+  }
+  .badge-warning {
+    background: var(--warning-light);
+    color: var(--warning);
+    border: 1px solid #fde68a;
+  }
+  .badge-success {
+    background: var(--success-light);
+    color: var(--success);
+    border: 1px solid #bbf7d0;
+  }
+  .badge-neutral {
+    background: var(--slate-100);
+    color: var(--slate-600);
+    border: 1px solid var(--slate-200);
+  }
+  .badge-donation {
+    background: var(--purple-light);
+    color: var(--purple);
+    border: 1px solid #ddd6fe;
+  }
+  .badge-brand {
+    background: #eef2ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
+    font-weight: 700;
+  }
+
+  .qty-display {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .qty-zero {
+    color: var(--danger);
+    font-weight: 800;
+  }
+  .price-display {
+    font-family: monospace;
+    font-weight: 700;
+    color: #047857;
+    font-size: 13px;
+  }
+  .cost-callout {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-top: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Forms & Card Layouts */
+  .form-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 650px;
+    margin: 0 auto;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .form-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--slate-900);
+  }
+
+  .form-desc {
+    font-size: 12px;
+    color: var(--slate-500);
+    margin-bottom: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--slate-700);
+    margin-bottom: 6px;
+  }
+
+  .form-input, .form-textarea, .form-select-full {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    outline: none;
+    transition: all 0.2s;
+  }
+  .form-input:focus, .form-textarea:focus, .form-select-full:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+
+  /* Grid Layouts */
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 768px) {
+    .form-grid-2 {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+  }
+
+  .label-hint {
+    font-size: 11px;
+    color: var(--slate-400);
+    font-weight: normal;
+    margin-left: 4px;
+  }
+
+  /* Sync Notice Banner */
+  .sync-banner {
+    background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%);
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: #1e3a8a;
+    box-shadow: var(--shadow-sm);
+  }
+  .sync-banner-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .sync-banner-text {
+    line-height: 1.45;
+  }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid #cbd5e1;
+    color: var(--slate-600);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-ghost:hover {
+    background: #ffffff;
+    border-color: var(--slate-400);
+    color: var(--slate-900);
+  }
+
+  /* Enhanced Searchable Combobox & Floating Dropdowns */
+  .combobox-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .combobox-input {
+    padding-right: 58px !important;
+    font-weight: 500;
+  }
+
+  .combobox-actions {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .combobox-btn {
+    background: transparent;
+    border: none;
+    color: var(--slate-400);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s ease;
+  }
+  .combobox-btn:hover {
+    background: var(--slate-100);
+    color: var(--slate-700);
+  }
+  .combobox-btn.btn-clear:hover {
+    background: var(--danger-light);
+    color: var(--danger);
+  }
+  .combobox-btn.btn-toggle:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+
+  /* Floating Dropdown Menu */
+  .combobox-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    max-height: 280px;
+    overflow-y: auto;
+    z-index: 100;
+    animation: dropdownPop 0.15s ease-out;
+  }
+
+  @keyframes dropdownPop {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .dropdown-header {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border-color);
+    padding: 7px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--slate-600);
+    z-index: 2;
+  }
+  .dropdown-title {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 10px;
+    color: var(--slate-500);
+  }
+  .dropdown-count {
+    background: var(--slate-200);
+    color: var(--slate-700);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+  }
+
+  .dropdown-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dropdown-item {
+    padding: 9px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12.5px;
+    transition: background 0.1s ease;
+  }
+  .dropdown-item:last-child {
+    border-bottom: none;
+  }
+  .dropdown-item:hover, .dropdown-item.focused {
+    background: #eff6ff;
+    color: #1e40af;
+  }
+
+  .dropdown-item-code {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 11.5px;
+    color: #2563eb;
+    background: #dbeafe;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .dropdown-item:hover .dropdown-item-code, .dropdown-item.focused .dropdown-item-code {
+    background: #bfdbfe;
+    color: #1d4ed8;
+  }
+
+  .dropdown-item-desc {
+    font-weight: 500;
+    color: #1e293b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .dropdown-highlight {
+    background: #fef08a;
+    color: #854d0e;
+    font-weight: 700;
+    padding: 0 1px;
+    border-radius: 2px;
+  }
+
+  .dropdown-empty {
+    padding: 18px 14px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--slate-500);
+  }
+  .dropdown-empty-hint {
+    font-size: 11px;
+    color: var(--slate-400);
+    margin-top: 4px;
+  }
+
+  .batch-preview-box {
+    background: var(--slate-50);
+    border: 1px dashed var(--slate-300);
+    border-radius: var(--radius-md);
+    padding: 12px;
+    margin-top: 8px;
+    font-size: 12px;
+  }
+  .batch-preview-title {
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
+
+  /* Modals */
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    padding: 16px;
+  }
+
+  .modal-card {
+    background: #ffffff;
+    width: 100%;
+    max-width: 480px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: modalPop 0.2s ease-out;
+  }
+
+  @keyframes modalPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--slate-900);
+  }
+  .modal-body {
+    padding: 20px;
+  }
+  .modal-footer {
+    padding: 14px 20px;
+    background: #f8fafc;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* Toast Notification */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    padding: 12px 18px;
+    border-radius: var(--radius-md);
+    background: var(--slate-900);
+    color: #ffffff;
+    font-size: 13px;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideUp 0.25s ease-out;
+    max-width: 380px;
+  }
+  .toast.success { background: #065f46; border-left: 4px solid #34d399; }
+  .toast.error { background: #991b1b; border-left: 4px solid #f87171; }
+  .toast.info { background: #1e3a8a; border-left: 4px solid #60a5fa; }
+
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Loading Spinner */
+  .spinner-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--slate-500);
+    gap: 12px;
+  }
+  .spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--slate-200);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Autocomplete Suggestions */
+  .autocomplete-list {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 50;
+    box-shadow: var(--shadow-md);
+  }
+  .autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    border-bottom: 1px solid var(--slate-100);
+  }
+  .autocomplete-item:hover {
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+</style>
+
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="header-icon">🏥</div>
+        <div>
+          <div class="header-institution">AMANG RODRIGUEZ MEMORIAL MEDICAL CENTER</div>
+          <h1 class="header-title">Pharmacy Expiry Monitoring</h1>
+          <p class="header-subtitle">Hospital Storage Inventory, FEFO Expiry Tracking, Brand Management & Dispensing</p>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <button class="btn btn-outline btn-sm" onclick="loadInventory()" title="Refresh from Sheet">
+          🔄 Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Top KPI Stats Banner -->
+    <section class="stats-banner">
+      <div class="stat-card total">
+        <div class="stat-icon">📦</div>
+        <div>
+          <div class="stat-value" id="stat-total-items">0</div>
+          <div class="stat-label">Total Batches</div>
+        </div>
+      </div>
+      <div class="stat-card total">
+        <div class="stat-icon">📊</div>
+        <div>
+          <div class="stat-value" id="stat-total-qty">0 units</div>
+          <div class="stat-label">Total Units in Storage</div>
+        </div>
+      </div>
+      <div class="stat-card critical">
+        <div class="stat-icon">🔴</div>
+        <div>
+          <div class="stat-value" id="stat-2026-count">0</div>
+          <div class="stat-label">2026 Critical Risk</div>
+        </div>
+      </div>
+      <div class="stat-card near">
+        <div class="stat-icon">🟠</div>
+        <div>
+          <div class="stat-value" id="stat-2027-count">0</div>
+          <div class="stat-label">2027 Near-Term</div>
+        </div>
+      </div>
+      <div class="stat-card zero">
+        <div class="stat-icon">⚠️</div>
+        <div>
+          <div class="stat-value" id="stat-zero-count">0</div>
+          <div class="stat-label">Out of Stock (0 Qty)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-tab="tab-inventory">
+        📦 Inventory & Stock-Out
+      </button>
+      <button class="tab-btn" data-tab="tab-add">
+        ➕ Add Medicine / New Batch
+      </button>
+      <button class="tab-btn" data-tab="tab-restock">
+        🔄 Restock 0-Qty Items
+      </button>
+      <button class="tab-btn" data-tab="tab-logs">
+        📋 Stock-Out Audit Log
+      </button>
+    </nav>
+
+    <!-- Tab Content -->
+    <main class="tab-content-area">
+
+      <!-- TAB 1: INVENTORY & STOCK OUT -->
+      <section id="tab-inventory" class="tab-pane active">
+        <!-- Search and Filter Bar -->
+        <div class="filter-bar">
+          <div class="search-box">
+            <span class="search-icon-inside">🔍</span>
+            <input type="text" id="search-input" class="search-input" placeholder="Search by Item Code, Generic Name, Brand Name, or Expiry (e.g. Feb-27)..." oninput="applyFilter()">
+          </div>
+
+          <select id="filter-status" class="filter-select" onchange="applyFilter()">
+            <option value="ALL">All Expiry Statuses</option>
+            <option value="CRITICAL_2026">🔴 2026 Critical Expiry</option>
+            <option value="NEAR_2027">🟠 2027 Near-Term Expiry</option>
+            <option value="SAFE">🟢 2028+ Safe Stock</option>
+            <option value="NO_EXPIRY">⚪ Missing Expiry Date</option>
+            <option value="ZERO">⚠️ Out of Stock (0 Qty)</option>
+            <option value="DONATION">💜 Donated Program Items</option>
+          </select>
+
+          <button class="btn btn-primary btn-sm" onclick="switchTab('tab-add')">
+            ➕ Add Item / Batch
+          </button>
+        </div>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="spinner-overlay" style="display:none;">
+          <div class="spinner"></div>
+          <div>Loading inventory from Google Sheets...</div>
+        </div>
+
+        <!-- Inventory Table -->
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:120px;">Item Code</th>
+                <th>Generic Description</th>
+                <th style="width:140px;">Brand Name</th>
+                <th style="width:110px; text-align:right;">Storage Qty</th>
+                <th style="width:145px;">Expiry Status</th>
+                <th style="width:125px; text-align:right;">Acq. Price</th>
+                <th style="width:140px; text-align:right;">Quick Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 2: ADD MEDICINE / SMART BATCH INSERTION -->
+      <section id="tab-add" class="tab-pane">
+        <div class="form-card">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
+            <div>
+              <h2 class="form-title" style="margin-bottom:4px;">Add Medicine or New Batch Delivery</h2>
+              <p class="form-desc" style="margin-bottom:0;">
+                Select from the <strong>Sheet1 Master Catalog</strong> or enter a new medicine. Deliveries for existing medicines are <strong>automatically grouped and inserted directly below the last batch</strong> in Google Sheets!
+              </p>
+            </div>
+            <span id="catalog-count-badge" class="badge badge-brand" style="font-size:11px; padding:6px 12px; white-space:nowrap; display:none;"></span>
+          </div>
+
+          <!-- Master Sync Notice & Reset Bar -->
+          <div class="sync-banner">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="sync-banner-icon">⚡</span>
+              <span class="sync-banner-text">
+                <strong>Bi-Directional Auto-Sync:</strong> Selecting or typing either <strong>DCI Code</strong> or <strong>Generic Description</strong> automatically searches, matches, and fills the corresponding field from <strong>Sheet1</strong>.
+              </span>
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="resetDciSelection()" title="Clear and reset both fields">
+              ↺ Reset Fields
+            </button>
+          </div>
+
+          <!-- Dual Synchronized Searchable Comboboxes -->
+          <div class="form-grid-2">
+            <!-- 1. DCI Item Code Combobox -->
+            <div class="form-group" style="position:relative;">
+              <label class="form-label" for="add-code">
+                Item Code / DCI Code *
+                <span class="label-hint">(e.g. DMR000002, DMR000451)</span>
+              </label>
+              <div class="combobox-wrapper" id="combobox-code-wrapper">
+                <input type="text" id="add-code" class="form-input combobox-input" list="dci-codes-datalist" placeholder="Search or type DCI code..." autocomplete="off" spellcheck="false">
+                <div class="combobox-actions">
+                  <button type="button" class="combobox-btn btn-clear" id="btn-clear-code" onclick="clearAddInput('add-code')" title="Clear DCI Code" style="display:none;">✕</button>
+                  <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-code" onclick="toggleComboboxDropdown('code', event)" title="Browse Master Catalog">▼</button>
+                </div>
+                <!-- Custom Floating Dropdown Menu -->
+                <div class="combobox-dropdown" id="dropdown-code" style="display:none;">
+                  <div class="dropdown-header">
+                    <span class="dropdown-title">Sheet1 Master Catalog</span>
+                    <span class="dropdown-count" id="count-code-matches">0 items</span>
+                  </div>
+                  <div class="dropdown-list" id="list-code"></div>
+                </div>
+              </div>
+              <datalist id="dci-codes-datalist">
+                <!-- Dynamically populated fallback -->
+              </datalist>
+            </div>
+
+            <!-- 2. Generic Description Combobox -->
+            <div class="form-group" style="position:relative;">
+              <label class="form-label" for="add-desc">
+                Generic Description & Strength *
+                <span class="label-hint">(e.g. SODIUM CHLORIDE, FLUCONAZOLE)</span>
+              </label>
+              <div class="combobox-wrapper" id="combobox-desc-wrapper">
+                <input type="text" id="add-desc" class="form-input combobox-input" list="generic-names-datalist" placeholder="Search or type generic description..." autocomplete="off" spellcheck="false">
+                <div class="combobox-actions">
+                  <button type="button" class="combobox-btn btn-clear" id="btn-clear-desc" onclick="clearAddInput('add-desc')" title="Clear Generic Name" style="display:none;">✕</button>
+                  <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-desc" onclick="toggleComboboxDropdown('desc', event)" title="Browse Master Catalog">▼</button>
+                </div>
+                <!-- Custom Floating Dropdown Menu -->
+                <div class="combobox-dropdown" id="dropdown-desc" style="display:none;">
+                  <div class="dropdown-header">
+                    <span class="dropdown-title">Sheet1 Master Catalog</span>
+                    <span class="dropdown-count" id="count-desc-matches">0 items</span>
+                  </div>
+                  <div class="dropdown-list" id="list-desc"></div>
+                </div>
+              </div>
+              <datalist id="generic-names-datalist">
+                <!-- Dynamically populated fallback -->
+              </datalist>
+            </div>
+          </div>
+
+          <!-- Smart Batch Preview Box -->
+          <div id="add-batch-preview" class="batch-preview-box" style="display:none; margin-bottom:16px;">
+            <div id="add-batch-preview-content"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="add-brand">Brand Name (Commercial / Trade Name) *</label>
+            <input type="text" id="add-brand" class="form-input" placeholder="e.g. Diflucan, Flucan, Pfizer, etc.">
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label class="form-label" for="add-qty">Storage Quantity *</label>
+              <input type="number" id="add-qty" class="form-input" placeholder="e.g. 500" min="0">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="add-exp">Expiry Date *</label>
+              <input type="text" id="add-exp" class="form-input" placeholder="MMM-YY (e.g. Dec-28)">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="add-price">Acq. Price (₱ / unit) *</label>
+              <input type="number" id="add-price" class="form-input" placeholder="e.g. 45.50" step="0.01" min="0">
+            </div>
+          </div>
+
+          <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
+            <button class="btn btn-outline" onclick="switchTab('tab-inventory')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitAddNew()">✨ Save & Insert into Sheet</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: RESTOCK 0-QTY ITEMS -->
+      <section id="tab-restock" class="tab-pane">
+        <div style="margin-bottom:16px;">
+          <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Zero-Quantity Items Replenishment</h2>
+          <p style="font-size:12px; color:var(--slate-500);">
+            Quickly replenish medicines that are currently out of stock. You can set the incoming Brand Name, new batch expiry date, updated acquisition price, and quantity.
+          </p>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:130px;">Item Code</th>
+                <th>Generic Description</th>
+                <th style="width:140px;">Brand Name</th>
+                <th style="width:120px;">Old Expiry</th>
+                <th style="width:120px; text-align:right;">Last Price</th>
+                <th style="width:110px;">Current Stock</th>
+                <th style="width:180px; text-align:right;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="restock-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 4: AUDIT LOG -->
+      <section id="tab-logs" class="tab-pane">
+        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Stock-Out Dispensing Log</h2>
+            <p style="font-size:12px; color:var(--slate-500);">Real-time financial and batch audit record of all dispensed medicines.</p>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="loadLogs()">🔄 Refresh Log</button>
+        </div>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:150px;">Timestamp</th>
+                <th style="width:120px;">Item Code</th>
+                <th>Generic Name</th>
+                <th style="width:130px;">Brand Name</th>
+                <th style="width:100px;">Batch Expiry</th>
+                <th style="width:110px; text-align:right;">Unit Price</th>
+                <th style="width:90px; text-align:right;">Qty Out</th>
+                <th style="width:120px; text-align:right;">Total Value (₱)</th>
+                <th style="width:100px; text-align:right;">Remaining</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL: DEDUCT / STOCK OUT -->
+  <div id="modal-stock-out" class="modal-backdrop" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">➖ Record Stock-Out (Dispense)</div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-stock-out')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; font-weight:700; color:#64748b; font-family:monospace;" id="so-code"></span>
+            <span id="so-brand-badge" class="badge badge-brand"></span>
+          </div>
+          <div style="font-size:14px; font-weight:700; color:#0f172a; margin:4px 0;" id="so-desc"></div>
+          <div style="display:flex; justify-content:space-between; font-size:12px; color:#475569; margin-top:6px; border-top:1px dashed #e2e8f0; padding-top:6px;">
+            <span>Batch Expiry: <strong id="so-exp"></strong></span>
+            <span>Unit Price: <strong id="so-price" style="color:#047857;">₱0.00</strong></span>
+            <span>Current Stock: <strong id="so-current-qty" style="color:#2563eb;"></strong></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="so-input-qty">Quantity Taken Out (Deducted) *</label>
+          <input type="number" id="so-input-qty" class="form-input" placeholder="Enter number of units..." min="1" oninput="updateStockOutPreview()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="so-remarks">Department / Ward / Remarks</label>
+          <input type="text" id="so-remarks" class="form-input" placeholder="e.g. OR / ICU / Ward 3 / Outpatient">
+        </div>
+
+        <div class="cost-callout">
+          <div>
+            <div style="font-size:11px; color:#64748b; font-weight:600;">NEW BALANCE IN STORAGE</div>
+            <div id="so-remaining-preview" style="font-size:14px; font-weight:700; color:#0f172a;">--</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:11px; color:#047857; font-weight:600;">TOTAL DISPENSED VALUE</div>
+            <div id="so-cost-preview" style="font-size:16px; font-weight:800; color:#047857;">₱0.00</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-stock-out')">Cancel</button>
+        <button class="btn btn-danger" onclick="submitStockOut()">Confirm Stock-Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT / RESTOCK BATCH -->
+  <div id="modal-edit-batch" class="modal-backdrop" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">✏️ Edit / Restock Medicine Batch</div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-edit-batch')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="edit-row-info" style="font-size:11px; color:#64748b; margin-bottom:12px; font-weight:600;"></div>
+
+        <div class="form-group">
+          <label class="form-label">Item Code (DCI)</label>
+          <input type="text" id="edit-code" class="form-input" readonly style="background:#f1f5f9;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Generic Description</label>
+          <input type="text" id="edit-desc" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Brand Name *</label>
+          <input type="text" id="edit-brand" class="form-input" placeholder="e.g. Diflucan, Tegretol...">
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label">Storage Qty</label>
+            <input type="number" id="edit-qty" class="form-input" min="0">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Expiry Date</label>
+            <input type="text" id="edit-exp" class="form-input" placeholder="e.g. Feb-28">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Price (₱)</label>
+            <input type="number" id="edit-price" class="form-input" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('modal-edit-batch')">Cancel</button>
+        <button class="btn btn-primary" onclick="submitEditBatch()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script>
+  // Global Application State
+  const state = {
+    items: [],
+    filteredItems: [],
+    masterCatalog: [], // Master DCI catalog from Sheet1
+    logs: [],
+    selectedRow: null,
+    loading: false,
+    activeTab: 'tab-inventory',
+    activeDropdown: null, // 'code' or 'desc' or null
+    focusedIndex: -1
+  };
+
+  // On DOM Ready
+  document.addEventListener('DOMContentLoaded', () => {
+    initTabs();
+    setupComboboxEvents();
+    loadInventory();
+  });
+
+  // Tab Navigation Handling
+  function initTabs() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        switchTab(target);
+      });
+    });
+  }
+
+  function switchTab(tabId) {
+    state.activeTab = tabId;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+
+    const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    const activePane = document.getElementById(tabId);
+    if (activeBtn) activeBtn.classList.add('active');
+    if (activePane) activePane.classList.add('active');
+
+    if (tabId === 'tab-logs') {
+      loadLogs();
+    } else if (tabId === 'tab-restock') {
+      filterRestockTable();
+    }
+  }
+
+  // Toast Notification System
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    let icon = 'ℹ️';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+
+    toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 4500);
+  }
+
+  // Default Master DCI Catalog (291 items from Sheet1)
+  const DEFAULT_MOCK_DCI_CATALOG = [{"code":"DMDON001151","desc":"(DON) CARBAMAZEPINE 200MG TABLET"},{"code":"DMDON000506","desc":"(DON) GABAPENTIN 300MG CAPSULE"},{"code":"DMDON000808","desc":"(DON) OSELTAMIVIR PHOSPHATE 75MG CAPSULE"},{"code":"DMDON000909","desc":"(DON) PRAZIQUANTEL 600MG TABLET (AVAILABLE UNDER DOH PROGRAM)"},{"code":"DMR000023","desc":"ACETYLCYSTEINE 600MG EFFERVESCENT TABLET"},{"code":"DMR000029","desc":"ACICLOVIR 400MG TABLET"},{"code":"DMR000030","desc":"ACICLOVIR 800MG TABLET"},{"code":"DMR000060","desc":"AMLODIPINE BESILATE 10MG TABLET"},{"code":"DMR000061","desc":"AMLODIPINE BESILATE 5MG TABLET"},{"code":"DMR000066","desc":"AMOXICILLIN TRIHYDRATE 500MG CAPSULE"},{"code":"DMR000079","desc":"APIXABAN 2.5MG TABLET"},{"code":"DMR000088","desc":"ASCORBIC ACID 500MG TABLET"},{"code":"DMR000099","desc":"ASPIRIN 80MG TABLET"},{"code":"DMR000113","desc":"AZITHROMYCIN DIHYDRATE 500MG TABLET"},{"code":"DMR000129","desc":"BETAHISTINE HYDROCHLORIDE 16MG TABLET"},{"code":"DMR000130","desc":"BETAHISTINE HYDROCHLORIDE 24MG TABLET"},{"code":"DMR000138","desc":"BISACODYL 10MG (ADULT) SUPPOSITORY"},{"code":"DMR000148","desc":"BUDESONIDE + FORMOTEROL FUMARATE DIHYDRATE (160 MICROGRAMS BUDESONIDE + 4.5 MICROGRAMS FORMOTEROL) X 60 DOSES WITH APPROPRIATE ACCOMPANYING DISPENSER"},{"code":"DMR000150","desc":"BUDESONIDE 200MCG/DOSE X 200 DOSES DPI"},{"code":"DMR000151","desc":"BUDESONIDE 250MCG/ML,2ML RESPIRATORY SOLUTION FOR NEBULIZATION"},{"code":"DMR000198","desc":"CARVEDILOL 25MG TABLET"},{"code":"DMR000205","desc":"CEFALEXIN MONOHYDRATE 500MG CAPSULE"},{"code":"DMR000212","desc":"CEFIXIME 200MG CAPSULE"},{"code":"DMR000229","desc":"CEFUROXIME AXETIL 500MG TABLET"},{"code":"DMR000234","desc":"CELECOXIB 200MG CAPSULE"},{"code":"DMR000237","desc":"CETIRIZINE DIHYDROCHLORIDE 10MG TABLET"},{"code":"DMR000255","desc":"CICLOSPORIN 100MG CAPSULE"},{"code":"DMR000258","desc":"CICLOSPORIN 25MG CAPSULE"},{"code":"DMR000283","desc":"CLINDAMYCIN HYDROCHLORIDE 300MG CAPSULE"},{"code":"DMR000293","desc":"CLONIDINE HYDROCHLORIDE 75MCG TABLET"},{"code":"DMR000294","desc":"CLOPIDOGREL 75 MG TABLET"},{"code":"DMR000300","desc":"CLOXACILLIN SODIUM 500MG CAPSULE"},{"code":"DMR000301","desc":"CLOZAPINE 100 MG TABLET"},{"code":"DMR000303","desc":"CO-AMOXICLAV (AMOXICILLIN + POTASSIUM CLAVULANATE) 875MG AMOXICILLIN TRIHYDRATE + 125MG POTASSIUM CLAVULANATE TABLET"},{"code":"DMR000306","desc":"CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 500 MG AMOXICILLIN TRIHYDRATE + 125 MG POTASSIUM CLAVULANATE PER TABLET"},{"code":"DMR000319","desc":"COTRIMOXAZOLE (SULFAMETHOXAZOLE + TRIMETHOPRIM) 800 MG SULFAMETHOXAZOLE + 160 MG TRIMETHOPRIM TABLET"},{"code":"DMR000333","desc":"DAPAGLIFLOZIN 10MG TABLET"},{"code":"DMR000340","desc":"DEXAMETHASONE 4MG TABLET"},{"code":"DMR000352","desc":"DICLOFENAC SODIUM 50MG TABLET/CAPSULE/ENTERIC COATED TABLET/MR TABLET"},{"code":"DMR000360","desc":"DIGOXIN 250MCG TABLET"},{"code":"DMR000363","desc":"DIGOXIN 50MCG/ML ELIXIR, 60ML BOTTLE"},{"code":"DMR000394","desc":"DOXYCYCLINE HYCLATE 100MG CAPSULE"},{"code":"DMR000422","desc":"ESCITALOPRAM 10 MG TABLET"},{"code":"DMR000450","desc":"FLUCONAZOLE 150MG CAPSULE"},{"code":"DMR000451","desc":"FLUCONAZOLE 200MG CAPSULE"},{"code":"DMR000505","desc":"GABAPENTIN 100MG CAPSULE"},{"code":"DMR000506","desc":"GABAPENTIN 300MG CAPSULE"},{"code":"DMR000548","desc":"HYOSCINE N-BUTYL BROMIDE 10MG TABLET"},{"code":"DMR000562","desc":"INDACATEROL MALEATE + GLYCOPYRRONIUM BROMIDE 110 MCG + 50 MCG INHALATION POWDER IN HARD CAPSULES"},{"code":"DMR000589","desc":"IRBESARTAN + HYDROCHLOROTHIAZIDE 150MG IRBESARTAN + 12.5MG HYDROCHLOROTHIAZIDE TABLET"},{"code":"DMR000590","desc":"IRBESARTAN 150MG TABLET"},{"code":"DMR000607","desc":"ISOXSUPRINE HYDROCHLORIDE 10MG TABLET"},{"code":"DMR000634","desc":"LEVETIRACETAM 250MG FILM COATED TABLET"},{"code":"DMR000644","desc":"LEVOFLOXACIN 500MG TABLET"},{"code":"DMR000660","desc":"LINEZOLID 600MG TABLET/FILM-COATED TABLET"},{"code":"DMR000673","desc":"LORATIDINE 10MG TABLET/FILM COATED TABLET"},{"code":"DMR000689","desc":"MEFENAMIC ACID 500MG CAPSULE/TABLET"},{"code":"DMR000700","desc":"METHIMAZOLE (THIAMAZOLE) 5MG TABLET"},{"code":"DMR000722","desc":"METRONIDAZOLE 500MG TABLET"},{"code":"DMR000740","desc":"MONTELUKAST SODIUM 10MG TABLET"},{"code":"DMR000741","desc":"MONTELUKAST SODIUM 4MG CHEWABLE TABLET"},{"code":"DMR000751","desc":"MULTIVITAMINS ADULTS CAPSULE/TABLET"},{"code":"DMR000780","desc":"NIFEDIPINE 10MG CAPSULE"},{"code":"DMR000798","desc":"OLANZAPINE 10MG TABLET"},{"code":"DMR000799","desc":"OMEPRAZOLE 20MG CAPSULE"},{"code":"DMR000806","desc":"ORAL REHYDRATION SALTS (ORS-75 REPLACEMENT) 20.5G SACHET"},{"code":"DMR000844","desc":"PARACETAMOL 250MG SUPPOSITORY"},{"code":"DMR000846","desc":"PARACETAMOL 500MG TABLET"},{"code":"DMR000877","desc":"PHENOXYMETHYL PENICILIN 250MG TABLET/CAPSULE"},{"code":"DMR000905","desc":"POTASSIUM CHLORIDE 600MG TABLET"},{"code":"DMR000937","desc":"QUETIAPINE FUMARATE 25MG TABLET"},{"code":"DMR000966","desc":"RISPERIDONE 2MG TABLET"},{"code":"DMR000973","desc":"ROSUVASTATIN CALCIUM 10MG TABLET"},{"code":"DMR000975","desc":"ROSUVASTATIN CALCIUM 20MG TABLET"},{"code":"DMR000976","desc":"SACUBITRIL/VALSARTAN 100MG TABLET"},{"code":"DMR000977","desc":"SACUBITRIL/VALSARTAN 200MG TABLET"},{"code":"DMR000978","desc":"SACUBITRIL/VALSARTAN 50MG TABLET"},{"code":"DMR000981","desc":"SALBUTAMOL SULFATE MDI 100MCG/DOSE X 200 ACTUATIONS"},{"code":"DMR000986","desc":"SEVELAMER CARBONATE 800MG TABLET"},{"code":"DMR000998","desc":"SODIUM BICARBONATE 325MG TABLET"},{"code":"DMR001000","desc":"SODIUM BICARBONATE 650 MG TABLET"},{"code":"DMR001008","desc":"SPIRONOLACTONE 25MG TABLET"},{"code":"DMR001011","desc":"SPIRONOLACTONE 50MG TABLET"},{"code":"DMR001022","desc":"SUCRALFATE 1G TABLET"},{"code":"DMR001057","desc":"TOLVAPTAN 15MG TABLET"},{"code":"DMR001074","desc":"TRIMETAZIDINE HYDROCHLORIDE 35MG TABLET"},{"code":"DMR001095","desc":"VALGANCICLOVIR 450 MG TABLET"},{"code":"DMR000378","desc":"DIVALPROEX SODIUM 250 MG TABLET"},{"code":"DMR000379","desc":"DIVALPROEX SODIUM 500MG CONTROLLED RELEASE TABLET"},{"code":"DMR001102","desc":"VALSARTAN 80MG TABLET/FILM COATED TABLET"},{"code":"DMR001114","desc":"VITAMIN B COMPLEX (VITAMIN B1 B6 B12) 100 MG B1 + 5 MG B6 + 50 MCG B12 TABLET/CAPSULE"},{"code":"DMR001119","desc":"WARFARIN SODIUM 2.5MG TABLET"},{"code":"DMDON000652","desc":"(DON) LIDOCAINE HYDROCHLORIDE 2% (20MG/ML) 50ML AMPULE/VIAL (IM/IV)"},{"code":"DMDON000803","desc":"(DON) ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMCSP000002","desc":"(DONCSP) CISPLATIN 1MG/ML, 50ML VIAL (IV)"},{"code":"DMR000028","desc":"ACICLOVIR 25MG/ML, 10ML VIAL (IV INFUSION)"},{"code":"DMR000048","desc":"AMIKACIN SULFATE 125MG/ML,2ML VIAL"},{"code":"DMR000049","desc":"AMIKACIN SULFATE 250MG/ML, 2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000050","desc":"AMIKACIN SULFATE 50MG/ML, 2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000087","desc":"ASCORBIC ACID 250MG/ML, 2ML AMPULE (IV)"},{"code":"DMR000109","desc":"ATROPINE SULFATE 1MG/ML, 1ML AMPULE (IM,IV,SC)"},{"code":"DMR000112","desc":"AZITHROMYCIN DIHYDRATE 500MG POWDER, VIAL (IV INFUSION)"},{"code":"DMR000157","desc":"BUPIVACAINE HYDROCHLORIDE 0.5% + 8% DEXTROSE, 4ML AMPULE"},{"code":"DMR000155","desc":"BUPIVACAINE HYDROCHLORIDE 0.5%, 10ML AMPULE (ISOBARIC)"},{"code":"DMR000159","desc":"BUTORPHANOL TARTRATE 2MG/ML,1ML AMPULE/VIAL (IM,IV)."},{"code":"DMR000168","desc":"CALCIUM GLUCONATE 10%, 10ML VIAL/AMPULE (IV)"},{"code":"DMR000209","desc":"CEFEPIME HYDROCHLORIDE 2 G VIAL (IM,IV)"},{"code":"DMR001128","desc":"CLINDAMYCIN PHOSPHATE 150 MG/ML,2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000328","desc":"CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 1ML VIAL/AMPULE"},{"code":"DMR000380","desc":"DOBUTAMINE HYDROCHLORIDE 50MG/ML, 5ML AMPULE (IV INFUSION)"},{"code":"DMR000389","desc":"DOPAMINE HYDROCHLORIDE 40MG/ML, 5ML VIAL/AMPULE (IV)"},{"code":"DMR000401","desc":"ENOXAPARIN SODIUM 100MG/ML, 0.4ML PRE‐FILLED SYRINGE (SC)"},{"code":"DMR000411","desc":"EPINEPHRINE HYDROCHLORIDE 1MG/ML, 1ML AMPULE (IV, IM,SC)"},{"code":"DMR000489","desc":"FUROSEMIDE 10MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMR000511","desc":"GADOTERIC ACID, 0.5 MMOL/ML SOLUTION FOR INJECTION, 10 ML VIAL"},{"code":"DMR000522","desc":"GOSERELIN ACETATE 3.6 MG DEPOT SOLUTION, PRE‐FILLED SYRINGE (SC)"},{"code":"DMR000525","desc":"HEPARIN SODIUM 5000IU/ML,5ML VIAL"},{"code":"DMR000534","desc":"HYDRALAZINE HYDROCHLORIDE 20MG/ML, 1ML AMPULE (IM,IV)"},{"code":"DMR000541","desc":"HYDROCORTISONE SODIUM SUCCINATE POWDER 250MG VIAL (IV)"},{"code":"DMR000571","desc":"IOHEXOL 300MG IODINE/ML, 100 ML VIAL"},{"code":"DMR000573","desc":"IOHEXOL 350MG IODINE/ML, 100 ML VIAL"},{"code":"DMR000586","desc":"IPRATROPIUM + SALBUTAMOL (500MCG IPRATROPIUM BROMIDE + 2.5MG SALBUTAMOL), 2.5ML NEBULE"},{"code":"DMR000594","desc":"IRON SUCROSE 20MG/ML, 5ML AMPULE"},{"code":"DMR000595","desc":"ISOFLURANE INHALATION 100ML BOTTLE"},{"code":"DMR000602","desc":"ISOSORBIDE DINITRATE 1MG/ML, 10ML AMPULE (IV)"},{"code":"DMR000630","desc":"LEUPRORELINE ACETATE 11.25 MG DEPOT SOLUTION, VIAL WITH SYRINGE (IM, SC)"},{"code":"DMR000631","desc":"LEUPRORELINE ACETATE 3.75 MG/ 2 ML VIAL WITH SYRINGE (IM, SC) POWDER"},{"code":"DMR000637","desc":"LEVETIRACETAM 500MG/5 ML (100 MG/ML) CONCENTRATE SOLUTION FOR IV INFUSION, 5 ML VIAL"},{"code":"DMR000643","desc":"LEVOFLOXACIN (0.5% W/V), 5MG/ML, OPHTHALMIC SOLUTION"},{"code":"DMR000675","desc":"LOSARTAN + HYDROCHLOROTHIAZIDE (50 MG LOSARTAN + 12.5 MG HYDROCHLOROTHIAZIDE) TABLET"},{"code":"DMR000715","desc":"METHYLPREDNISOLONE SODIUM SUCCINATE POWDER 1G/16ML + DILUENT VIAL (IM, IV, IV INFUSION)"},{"code":"DMR000716","desc":"METHYLPREDNISONLONE SODIUM SUCCINATE POWDER 500MG/8.0ML + DILUENT VIAL (IM, IV, IV INFUSION)"},{"code":"DMR000787","desc":"NOREPINEPHRINE BITARTRATE 1MG/ML, 2ML AMPULE (IV INFUSION)"},{"code":"DMR000789","desc":"NOREPINEPHRINE BITARTRATE 2MG/ML, 4ML AMPULE (8MG/4ML) SOLUTION FOR INJECTION"},{"code":"DMR000803","desc":"ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMR000826","desc":"OXYTOCIN 10 IU/ML, 1 ML AMPULE (IM,IV)"},{"code":"DMR000830","desc":"PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)"},{"code":"DMR000894","desc":"PHYTOMENADIONE 10MG/ML ,1ML AMPULE (IM,IV,SC)"},{"code":"DMR000902","desc":"POLYMYXIN B SULFATE 500,000 UNITS POWDER FOR SOLUTION FOR INJECTION (INTRATHECAL/IM/IV), 5ML VIAL"},{"code":"DMR000904","desc":"POTASSIUM CHLORIDE 2MEQ/ML, 20ML VIAL (IV INFUSION)"},{"code":"DMR000925","desc":"PROPRANOLOL HYDROCHLORIDE 40MG TABLET"},{"code":"DMR000948","desc":"RANITIDINE 300MG TABLET"},{"code":"DMR000972","desc":"ROPIVACAINE HYDROCHLORIDE 10MG/ML ,10ML AMPULE (IV)"},{"code":"DMR001001","desc":"SODIUM CHLORIDE 2.5MEQ/ML , 20ML VIAL"},{"code":"DMR001023","desc":"SUGAMMADEX 100MG/ML SOLUTION FOR INJECTION, 2ML VIAL (IV)"},{"code":"DMR001066","desc":"TRAMADOL HYDROCHLORIDE 50MG/ML,2ML AMPULE (IM,SC,IV)"},{"code":"DMR001068","desc":"TRANEXAMIC ACID 100MG/ML, 5ML AMPULE (IM,IV)"},{"code":"DMR001103","desc":"VANCOMYCIN HYDROCHLORIDE 1G VIAL (IV)"},{"code":"DMR001113","desc":"VITAMIN B COMPLEX (IV) (VITAMIN B1 B6 B12) 100 MG B1 + 100 MG B6 + 1 MG B12, 3 ML AMPULE (IV)"},{"code":"DMR001117","desc":"VORICONAZOLE 200MG LYOPHILIZED POWDER FOR SOLUTION FOR IV INFUSION, 30ML VIAL"},{"code":"DMC000861","desc":"(C) PHENOBARBITAL 15 MG TABLET"},{"code":"DMC000868","desc":"(C) PHENOBARBITAL 30 MG TABLET"},{"code":"DMC000871","desc":"(C) PHENOBARBITAL 60 MG TAB"},{"code":"DMC000873","desc":"(C) PHENOBARBITAL 90 MG TABLET"},{"code":"DMDON001127","desc":"(DON) OXYCODONE HYDROCHLORIDE 10MG/ML, 2ML AMPULE (IV INFUSION)"},{"code":"DMCSP000004","desc":"(DONCSP) FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)"},{"code":"DMR000348","desc":"DIAZEPAM 5MG/ML, 2ML AMPULE (IM, IV)"},{"code":"DMR000409","desc":"EPHEDRINE SULFATE 30MG/ML, 1ML AMPULE (IM, IV)"},{"code":"DMR000410","desc":"EPHEDRINE SULFATE 50MG/ML, 1ML AMPULE (IM, IV)"},{"code":"DMR000438","desc":"FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)"},{"code":"DMR000611","desc":"KETAMINE HYDROCHLORIDE 50MG/ML, 10ML VIAL (IM/IV)"},{"code":"DMR000730","desc":"MIDAZOLAM 1MG/ML, 5ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000731","desc":"MIDAZOLAM 5MG/ML, 1ML AMPULE (IM,IV)"},{"code":"DMR000732","desc":"MIDAZOLAM 5MG/ML, 3ML AMPULE (IM,IV)"},{"code":"DMR000746","desc":"MORPHINE SULFATE 10MG TABLET/CAPSULE"},{"code":"DMR000747","desc":"MORPHINE SULFATE 10MG/ML, 1ML AMPULE (IM,IV,SC)"},{"code":"DMR000764","desc":"NALBUPHINE HYDROCHLORIDE 10MG/ML, 1ML AMPULE (IM, IV, SC)"},{"code":"DMR000857","desc":"PETHIDINE (MEPERIDINE) HYDROCHLORIDE 50MG/ML, 2ML AMPULE (IM, IV, SC)"},{"code":"DMDON000412","desc":"(DON) EPIRUBICIN HCL 50MG VIAL CSPMAP"},{"code":"DMR000074","desc":"ANASTRAZOLE 1MG FILM COATED TABLET"},{"code":"DMR000174","desc":"CAPECITABINE 500MG TABLET"},{"code":"DMR000192","desc":"CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)"},{"code":"DMR000275","desc":"CISPLATIN 1MG/ML, 50ML VIAL (IV)"},{"code":"DMR000382","desc":"DOCETAXEL ANHYDROUS 20MG/0.5 ML, 0.5ML VIAL (IV INFUSION)"},{"code":"DMR000383","desc":"DOCETAXEL ANHYDROUS 40MG/ML, 2ML (80MG/2ML) VIAL (IV INFUSION)"},{"code":"DMR000412","desc":"EPIRUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)"},{"code":"DMR000546","desc":"HYDROXYUREA 500MG CAPSULE"},{"code":"DMR000557","desc":"IMATINIB 100MG TABLET"},{"code":"DMR000593","desc":"IRINOTECAN HYDROCHLORIDE 40MG/2ML VIAL, CONCENTRATE, VIAL (IV INFUSION)"},{"code":"DMR000628","desc":"LETROZOLE 2.5MG TABLET/FILM-COATED TABLET"},{"code":"DMR000696","desc":"MESNA (SODIUM-2- MERCAPTOETHANESULPHONATE) 100MG/ML, 4ML AMPULE"},{"code":"DMR001027","desc":"TAMOXIFEN CITRATE 20MG TABLET"},{"code":"DMR001125","desc":"ZOLEDRONIC ACID (4MG/5ML CONCENTRATED SOLUTION FOR IV INFUSION) VIAL"},{"code":"DMR000019","desc":"ACETYLCYSTEINE 100MG/ML, 3ML AMPULE SOLUTION FOR INHALATION"},{"code":"DMR000021","desc":"ACETYLCYSTEINE 200 MG/ML, 25 ML BOTTLE (IV INFUSION)"},{"code":"DMR000065","desc":"AMOXICILLIN TRIHYDRATE 250MG/5ML GRANULES/POWDER FOR SUSPENSION, 60ML BOTTLE"},{"code":"DMR000084","desc":"ASCORBIC ACID 100MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000110","desc":"AZITHROMYCIN DIHYDRATE 200MG/5ML POWDER FOR SUSPENSION, 15ML BOTTLE"},{"code":"DMR000236","desc":"CETIRIZINE DIHYDROCHLORIDE 10 MG/ML DROPS, 10 ML BOTTLE"},{"code":"DMR000239","desc":"CETIRIZINE DIHYDROCHLORIDE 1MG/ML SOLUTION 60 ML BOTTLE"},{"code":"DMR000240","desc":"CETIRIZINE DIHYDROCHLORIDE 2.5MG/ML SYRUP ORAL DROPS, 10ML BOTTLE"},{"code":"DMR000241","desc":"CETIRIZINE DIHYDROCHLORIDE 5MG/5ML SYRUP, 60 ML BOTTLE"},{"code":"DMR000305","desc":"CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 400 MG AMOXICILLIN TRIHYDRATE + 57 MG POTASSIUM CLAVULANATE PER 5 ML GRANULES/POWDER FOR SUSPENSION, 70 ML BOTTLE"},{"code":"DMR000371","desc":"DIPHENHYDRAMINE HYDROCHLORIDE 12.5MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000533","desc":"HUMAN RECOMBINANT TISSUE TYPE PLASMINOGEN ACTIVATOR (ALTEPLASE) 50MG POWDER FOR IV INFUSION"},{"code":"DMR000724","desc":"METRONIDAZOLE BENZOATE 125MG/5ML, SUSPENSION 60ML BOTTLE"},{"code":"DMR000750","desc":"MOXIFLOXACIN HYDROCHLORIDE 5MG/ML (0.5% W/V) STERILE OPHTHALMIC SOLUTION, 5 ML BOTTLE"},{"code":"DMR000754","desc":"MULTIVITAMINS PER 5ML,60ML SYRUP BOTTLE"},{"code":"DMR000760","desc":"MUPIROCIN OINTMENT 2% 5G TUBE"},{"code":"DMR000791","desc":"NYSTATIN 100,000 UNITS/ML, SUSPENSION 30ML BOTTLE"},{"code":"DMR000835","desc":"PARACETAMOL 100MG/ML DROPS, 15ML BOTTLE"},{"code":"DMR000843","desc":"PARACETAMOL 250MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000891","desc":"PHENYTOIN SODIUM 100MG CAPSULE"},{"code":"DMR000906","desc":"POTASSIUM CHLORIDE 750MG DURULES TABLET"},{"code":"DMR000988","desc":"SILVER SULFADIAZINE CREAM 1% ,15G TUBE"},{"code":"DMR000989","desc":"SILVER SULFADIAZINE CREAM 1% ,25G TUBE"},{"code":"DMR000990","desc":"SILVER SULFADIAZINE CREAM 1% ,500G JAR"},{"code":"DMR001002","desc":"SODIUM HYALURONATE OPHTHALMIC SOLUTION 0.1% (1MG/ML), 5ML BOTTLE"},{"code":"DMR001051","desc":"TOBRAMYCIN + DEXAMETHASONE EYE DROP SUSPENSION 0.3% + 0.1%, 5ML BOTTLE"},{"code":"DMR001075","desc":"TROPICAMIDE+ PHENYLEPHRINE HYDROCHLORIDE 5MG + 5MG/ML EYE DROPS FIXED DOSE COMBINATION, 10ML BOTTLE"},{"code":"DMDON000944","desc":"(DON) RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)"},{"code":"DMDON000943","desc":"(DON) VACCINE, RABIES (CHICK EMBRYO CELL) PURIFIED INACTIVATED 2.5 IU/ ML, 1 DOSE + 1 ML DILUENT VIAL ( WHO PRE-QUALIFIED)"},{"code":"DMR000067","desc":"AMPHOTERICIN B (LIPID COMPLEX) 50MG VIAL (IV INFUSION)"},{"code":"DMR000068","desc":"AMPHOTERICIN B (NON-LIPID COMPLEX) 50MG LYOPHILIZED POWDER,VIAL (IV INFUSION)"},{"code":"DMR000078","desc":"ANTI-TETANUS SERUM (EQUINE) 1500 IU/0.7ML SOLUTION FOR INJECTION AMPULE/VIAL (IM)"},{"code":"DMR000107","desc":"ATRACURIUM BESILATE 10MG/ML, 2.5ML AMPULE (IV)"},{"code":"DMR000123","desc":"BCG VACCINE 500MCG/ML VIAL + 1ML DILUENT IN AMPULE (ID) 20 DOSES"},{"code":"DMR000126","desc":"BERACTANT 25MG/ML SUSPENSION, 4ML VIAL (INTRATRACHEAL ADMINISTRATION)"},{"code":"DMR000127","desc":"BERACTANT 25MG/ML SUSPENSION, 8ML VIAL (INTRATRACHEAL ADMINISTRATION)"},{"code":"DMR000136","desc":"BIPHASIC ISOPHANE HUMAN INSULIN 70/30 (RECOMBINANT DNA) ,70% ISOPHANE SUSPENSION + 30% SOLUBLE INSULIN IN 100 IU/ML, 10ML VIAL (SC)"},{"code":"DMR000193","desc":"CARBOPROST 125MCG/ML, 0.5ML SOLUTION FOR INJECTION"},{"code":"DMR000194","desc":"CARBOPROST 250MCG/ML SOLUTION FOR INJECTION,1ML AMPULE/VIAL"},{"code":"DMR000413","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 10,000 IU/ML, PRE-FILLED SYRINGE (IV,SC)"},{"code":"DMR000415","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4,000 IU/0.4 ML, PRE‐FILLED SYRINGE (IV,SC)"},{"code":"DMR000445","desc":"FILGRASTIM (G-CSF) 300MCG/ML 0.5 ML SOLUTION FOR INJECTION IN PREFILLED SYRINGE (IV, SC)"},{"code":"DMR000448","desc":"FILGRASTIM 300MCG, 0.9ML PRE FILLED SYRINGE,"},{"code":"DMR000526","desc":"HEPATITIS A INACTIVATED VACCINE VIRAL ANTIGEN NOT LESS THAN 1440 EU IN 1.0 ML MONODOSE VIAL (IM) (ADULT)"},{"code":"DMR000527","desc":"HEPATITIS B IMMUNOGLOBULIN (HUMAN) 0.5ML VIAL (IM)"},{"code":"DMR000528","desc":"HEPATITIS B VACCINE (RECOMBINANT DNA) 20 MICROGRAMS/ML MONODOSE VIAL (IM) ADULT"},{"code":"DMR000529","desc":"HEPATITIS B VACCINE (RECOMBINANT DNA)10MCG/0.5ML MONODOSE VIAL (IM) (PEDIATRIC"},{"code":"DMR001133","desc":"IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 200ML VIAL (IV)"},{"code":"DMR000559","desc":"IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 100ML VIAL (IV)"},{"code":"DMR000563","desc":"INFLUENZA POLYVALENT VACCINE 0.5ML, SUSPENSION FOR INJECTION ( VAXIGRIP TETRA PRE-FILED SYRINGE)"},{"code":"DMR000600","desc":"ISOPHANE INSULIN HUMAN (RECOMBINANT DNA) 100IU/ML, 10ML VIAL (SC)"},{"code":"DMR000792","desc":"OCTREOTIDE ACETATE 100MCG/ML, 1 ML AMPULE (IV INFUSION)"},{"code":"DMR000943","desc":"RABIES VACCINE,CHICK EMBRYO CELL (PURIFIED INACTIVATED) LYOPHILIZED POWDER, 2.5 IU/ML, 1 DOSE VIAL + 1 ML DILUENT (ID, IM)"},{"code":"DMR000944","desc":"RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)"},{"code":"DMR000951","desc":"REGULAR, INSULIN (RECOMBINANT DNA HUMAN) 100 IU/ML, 10ML VIAL (SC, IV/IM)"},{"code":"DMR000971","desc":"ROCURONIUM BROMIDE 10MG/ML, 5ML AMPULE/VIAL (IV)"},{"code":"DMR001025","desc":"SUXAMETHONIUM (SUCCINYLCHOLINE) CHLORIDE 20MG/ML, 10ML VIAL (IV)"},{"code":"DMR001026","desc":"TAFLUPROST OPHTHALMIC SOLUTION 15MCG/ML, 0.3ML BOTTLE SINGLE DOSE"},{"code":"DMR001042","desc":"TETANUS IMMUNOGLOBULIN (HUMAN) 250 IU/ML, 1ML AMPULE (IM)"},{"code":"DMR001044","desc":"TETANUS TOXOID 0.5ML AMPULE (IM)"},{"code":"DMR001106","desc":"VASOPRESSIN 20IU/ML VIAL/AMPULE (IM, IV)"},{"code":"DMR000070","desc":"AMPICILLIN + SULBACTAM (500MG AMPICILLIN + 250MG SULBACTAM) VIAL (IM,IV)"},{"code":"DMR000071","desc":"AMPICILLIN SODIUM 1G VIAL (IM,IV)"},{"code":"DMR000072","desc":"AMPICILLIN SODIUM 250MG VIAL (IM,IV)"},{"code":"DMR000520","desc":"GLUCOSE (DEXTROSE) 50%, 50ML VIAL (IV)"},{"code":"DMR000577","desc":"IOPAMIDOL 755MG/ML EQUIV. TO 370 MG IODINE, 100 ML VIAL/BOTTLE"},{"code":"DMR000656","desc":"LIDOCAINE SPRAY 10%, 50ML BOTTLE"},{"code":"DMR000848","desc":"PENICILLIN G CRYSTALLINE SODIUM (BENZYLPENICILLIN) 1M UNITS VIAL (IM/IV)"},{"code":"DMR000849","desc":"PENICILLIN G CRYSTALLINE SODIUM 5M UNITS VIAL (IM,IV)"},{"code":"DMDON000719","desc":"(DON) (ACTU USE ONLY) METOCLOPRAMIDE HYDROCHLORIDE 5MG/ML, 2ML AMPULE (IM, IV)"},{"code":"DMDON000382","desc":"(DON) (ACTU USE) DOCETAXEL 20MG/0.5ML (40MG/ML),1ML CONCENTRATE FOR SOLUTION FOR INFUSION (AS TRIHYDRATE)"},{"code":"DMDON000804","desc":"(DON) (FOR ACTU USE ONLY) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMDON000329","desc":"(DON) CYTARABINE 100MG/ML, 5ML VIAL CSPMAP"},{"code":"DMDON000383","desc":"(DON) DOCETAXEL 40MG/ML (80MG/2ML), 2ML CONCENTRATE FOR SOLUTION FOR IV INFUSION"},{"code":"DMDON000393","desc":"(DON) DOXORUBICIN 50MG VIAL"},{"code":"DMDON000815","desc":"(DON) OXALIPLATIN 5 MG/ML CONCENTRATE SOLUTION 10 ML VIAL (IV INFUSION)"},{"code":"DMDON000830","desc":"(DON) PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)"},{"code":"DMCSP000012","desc":"(DONCSP)CAPECITABINE 500MG TABLET"},{"code":"DMCSP000014","desc":"(DONCSP) CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)"},{"code":"DMCSP000011","desc":"(DONCSP) LETROZOLE 2.5MG TABLET/FILM-COATED TABLET"},{"code":"DMCSP000005","desc":"(DONCSP) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMCSP000010","desc":"(DONCSP) TAMOXIFEN 20MG TABLET"},{"code":"DMDON000390","desc":"(DON) DOXORUBICIN HCL 10MG VIAL (DOANTION)-CSPMAP"},{"code":"DMDON000967","desc":"(DON) RITUXIMAB 10MG/ML, 10 ML VIAL (IV)"},{"code":"DMDON000968","desc":"(DON) RITUXIMAB 10MG/ML, 50 ML VIAL (IV)"},{"code":"DMCSP000008","desc":"(DONCSP) FILGRASTIM 300MCG/0.9ML SOLUTION (IV,SC), 0.9ML PRE-FILLED SYRINGE"},{"code":"DMR000392","desc":"DOXORUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)"},{"code":"DMR000967","desc":"RITUXIMAB 10MG/ML, 10 ML VIAL (IV)"},{"code":"DMR000968","desc":"RITUXIMAB 10MG/ML, 50 ML VIAL (IV)"},{"code":"DMR001071","desc":"TRASTUZUMAB 150 MG LYOPHILIZED POWDER (IV INFUSION) VIAL"},{"code":"DMR001072","desc":"TRASTUZUMAB 600MG/5ML (120MG/ML) SOLUTION FOR INJECTION, 5ML VIAL"},{"code":"DMR000037","desc":"ALBUMIN, HUMAN 25% 50ML BOTTLE (IV, IV INFUSION)"},{"code":"DMR000166","desc":"CALCIUM CARBONATE 500MG TABLET/CHEWABLE TABLET"},{"code":"DMR000248","desc":"CHLORHEXIDINE GLUCONATE 4% SOLUTION 500 ML BOTTLE"},{"code":"DMR000441","desc":"FERROUS SULFATE + FOLIC ACID 60 MG ELEMENTAL IRON + 400 MICROGRAM FOLIC ACID PER TABLET/CAPSULE/FILM COATED TABLET"},{"code":"DMR000572","desc":"IOHEXOL 300MG IODINE/ML, 50 ML VIAL"},{"code":"DMR000681","desc":"MAGNESIUM SULFATE HEPTAHYDRATE 250MG/ML, 20ML VIAL (IV)"},{"code":"DMDON000558","desc":"(DON) IMATINIB (as mesylate) 400MG TABLET"},{"code":"DMDON000631","desc":"(DON) LEUPRORELINE ACETATE 3.75MG PRE-FILLED SYRINGE"},{"code":"DMDON000829","desc":"(DON) PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL"},{"code":"DMCSP000003","desc":"(DONCSP) ANASTRAZOLE 1MG FILM COATED TABLET"},{"code":"DMR000326","desc":"CYCLOPHOSPHAMIDE POWDER 500MG VIAL (IV)"},{"code":"DMR000329","desc":"CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 5ML VIAL/AMPULE"},{"code":"DMR000804","desc":"ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMR000816","desc":"OXALIPLATIN POWDER 50MG VIAL (IV INFUSION)"},{"code":"DMR000829","desc":"PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL"},{"code":"DMR000416","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4000IU/ML SOLUTION FOR INJECTION, 1ML PREFILLED SYRINGE (IV, SC)"},{"code":"DMR000560","desc":"IMMUNOGLOBULIN NORMAL, HUMAN (IGIV) 50MG/ML, 50ML VIAL (IV)"}];
+
+  // Load Inventory from Google Apps Script Backend
+  function loadInventory() {
+    setLoading(true);
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(onInventoryLoaded)
+        .withFailureHandler(onApiError)
+        .getInventoryData();
+    } else {
+      // Mock Data for local testing / preview outside Google Apps Script
+      console.warn("Running in preview mode (mock data with Brand, Price & Sheet1 Master Catalog)");
+      setTimeout(() => {
+        onInventoryLoaded({
+          success: true,
+          items: [
+            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', brandName: 'Tegretol', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 12.50, isDonation: true, isZeroStock: false },
+            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', brandName: 'Lexapro', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', acquisitionPrice: 28.00, isDonation: false, isZeroStock: false },
+            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, isDonation: false, isZeroStock: false },
+            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, isDonation: false, isZeroStock: false },
+            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, isDonation: false, isZeroStock: true }
+          ],
+          catalog: DEFAULT_MOCK_DCI_CATALOG
+        });
+      }, 500);
+    }
+  }
+
+  function onInventoryLoaded(response) {
+    setLoading(false);
+    if (!response.success) {
+      showToast(response.error || "Failed to load inventory.", "error");
+      return;
+    }
+
+    state.items = response.items || [];
+    if (response.catalog && Array.isArray(response.catalog) && response.catalog.length > 0) {
+      state.masterCatalog = response.catalog;
+    } else if (!state.masterCatalog || state.masterCatalog.length === 0) {
+      state.masterCatalog = DEFAULT_MOCK_DCI_CATALOG;
+    }
+    renderStats();
+    applyFilter();
+    populateCatalogDatalists();
+    setupComboboxEvents();
+  }
+
+  function onApiError(err) {
+    setLoading(false);
+    showToast(err.message || "An error occurred with Google Apps Script.", "error");
+  }
+
+  function setLoading(isLoading) {
+    state.loading = isLoading;
+    const spinner = document.getElementById('loading-spinner');
+    if (spinner) {
+      spinner.style.display = isLoading ? 'flex' : 'none';
+    }
+  }
+
+  // Calculate & Render Stats Banner
+  function renderStats() {
+    const totalItems = state.items.length;
+    const totalUnits = state.items.reduce((sum, item) => sum + (item.qty || 0), 0);
+    const critical2026 = state.items.filter(i => i.expStatus === 'CRITICAL_2026').length;
+    const near2027 = state.items.filter(i => i.expStatus === 'NEAR_2027').length;
+    const zeroStock = state.items.filter(i => i.isZeroStock).length;
+
+    document.getElementById('stat-total-items').textContent = totalItems.toLocaleString();
+    document.getElementById('stat-total-qty').textContent = totalUnits.toLocaleString() + ' units';
+    document.getElementById('stat-2026-count').textContent = critical2026;
+    document.getElementById('stat-2027-count').textContent = near2027;
+    document.getElementById('stat-zero-count').textContent = zeroStock;
+  }
+
+  // Filter and Live Search Logic (Matches Code, Generic, Brand, Expiry)
+  function applyFilter() {
+    const query = (document.getElementById('search-input').value || '').toLowerCase().trim();
+    const statusFilter = document.getElementById('filter-status').value;
+
+    state.filteredItems = state.items.filter(item => {
+      const matchQuery = !query || 
+        item.itemCode.toLowerCase().includes(query) || 
+        item.itemDesc.toLowerCase().includes(query) ||
+        (item.brandName && item.brandName.toLowerCase().includes(query)) ||
+        item.expDate.toLowerCase().includes(query);
+
+      let matchStatus = true;
+      if (statusFilter === 'CRITICAL_2026') matchStatus = item.expStatus === 'CRITICAL_2026';
+      else if (statusFilter === 'NEAR_2027') matchStatus = item.expStatus === 'NEAR_2027';
+      else if (statusFilter === 'SAFE') matchStatus = item.expStatus === 'SAFE';
+      else if (statusFilter === 'NO_EXPIRY') matchStatus = item.expStatus === 'NO_EXPIRY';
+      else if (statusFilter === 'ZERO') matchStatus = item.isZeroStock;
+      else if (statusFilter === 'DONATION') matchStatus = item.isDonation;
+
+      return matchQuery && matchStatus;
+    });
+
+    renderInventoryTable();
+  }
+
+  // Render Main Inventory Table (Option A Layout: Code | Generic | Brand | Qty | Expiry | Price | Actions)
+  function renderInventoryTable() {
+    const tbody = document.getElementById('inventory-table-body');
+    tbody.innerHTML = '';
+
+    if (state.filteredItems.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>`;
+      return;
+    }
+
+    state.filteredItems.forEach(item => {
+      const tr = document.createElement('tr');
+      if (item.isZeroStock) tr.classList.add('zero-stock-row');
+
+      let badgeHtml = '';
+      if (item.expStatus === 'CRITICAL_2026') {
+        badgeHtml = `<span class="badge badge-danger">🔴 2026 Risk (${item.expDate})</span>`;
+      } else if (item.expStatus === 'NEAR_2027') {
+        badgeHtml = `<span class="badge badge-warning">🟠 2027 Near (${item.expDate})</span>`;
+      } else if (item.expStatus === 'SAFE') {
+        badgeHtml = `<span class="badge badge-success">🟢 ${item.expDate}</span>`;
+      } else {
+        badgeHtml = `<span class="badge badge-neutral">⚪ ${item.expDate}</span>`;
+      }
+
+      const catBadge = item.isDonation 
+        ? `<span class="badge badge-donation" style="margin-left:4px;">Donation</span>` 
+        : '';
+
+      const brandBadge = item.brandName 
+        ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>`
+        : `<span style="color:#94a3b8; font-style:italic;">--</span>`;
+
+      const qtyDisplay = item.isZeroStock 
+        ? `<span class="qty-zero">0 (Out of Stock)</span>` 
+        : `<span class="qty-display">${item.qty.toLocaleString()}</span>`;
+
+      const priceDisplay = (typeof item.acquisitionPrice === 'number' && item.acquisitionPrice > 0)
+        ? `<span class="price-display">₱${item.acquisitionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
+        : `<span style="color:#94a3b8;">₱0.00</span>`;
+
+      tr.innerHTML = `
+        <td style="font-family:monospace; font-weight:600; color:#1e293b;">${escapeHtml(item.itemCode)}</td>
+        <td>
+          <div style="font-weight:600;">${escapeHtml(item.itemDesc)} ${catBadge}</div>
+          <div style="font-size:11px; color:#64748b;">Row ${item.rowIndex} in Sheet</div>
+        </td>
+        <td>${brandBadge}</td>
+        <td style="text-align:right;">${qtyDisplay}</td>
+        <td>${badgeHtml}</td>
+        <td style="text-align:right;">${priceDisplay}</td>
+        <td style="text-align:right;">
+          <div style="display:inline-flex; gap:6px;">
+            <button class="btn btn-sm btn-danger" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
+              ➖ Out
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="openEditBatchModal(${item.rowIndex})">
+              ✏️ Edit
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // --- STOCK OUT MODAL ACTIONS (BRAND + FINANCIAL DEDUCTION) ---
+  function openStockOutModal(rowIndex) {
+    const item = state.items.find(i => i.rowIndex === rowIndex);
+    if (!item) return;
+
+    state.selectedRow = item;
+    document.getElementById('so-code').textContent = item.itemCode;
+    document.getElementById('so-desc').textContent = item.itemDesc;
+    
+    const brandEl = document.getElementById('so-brand-badge');
+    brandEl.textContent = item.brandName || 'Brand Batch';
+    
+    document.getElementById('so-exp').textContent = item.expDate;
+    
+    const unitPrice = typeof item.acquisitionPrice === 'number' ? item.acquisitionPrice : 0;
+    document.getElementById('so-price').textContent = '₱' + unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    document.getElementById('so-current-qty').textContent = item.qty.toLocaleString() + ' units';
+    document.getElementById('so-input-qty').value = '';
+    document.getElementById('so-input-qty').max = item.qty;
+    document.getElementById('so-remarks').value = '';
+    document.getElementById('so-remaining-preview').textContent = item.qty.toLocaleString() + ' units';
+    document.getElementById('so-cost-preview').textContent = '₱0.00';
+
+    document.getElementById('modal-stock-out').style.display = 'flex';
+    document.getElementById('so-input-qty').focus();
+  }
+
+  function updateStockOutPreview() {
+    if (!state.selectedRow) return;
+    const outVal = parseFloat(document.getElementById('so-input-qty').value) || 0;
+    const rem = state.selectedRow.qty - outVal;
+    const price = typeof state.selectedRow.acquisitionPrice === 'number' ? state.selectedRow.acquisitionPrice : 0;
+    const totalCost = outVal > 0 ? (outVal * price) : 0;
+
+    const previewRem = document.getElementById('so-remaining-preview');
+    const previewCost = document.getElementById('so-cost-preview');
+
+    if (rem < 0) {
+      previewRem.textContent = 'Invalid (Exceeds current stock)';
+      previewRem.style.color = '#dc2626';
+      previewCost.textContent = '₱0.00';
+    } else {
+      previewRem.textContent = rem.toLocaleString() + ' units';
+      previewRem.style.color = '#0f172a';
+      previewCost.textContent = '₱' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+  }
+
+  function submitStockOut() {
+    if (!state.selectedRow) return;
+    const qtyOut = parseFloat(document.getElementById('so-input-qty').value);
+    const remarks = document.getElementById('so-remarks').value.trim();
+
+    if (isNaN(qtyOut) || qtyOut <= 0) {
+      showToast("Please enter a valid positive quantity to deduct.", "error");
+      return;
+    }
+
+    if (qtyOut > state.selectedRow.qty) {
+      showToast(`Cannot deduct ${qtyOut.toLocaleString()}! Current storage only has ${state.selectedRow.qty.toLocaleString()}.`, "error");
+      return;
+    }
+
+    const payload = {
+      rowIndex: state.selectedRow.rowIndex,
+      itemCode: state.selectedRow.itemCode,
+      qtyOut: qtyOut,
+      remarks: remarks || 'Stock-Out Dispense'
+    };
+
+    setModalLoading('modal-stock-out', true);
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          setModalLoading('modal-stock-out', false);
+          closeModal('modal-stock-out');
+          if (res.success) {
+            showToast(res.message, "success");
+            loadInventory();
+          } else {
+            showToast(res.error, "error");
+          }
+        })
+        .withFailureHandler(err => {
+          setModalLoading('modal-stock-out', false);
+          showToast(err.message, "error");
+        })
+        .recordStockOut(payload);
+    } else {
+      // Mock local update
+      state.selectedRow.qty -= qtyOut;
+      state.selectedRow.isZeroStock = state.selectedRow.qty <= 0;
+      const unitPrice = state.selectedRow.acquisitionPrice || 0;
+      const totalCost = qtyOut * unitPrice;
+      setModalLoading('modal-stock-out', false);
+      closeModal('modal-stock-out');
+      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} units of ${state.selectedRow.itemDesc} [${state.selectedRow.brandName}] (₱${totalCost.toFixed(2)})`, "success");
+      renderStats();
+      applyFilter();
+    }
+  }
+
+  // --- EDIT / RESTOCK BATCH MODAL ---
+  function openEditBatchModal(rowIndex) {
+    const item = state.items.find(i => i.rowIndex === rowIndex);
+    if (!item) return;
+
+    state.selectedRow = item;
+    document.getElementById('edit-code').value = item.itemCode;
+    document.getElementById('edit-desc').value = item.itemDesc;
+    document.getElementById('edit-brand').value = item.brandName || '';
+    document.getElementById('edit-qty').value = item.qty;
+    document.getElementById('edit-exp').value = item.expDate === 'NO EXPIRY' ? '' : item.expDate;
+    document.getElementById('edit-price').value = item.acquisitionPrice || '';
+    document.getElementById('edit-row-info').textContent = `Editing Google Sheet Row #${item.rowIndex}`;
+
+    document.getElementById('modal-edit-batch').style.display = 'flex';
+  }
+
+  function submitEditBatch() {
+    if (!state.selectedRow) return;
+    const newDesc = document.getElementById('edit-desc').value.trim();
+    const newBrand = document.getElementById('edit-brand').value.trim();
+    const newQty = parseFloat(document.getElementById('edit-qty').value) || 0;
+    const newExp = document.getElementById('edit-exp').value.trim();
+    const newPrice = parseFloat(document.getElementById('edit-price').value) || 0;
+
+    if (!newBrand) {
+      showToast("Brand Name is required.", "error");
+      return;
+    }
+
+    const payload = {
+      rowIndex: state.selectedRow.rowIndex,
+      itemCode: state.selectedRow.itemCode,
+      itemDesc: newDesc,
+      brandName: newBrand,
+      newQty: newQty,
+      newExpDate: newExp,
+      acquisitionPrice: newPrice
+    };
+
+    setModalLoading('modal-edit-batch', true);
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          setModalLoading('modal-edit-batch', false);
+          closeModal('modal-edit-batch');
+          if (res.success) {
+            showToast(res.message, "success");
+            loadInventory();
+          } else {
+            showToast(res.error, "error");
+          }
+        })
+        .withFailureHandler(err => {
+          setModalLoading('modal-edit-batch', false);
+          showToast(err.message, "error");
+        })
+        .updateMedicineBatch(payload);
+    } else {
+      state.selectedRow.qty = newQty;
+      state.selectedRow.expDate = newExp;
+      state.selectedRow.itemDesc = newDesc;
+      state.selectedRow.brandName = newBrand;
+      state.selectedRow.acquisitionPrice = newPrice;
+      state.selectedRow.isZeroStock = newQty <= 0;
+      setModalLoading('modal-edit-batch', false);
+      closeModal('modal-edit-batch');
+      showToast(`[Mock] Batch updated successfully!`, "success");
+      renderStats();
+      applyFilter();
+    }
+  }
+
+  // --- ADD MEDICINE / NEW BATCH SMART CHECK ---
+  function onAddCodeOrDescChange() {
+    const codeInput = document.getElementById('add-code').value.trim().toUpperCase();
+    const previewBox = document.getElementById('add-batch-preview');
+    const previewContent = document.getElementById('add-batch-preview-content');
+
+    if (!codeInput) {
+      previewBox.style.display = 'none';
+      return;
+    }
+
+    // Check if itemCode already exists in inventory
+    const existingBatches = state.items.filter(i => i.itemCode.toUpperCase() === codeInput);
+
+    if (existingBatches.length > 0) {
+      const matchDesc = existingBatches[0].itemDesc;
+      if (!document.getElementById('add-desc').value) {
+        document.getElementById('add-desc').value = matchDesc;
+      }
+      
+      const lastRow = Math.max(...existingBatches.map(b => b.rowIndex));
+      
+      let html = `<div style="color:#2563eb; font-weight:700; margin-bottom:4px;">
+        📌 Existing DCI Code Found (${existingBatches.length} batch${existingBatches.length > 1 ? 'es' : ''} in inventory):
+      </div>`;
+      html += `<ul style="padding-left:16px; margin-bottom:6px; line-height:1.6;">`;
+      existingBatches.forEach(b => {
+        const brandStr = b.brandName ? `Brand: <strong>${escapeHtml(b.brandName)}</strong>` : 'Generic';
+        const priceStr = b.acquisitionPrice ? ` | Price: <strong>₱${Number(b.acquisitionPrice).toFixed(2)}</strong>` : '';
+        html += `<li>Row ${b.rowIndex}: ${brandStr} | Qty <strong>${b.qty.toLocaleString()}</strong> | Expiry <strong>${b.expDate}</strong>${priceStr}</li>`;
+      });
+      html += `</ul>`;
+      html += `<div style="background:#e0f2fe; padding:8px 12px; border-radius:6px; color:#0369a1; font-weight:600;">
+        ✨ Smart Batch Grouping: This new brand delivery will be automatically inserted at <strong>Row ${lastRow + 1}</strong> (directly grouped below the last batch of this medicine).
+      </div>`;
+
+      previewContent.innerHTML = html;
+      previewBox.style.display = 'block';
+    } else {
+      previewContent.innerHTML = `<span style="color:#059669; font-weight:600;">✨ New DCI Code: This medicine is not in the system yet. It will be added to the bottom of the inventory master list.</span>`;
+      previewBox.style.display = 'block';
+    }
+  }
+
+  function submitAddNew() {
+    const code = document.getElementById('add-code').value.trim();
+    const desc = document.getElementById('add-desc').value.trim();
+    const brand = document.getElementById('add-brand').value.trim();
+    const qty = parseFloat(document.getElementById('add-qty').value) || 0;
+    const exp = document.getElementById('add-exp').value.trim();
+    const price = parseFloat(document.getElementById('add-price').value) || 0;
+
+    if (!code || !desc) {
+      showToast("Please enter both DCI Item Code and Generic Description.", "error");
+      return;
+    }
+
+    if (!brand) {
+      showToast("Brand Name is required for every batch delivery.", "error");
+      return;
+    }
+
+    const payload = {
+      itemCode: code,
+      itemDesc: desc,
+      brandName: brand,
+      qty: qty,
+      expDate: exp,
+      acquisitionPrice: price
+    };
+
+    setLoading(true);
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          setLoading(false);
+          if (res.success) {
+            showToast(`${res.message} (${res.mode})`, "success");
+            // Clear form
+            resetDciSelection();
+            document.getElementById('add-brand').value = '';
+            document.getElementById('add-qty').value = '';
+            document.getElementById('add-exp').value = '';
+            document.getElementById('add-price').value = '';
+            document.getElementById('add-batch-preview').style.display = 'none';
+            // Switch to inventory tab and reload
+            switchTab('tab-inventory');
+            loadInventory();
+          } else {
+            showToast(res.error, "error");
+          }
+        })
+        .withFailureHandler(err => {
+          setLoading(false);
+          showToast(err.message, "error");
+        })
+        .addNewMedicineOrBatch(payload);
+    } else {
+      setLoading(false);
+      showToast(`[Mock] Successfully saved ${code} - ${desc} [${brand}] (₱${price.toFixed(2)})`, "success");
+      resetDciSelection();
+      document.getElementById('add-brand').value = '';
+      document.getElementById('add-qty').value = '';
+      document.getElementById('add-exp').value = '';
+      document.getElementById('add-price').value = '';
+      switchTab('tab-inventory');
+    }
+  }
+
+  // --- RESTOCK TAB FILTER ---
+  function filterRestockTable() {
+    const zeroItems = state.items.filter(i => i.isZeroStock);
+    const tbody = document.getElementById('restock-table-body');
+    tbody.innerHTML = '';
+
+    if (zeroItems.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#16a34a; font-weight:600;">🎉 No 0-quantity items! All inventory lines currently have stock.</td></tr>`;
+      return;
+    }
+
+    zeroItems.forEach(item => {
+      const tr = document.createElement('tr');
+      const brandBadge = item.brandName 
+        ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>` 
+        : '<span style="color:#94a3b8;">--</span>';
+      const priceDisplay = (item.acquisitionPrice > 0)
+        ? `₱${item.acquisitionPrice.toFixed(2)}`
+        : '₱0.00';
+
+      tr.innerHTML = `
+        <td style="font-family:monospace; font-weight:600;">${escapeHtml(item.itemCode)}</td>
+        <td><strong>${escapeHtml(item.itemDesc)}</strong></td>
+        <td>${brandBadge}</td>
+        <td><span class="badge badge-neutral">${item.expDate}</span></td>
+        <td style="text-align:right; font-family:monospace;">${priceDisplay}</td>
+        <td><span class="qty-zero">0 units</span></td>
+        <td style="text-align:right;">
+          <button class="btn btn-sm btn-primary" onclick="openEditBatchModal(${item.rowIndex})">
+            🔄 Restock & Update
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // --- STOCK OUT AUDIT LOGS ---
+  function loadLogs() {
+    const tbody = document.getElementById('logs-table-body');
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px;">Loading audit logs...</td></tr>`;
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.success) {
+            renderLogsTable(res.logs || []);
+          } else {
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#dc2626;">${res.error}</td></tr>`;
+          }
+        })
+        .withFailureHandler(err => {
+          tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+        })
+        .getRecentLogs(50);
+    } else {
+      // Mock Logs
+      renderLogsTable([
+        { 
+          timestamp: '2026-10-13 14:30:00', 
+          itemCode: 'DMR000451', 
+          itemDesc: 'FLUCONAZOLE 200MG CAPSULE', 
+          brandName: 'Diflucan', 
+          expDate: 'Jun-28', 
+          unitPrice: 125.00, 
+          qtyOut: 20, 
+          totalCost: 2500.00, 
+          previousQty: 200, 
+          remainingBalance: 180, 
+          remarks: 'ICU Dispense', 
+          user: 'pharmacist@armmc.gov.ph' 
+        }
+      ]);
+    }
+  }
+
+  function renderLogsTable(logs) {
+    const tbody = document.getElementById('logs-table-body');
+    tbody.innerHTML = '';
+
+    if (logs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No stock-out transactions recorded yet.</td></tr>`;
+      return;
+    }
+
+    logs.forEach(log => {
+      const tr = document.createElement('tr');
+      const brandStr = log.brandName 
+        ? `<span class="badge badge-brand">${escapeHtml(log.brandName)}</span>` 
+        : '<span style="color:#94a3b8;">--</span>';
+      
+      const unitPriceFormatted = Number(log.unitPrice || 0) > 0 
+        ? `₱${Number(log.unitPrice).toFixed(2)}` 
+        : '₱0.00';
+
+      const totalValueFormatted = Number(log.totalCost || 0) > 0 
+        ? `₱${Number(log.totalCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+        : '₱0.00';
+
+      tr.innerHTML = `
+        <td style="font-size:11px; color:#64748b; white-space:nowrap;">${log.timestamp}</td>
+        <td style="font-family:monospace; font-weight:600;">${escapeHtml(log.itemCode)}</td>
+        <td>${escapeHtml(log.itemDesc)}</td>
+        <td>${brandStr}</td>
+        <td><span class="badge badge-neutral">${log.expDate}</span></td>
+        <td style="text-align:right; font-family:monospace;">${unitPriceFormatted}</td>
+        <td style="text-align:right; font-weight:700; color:#dc2626;">-${Number(log.qtyOut).toLocaleString()}</td>
+        <td style="text-align:right; font-family:monospace; font-weight:700; color:#047857;">${totalValueFormatted}</td>
+        <td style="text-align:right; font-family:monospace;">${Number(log.remainingBalance).toLocaleString()}</td>
+        <td style="font-size:12px; color:#475569;">${escapeHtml(log.remarks || '')}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Helpers
+  function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+  }
+
+  function setModalLoading(modalId, isLoading) {
+    const modal = document.getElementById(modalId);
+    const btns = modal.querySelectorAll('button');
+    btns.forEach(b => b.disabled = isLoading);
+  }
+
+  // --- MASTER DCI FORMULARY & SEARCHABLE COMBOBOX SYSTEM ---
+  function setupComboboxEvents() {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    if (!codeInput || !descInput) return;
+
+    // Reset previous listeners
+    codeInput.oninput = handleCodeInput;
+    codeInput.onfocus = () => {
+      renderDropdownItems('code', codeInput.value.trim());
+      openDropdown('code');
+    };
+    codeInput.onkeydown = (e) => handleComboboxKeydown(e, 'code');
+
+    descInput.oninput = handleDescInput;
+    descInput.onfocus = () => {
+      renderDropdownItems('desc', descInput.value.trim());
+      openDropdown('desc');
+    };
+    descInput.onkeydown = (e) => handleComboboxKeydown(e, 'desc');
+
+    // Global outside click listener to close dropdowns
+    document.addEventListener('click', (e) => {
+      const wrapperCode = document.getElementById('combobox-code-wrapper');
+      const wrapperDesc = document.getElementById('combobox-desc-wrapper');
+      const inCode = wrapperCode && wrapperCode.contains(e.target);
+      const inDesc = wrapperDesc && wrapperDesc.contains(e.target);
+
+      if (!inCode && !inDesc) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
+  function handleCodeInput(e) {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const q = codeInput.value.trim();
+    updateClearBtn('add-code', q);
+    renderDropdownItems('code', q);
+    openDropdown('code');
+
+    // Bi-directional Auto-Sync: Exact match on DCI Code immediately sets Generic Description
+    if (q && state.masterCatalog && state.masterCatalog.length > 0) {
+      const match = state.masterCatalog.find(item => item.code.toUpperCase() === q.toUpperCase());
+      if (match && match.desc) {
+        descInput.value = match.desc;
+        updateClearBtn('add-desc', match.desc);
+      }
+    }
+
+    onAddCodeOrDescChange();
+  }
+
+  function handleDescInput(e) {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const q = descInput.value.trim();
+    updateClearBtn('add-desc', q);
+    renderDropdownItems('desc', q);
+    openDropdown('desc');
+
+    // Bi-directional Auto-Sync: Exact match on Generic Description immediately sets DCI Code
+    if (q && state.masterCatalog && state.masterCatalog.length > 0) {
+      const match = state.masterCatalog.find(item => item.desc.toUpperCase() === q.toUpperCase());
+      if (match && match.code) {
+        codeInput.value = match.code;
+        updateClearBtn('add-code', match.code);
+      }
+    }
+
+    onAddCodeOrDescChange();
+  }
+
+  function toggleComboboxDropdown(type, event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    const dropdown = document.getElementById(`dropdown-${type}`);
+    if (!dropdown) return;
+
+    if (state.activeDropdown === type) {
+      closeAllDropdowns();
+    } else {
+      closeAllDropdowns();
+      const input = document.getElementById(type === 'code' ? 'add-code' : 'add-desc');
+      renderDropdownItems(type, input ? input.value.trim() : '');
+      openDropdown(type);
+      if (input) input.focus();
+    }
+  }
+
+  function openDropdown(type) {
+    closeAllDropdowns();
+    const dropdown = document.getElementById(`dropdown-${type}`);
+    if (dropdown) {
+      dropdown.style.display = 'block';
+      state.activeDropdown = type;
+      state.focusedIndex = -1;
+    }
+  }
+
+  function closeAllDropdowns() {
+    const dropCode = document.getElementById('dropdown-code');
+    const dropDesc = document.getElementById('dropdown-desc');
+    if (dropCode) dropCode.style.display = 'none';
+    if (dropDesc) dropDesc.style.display = 'none';
+    state.activeDropdown = null;
+    state.focusedIndex = -1;
+  }
+
+  function updateClearBtn(inputId, value) {
+    const btn = document.getElementById(inputId === 'add-code' ? 'btn-clear-code' : 'btn-clear-desc');
+    if (btn) {
+      btn.style.display = value ? 'flex' : 'none';
+    }
+  }
+
+  function renderDropdownItems(type, query) {
+    const listEl = document.getElementById(`list-${type}`);
+    const countEl = document.getElementById(`count-${type}-matches`);
+    if (!listEl) return;
+
+    const catalog = state.masterCatalog || [];
+    const qLower = (query || '').toLowerCase().trim();
+
+    let matches = [];
+    if (!qLower) {
+      matches = catalog;
+    } else {
+      matches = catalog.filter(item => {
+        const c = item.code.toLowerCase();
+        const d = item.desc.toLowerCase();
+        return c.includes(qLower) || d.includes(qLower);
+      }).sort((a, b) => {
+        const aCodeMatch = a.code.toLowerCase().startsWith(qLower);
+        const bCodeMatch = b.code.toLowerCase().startsWith(qLower);
+        const aDescMatch = a.desc.toLowerCase().startsWith(qLower);
+        const bDescMatch = b.desc.toLowerCase().startsWith(qLower);
+
+        if (type === 'code') {
+          if (aCodeMatch && !bCodeMatch) return -1;
+          if (!aCodeMatch && bCodeMatch) return 1;
+        } else {
+          if (aDescMatch && !bDescMatch) return -1;
+          if (!aDescMatch && bDescMatch) return 1;
+        }
+        return a.desc.localeCompare(b.desc);
+      });
+    }
+
+    if (countEl) {
+      countEl.textContent = `${matches.length} item${matches.length !== 1 ? 's' : ''}`;
+    }
+
+    if (matches.length === 0) {
+      listEl.innerHTML = `
+        <div class="dropdown-empty">
+          <div>🔍 No exact matches in Sheet1 Master Catalog.</div>
+          <div class="dropdown-empty-hint">You can still use this as a brand new medicine entry.</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Render top 60 matches for optimal scrolling performance
+    const displayList = matches.slice(0, 60);
+    listEl.innerHTML = displayList.map((item, idx) => {
+      const codeHtml = highlightText(item.code, qLower);
+      const descHtml = highlightText(item.desc, qLower);
+
+      if (type === 'code') {
+        return `
+          <div class="dropdown-item" data-index="${idx}" onclick="selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
+            <span class="dropdown-item-code">${codeHtml}</span>
+            <span class="dropdown-item-desc">${descHtml}</span>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="dropdown-item" data-index="${idx}" onclick="selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
+            <span class="dropdown-item-desc">${descHtml}</span>
+            <span class="dropdown-item-code">${codeHtml}</span>
+          </div>
+        `;
+      }
+    }).join('');
+  }
+
+  function handleComboboxKeydown(e, type) {
+    const dropdown = document.getElementById(`dropdown-${type}`);
+    if (!dropdown || dropdown.style.display === 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        openDropdown(type);
+        renderDropdownItems(type, e.target.value.trim());
+      }
+      return;
+    }
+
+    const items = dropdown.querySelectorAll('.dropdown-item');
+    if (items.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      state.focusedIndex = (state.focusedIndex + 1) % items.length;
+      updateDropdownFocus(items);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      state.focusedIndex = (state.focusedIndex - 1 + items.length) % items.length;
+      updateDropdownFocus(items);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (state.focusedIndex >= 0 && state.focusedIndex < items.length) {
+        items[state.focusedIndex].click();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeAllDropdowns();
+    }
+  }
+
+  function updateDropdownFocus(items) {
+    items.forEach((item, i) => {
+      if (i === state.focusedIndex) {
+        item.classList.add('focused');
+        item.scrollIntoView({ block: 'nearest' });
+      } else {
+        item.classList.remove('focused');
+      }
+    });
+  }
+
+  function selectDciItem(code, desc) {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const brandInput = document.getElementById('add-brand');
+
+    if (codeInput) {
+      codeInput.value = code;
+      updateClearBtn('add-code', code);
+    }
+    if (descInput) {
+      descInput.value = desc;
+      updateClearBtn('add-desc', desc);
+    }
+
+    closeAllDropdowns();
+    onAddCodeOrDescChange();
+
+    // Smooth workflow: focus brand name for incoming delivery
+    if (brandInput && !brandInput.value) {
+      setTimeout(() => brandInput.focus(), 60);
+    }
+  }
+
+  function clearAddInput(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+      input.value = '';
+      updateClearBtn(inputId, '');
+      input.focus();
+      closeAllDropdowns();
+      onAddCodeOrDescChange();
+    }
+  }
+
+  function resetDciSelection() {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const previewBox = document.getElementById('add-batch-preview');
+
+    if (codeInput) {
+      codeInput.value = '';
+      updateClearBtn('add-code', '');
+    }
+    if (descInput) {
+      descInput.value = '';
+      updateClearBtn('add-desc', '');
+    }
+    if (previewBox) {
+      previewBox.style.display = 'none';
+    }
+
+    closeAllDropdowns();
+    if (codeInput) codeInput.focus();
+  }
+
+  function highlightText(text, query) {
+    if (!text) return '';
+    if (!query) return escapeHtml(text);
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escapedQuery})`, 'gi');
+    return escapeHtml(text).replace(regex, '<mark class="dropdown-highlight">$1</mark>');
+  }
+
+  function escapeJs(str) {
+    if (!str) return '';
+    return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  }
+
+  function populateCatalogDatalists() {
+    const codeList = document.getElementById('dci-codes-datalist');
+    const descList = document.getElementById('generic-names-datalist');
+    const badge = document.getElementById('catalog-count-badge');
+
+    if (!state.masterCatalog || state.masterCatalog.length === 0) return;
+
+    if (codeList) {
+      codeList.innerHTML = state.masterCatalog.map(item => 
+        `<option value="${escapeHtml(item.code)}">${escapeHtml(item.desc)}</option>`
+      ).join('');
+    }
+
+    if (descList) {
+      descList.innerHTML = state.masterCatalog.map(item => 
+        `<option value="${escapeHtml(item.desc)}">${escapeHtml(item.code)}</option>`
+      ).join('');
+    }
+
+    if (badge) {
+      badge.textContent = `📋 ${state.masterCatalog.length} in Sheet1`;
+      badge.style.display = 'inline-block';
+    }
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+</script>
+
+
+</body>
+</html>
+

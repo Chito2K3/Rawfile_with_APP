@@ -9,6 +9,7 @@
 // Target or active sheet configuration
 const CONFIG = {
   MAIN_SHEET_NAME: null, // null will auto-detect active inventory sheet or look for standard headers
+  MASTER_DCI_SHEET_NAME: 'Sheet1', // Master catalog tab with Col A: DCI Code, Col B: Generic Description
   LOG_SHEET_NAME: 'STOCK_OUT_LOG',
   COLUMN_KEYS: {
     CODE: 'ITEM CODE',
@@ -112,7 +113,31 @@ function getInventorySheetInfo() {
   }
   
   if (!sheet) {
-    // Try to find the sheet that has ITEM CODE header
+    // Check if 'STORAGE' inventory sheet exists
+    sheet = ss.getSheetByName('STORAGE') || ss.getSheetByName('Storage');
+  }
+
+  if (!sheet) {
+    // Try to find the inventory sheet that has ITEM CODE and QTY STORAGE, avoiding the master DCI catalog tab
+    const sheets = ss.getSheets();
+    for (let s of sheets) {
+      const name = s.getName();
+      if (name === CONFIG.LOG_SHEET_NAME) continue;
+      if (CONFIG.MASTER_DCI_SHEET_NAME && name === CONFIG.MASTER_DCI_SHEET_NAME) continue;
+      
+      const data = s.getDataRange().getValues();
+      if (data.length > 0) {
+        const headerRow = data[0].map(c => String(c).trim().toUpperCase());
+        if (headerRow.some(h => h.includes('ITEM CODE') || h.includes('ITEM_CODE'))) {
+          sheet = s;
+          break;
+        }
+      }
+    }
+  }
+
+  if (!sheet) {
+    // Fallback: check any sheet with ITEM CODE header
     const sheets = ss.getSheets();
     for (let s of sheets) {
       if (s.getName() === CONFIG.LOG_SHEET_NAME) continue;
@@ -346,16 +371,86 @@ function getInventoryData() {
       });
     }
 
+    const masterCatalogRes = getMasterDciCatalog();
+
     return {
       success: true,
       sheetName: info.sheetName,
       totalCount: rows.length,
       hasBrandColumn: info.colBrand !== -1,
       hasPriceColumn: info.colPrice !== -1,
-      items: rows
+      items: rows,
+      catalog: masterCatalogRes.catalog || []
     };
   } catch (err) {
     return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetches the master list of DCI Codes and Generic Descriptions from 'Sheet1'
+ * Column A: DCI Code (Item Code)
+ * Column B: Generic Description & Strength
+ */
+function getMasterDciCatalog() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(CONFIG.MASTER_DCI_SHEET_NAME || 'Sheet1');
+    if (!sheet) {
+      const sheets = ss.getSheets();
+      for (let s of sheets) {
+        const sName = s.getName().trim().toLowerCase();
+        if (sName === 'sheet1' || sName === 'sheet 1' || sName.includes('catalog') || sName.includes('dci')) {
+          sheet = s;
+          break;
+        }
+      }
+    }
+
+    if (!sheet) {
+      return { success: false, catalog: [], message: "Master DCI tab ('Sheet1') not found." };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length === 0) {
+      return { success: true, catalog: [] };
+    }
+
+    const catalog = [];
+    const seenCodes = new Set();
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const rawCode = String(row[0] || '').trim();
+      const rawDesc = String(row[1] || '').trim();
+
+      if (!rawCode) continue;
+
+      // Skip header row if it contains header text like "CODE" or "DESCRIPTION"
+      if (i === 0 && (rawCode.toUpperCase().includes('CODE') || rawDesc.toUpperCase().includes('DESC'))) {
+        continue;
+      }
+
+      const upperCode = rawCode.toUpperCase();
+      if (!seenCodes.has(upperCode)) {
+        seenCodes.add(upperCode);
+        catalog.push({
+          code: rawCode,
+          desc: rawDesc
+        });
+      }
+    }
+
+    // Sort alphabetically by Generic Description
+    catalog.sort((a, b) => a.desc.localeCompare(b.desc));
+
+    return {
+      success: true,
+      catalog: catalog,
+      totalCount: catalog.length
+    };
+  } catch (err) {
+    return { success: false, catalog: [], error: err.message };
   }
 }
 
