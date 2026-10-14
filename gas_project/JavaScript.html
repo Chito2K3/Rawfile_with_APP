@@ -426,11 +426,6 @@
     const existingBatches = state.items.filter(i => i.itemCode.toUpperCase() === codeInput);
 
     if (existingBatches.length > 0) {
-      const matchDesc = existingBatches[0].itemDesc;
-      if (!document.getElementById('add-desc').value) {
-        document.getElementById('add-desc').value = matchDesc;
-      }
-      
       const lastRow = Math.max(...existingBatches.map(b => b.rowIndex));
       
       let html = `<div style="color:#2563eb; font-weight:700; margin-bottom:4px;">
@@ -763,11 +758,21 @@
     const descInput = document.getElementById('add-desc');
     const q = codeInput.value.trim();
     updateClearBtn('add-code', q);
+
+    if (!q) {
+      // User emptied the DCI Code field via Backspace/Delete
+      hideMatchHint('code');
+      closeAllDropdowns();
+      const previewBox = document.getElementById('add-batch-preview');
+      if (previewBox) previewBox.style.display = 'none';
+      return;
+    }
+
     renderDropdownItems('code', q);
     openDropdown('code');
 
     // Bi-directional Auto-Sync: Exact or match on DCI Code immediately sets Generic Description
-    if (q && state.masterCatalog && state.masterCatalog.length > 0) {
+    if (state.masterCatalog && state.masterCatalog.length > 0) {
       const match = state.masterCatalog.find(item => item.code.toUpperCase() === q.toUpperCase());
       if (match && match.desc) {
         if (descInput.value !== match.desc) {
@@ -796,11 +801,26 @@
     const descInput = document.getElementById('add-desc');
     const q = descInput.value.trim();
     updateClearBtn('add-desc', q);
+
+    if (!q) {
+      // User emptied the Generic Description field via Backspace/Delete
+      hideMatchHint('desc');
+      closeAllDropdowns();
+      if (codeInput) {
+        codeInput.value = '';
+        updateClearBtn('add-code', '');
+        hideMatchHint('code');
+      }
+      const previewBox = document.getElementById('add-batch-preview');
+      if (previewBox) previewBox.style.display = 'none';
+      return;
+    }
+
     renderDropdownItems('desc', q);
     openDropdown('desc');
 
     // Bi-directional Auto-Sync: When typing generic description
-    if (q && state.masterCatalog && state.masterCatalog.length > 0) {
+    if (state.masterCatalog && state.masterCatalog.length > 0) {
       const qNorm = normalizeMedText(q);
       const matches = findCatalogMatches('desc', q);
 
@@ -818,12 +838,20 @@
           onAddCodeOrDescChange();
         }
         hideMatchHint('desc');
-      } else if (matches.length > 0) {
-        // Show live match hint with top result
-        const top = matches[0];
-        showMatchHint('desc', top.code, top.desc);
       } else {
-        hideMatchHint('desc');
+        // While user is deleting or typing a partial name that does not match an exact item,
+        // clear the previously locked DCI code so it does not resurrect the old medicine!
+        if (codeInput && codeInput.value) {
+          codeInput.value = '';
+          updateClearBtn('add-code', '');
+          const previewBox = document.getElementById('add-batch-preview');
+          if (previewBox) previewBox.style.display = 'none';
+        }
+        if (matches.length > 0) {
+          showMatchHint('desc', matches[0].code, matches[0].desc);
+        } else {
+          hideMatchHint('desc');
+        }
       }
     } else {
       hideMatchHint('desc');
@@ -842,10 +870,16 @@
     // If DCI code already filled, nothing needed
     if (codeInput && codeInput.value.trim()) return;
 
-    const matches = findCatalogMatches('desc', q);
-    if (matches.length > 0) {
-      const top = matches[0];
-      selectDciItem(top.code, top.desc);
+    // Only auto-resolve on blur if there is an exact or normalized full match!
+    const qNorm = normalizeMedText(q);
+    const catalog = state.masterCatalog || [];
+    const exactMatch = catalog.find(item => 
+      item.desc.toUpperCase() === q.toUpperCase() || 
+      normalizeMedText(item.desc) === qNorm
+    );
+
+    if (exactMatch) {
+      selectDciItem(exactMatch.code, exactMatch.desc);
     }
   }
 
@@ -858,10 +892,10 @@
 
     if (descInput && descInput.value.trim()) return;
 
-    const matches = findCatalogMatches('code', q);
-    if (matches.length > 0) {
-      const top = matches[0];
-      selectDciItem(top.code, top.desc);
+    const catalog = state.masterCatalog || [];
+    const exactMatch = catalog.find(item => item.code.toUpperCase() === q.toUpperCase());
+    if (exactMatch) {
+      selectDciItem(exactMatch.code, exactMatch.desc);
     }
   }
 
@@ -1081,15 +1115,26 @@
   }
 
   function clearAddInput(inputId) {
-    const input = document.getElementById(inputId);
-    if (input) {
-      input.value = '';
-      updateClearBtn(inputId, '');
-      hideMatchHint(inputId === 'add-code' ? 'code' : 'desc');
-      input.focus();
-      closeAllDropdowns();
-      onAddCodeOrDescChange();
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    const previewBox = document.getElementById('add-batch-preview');
+
+    if (codeInput) {
+      codeInput.value = '';
+      updateClearBtn('add-code', '');
+      hideMatchHint('code');
     }
+    if (descInput) {
+      descInput.value = '';
+      updateClearBtn('add-desc', '');
+      hideMatchHint('desc');
+    }
+    if (previewBox) {
+      previewBox.style.display = 'none';
+    }
+    closeAllDropdowns();
+    const input = document.getElementById(inputId);
+    if (input) input.focus();
   }
 
   function resetDciSelection() {
