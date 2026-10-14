@@ -84,11 +84,11 @@
         onInventoryLoaded({
           success: true,
           items: [
-            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', brandName: 'Tegretol', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 12.50, isDonation: true, isZeroStock: false },
-            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', brandName: 'Lexapro', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', acquisitionPrice: 28.00, isDonation: false, isZeroStock: false },
-            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, isDonation: false, isZeroStock: false },
-            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, isDonation: false, isZeroStock: false },
-            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, isDonation: false, isZeroStock: true }
+            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', brandName: 'Tegretol', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 12.50, dateOut: '2026-10-14', isDonation: true, isZeroStock: false },
+            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', brandName: 'Lexapro', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', acquisitionPrice: 28.00, dateOut: '2026-10-12', isDonation: false, isZeroStock: false },
+            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, dateOut: '', isDonation: false, isZeroStock: false },
+            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, dateOut: '2026-10-10', isDonation: false, isZeroStock: false },
+            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, dateOut: '2026-10-08', isDonation: false, isZeroStock: true }
           ],
           catalog: DEFAULT_MOCK_DCI_CATALOG
         });
@@ -210,6 +210,10 @@
         ? `<span class="price-display">₱${item.acquisitionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
         : `<span style="color:#94a3b8;">₱0.00</span>`;
 
+      const dateOutDisplay = item.dateOut 
+        ? `<span style="font-weight:600; color:#475569; font-size:12px;">${escapeHtml(item.dateOut)}</span>`
+        : `<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>`;
+
       tr.innerHTML = `
         <td style="font-family:monospace; font-weight:600; color:#1e293b;">${escapeHtml(item.itemCode)}</td>
         <td>
@@ -220,22 +224,18 @@
         <td style="text-align:right;">${qtyDisplay}</td>
         <td>${badgeHtml}</td>
         <td style="text-align:right;">${priceDisplay}</td>
-        <td style="text-align:right;">
-          <div style="display:inline-flex; gap:6px;">
-            <button class="btn btn-sm btn-danger" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
-              ➖ Out
-            </button>
-            <button class="btn btn-sm btn-outline" onclick="openEditBatchModal(${item.rowIndex})">
-              ✏️ Edit
-            </button>
-          </div>
+        <td style="text-align:center;">${dateOutDisplay}</td>
+        <td style="text-align:center;">
+          <button class="btn btn-sm btn-danger" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} title="Deduct / Dispense Quantity">
+            ➖ Out
+          </button>
         </td>
       `;
       tbody.appendChild(tr);
     });
   }
 
-  // --- STOCK OUT MODAL ACTIONS (BRAND + FINANCIAL DEDUCTION) ---
+  // --- STOCK OUT MODAL ACTIONS (BRAND & DATE OUT DEDUCTION) ---
   function openStockOutModal(rowIndex) {
     const item = state.items.find(i => i.rowIndex === rowIndex);
     if (!item) return;
@@ -248,16 +248,16 @@
     brandEl.textContent = item.brandName || 'Brand Batch';
     
     document.getElementById('so-exp').textContent = item.expDate;
-    
-    const unitPrice = typeof item.acquisitionPrice === 'number' ? item.acquisitionPrice : 0;
-    document.getElementById('so-price').textContent = '₱' + unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    
     document.getElementById('so-current-qty').textContent = item.qty.toLocaleString() + ' units';
     document.getElementById('so-input-qty').value = '';
     document.getElementById('so-input-qty').max = item.qty;
+
+    // Automatically initialize Date Out with today's date (YYYY-MM-DD)
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById('so-date-out').value = todayStr;
+
     document.getElementById('so-remarks').value = '';
     document.getElementById('so-remaining-preview').textContent = item.qty.toLocaleString() + ' units';
-    document.getElementById('so-cost-preview').textContent = '₱0.00';
 
     document.getElementById('modal-stock-out').style.display = 'flex';
     document.getElementById('so-input-qty').focus();
@@ -267,26 +267,22 @@
     if (!state.selectedRow) return;
     const outVal = parseFloat(document.getElementById('so-input-qty').value) || 0;
     const rem = state.selectedRow.qty - outVal;
-    const price = typeof state.selectedRow.acquisitionPrice === 'number' ? state.selectedRow.acquisitionPrice : 0;
-    const totalCost = outVal > 0 ? (outVal * price) : 0;
 
     const previewRem = document.getElementById('so-remaining-preview');
-    const previewCost = document.getElementById('so-cost-preview');
 
     if (rem < 0) {
       previewRem.textContent = 'Invalid (Exceeds current stock)';
       previewRem.style.color = '#dc2626';
-      previewCost.textContent = '₱0.00';
     } else {
       previewRem.textContent = rem.toLocaleString() + ' units';
-      previewRem.style.color = '#0f172a';
-      previewCost.textContent = '₱' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      previewRem.style.color = '#15803d';
     }
   }
 
   function submitStockOut() {
     if (!state.selectedRow) return;
     const qtyOut = parseFloat(document.getElementById('so-input-qty').value);
+    const dateOut = document.getElementById('so-date-out').value;
     const remarks = document.getElementById('so-remarks').value.trim();
 
     if (isNaN(qtyOut) || qtyOut <= 0) {
@@ -299,10 +295,16 @@
       return;
     }
 
+    if (!dateOut) {
+      showToast("Please select the date when the item was taken out.", "error");
+      return;
+    }
+
     const payload = {
       rowIndex: state.selectedRow.rowIndex,
       itemCode: state.selectedRow.itemCode,
       qtyOut: qtyOut,
+      dateOut: dateOut,
       remarks: remarks || 'Stock-Out Dispense'
     };
 
@@ -327,12 +329,11 @@
     } else {
       // Mock local update
       state.selectedRow.qty -= qtyOut;
+      state.selectedRow.dateOut = dateOut;
       state.selectedRow.isZeroStock = state.selectedRow.qty <= 0;
-      const unitPrice = state.selectedRow.acquisitionPrice || 0;
-      const totalCost = qtyOut * unitPrice;
       setModalLoading('modal-stock-out', false);
       closeModal('modal-stock-out');
-      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} units of ${state.selectedRow.itemDesc} [${state.selectedRow.brandName}] (₱${totalCost.toFixed(2)})`, "success");
+      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} units of ${state.selectedRow.itemDesc} [${state.selectedRow.brandName || 'Batch'}]. Date Out: ${dateOut}`, "success");
       renderStats();
       applyFilter();
     }
@@ -574,14 +575,14 @@
       // Mock Logs
       renderLogsTable([
         { 
-          timestamp: '2026-10-13 14:30:00', 
+          timestamp: '2026-10-14 14:30:00', 
+          dateOut: '2026-10-14',
           itemCode: 'DMR000451', 
           itemDesc: 'FLUCONAZOLE 200MG CAPSULE', 
           brandName: 'Diflucan', 
           expDate: 'Jun-28', 
           unitPrice: 125.00, 
           qtyOut: 20, 
-          totalCost: 2500.00, 
           previousQty: 200, 
           remainingBalance: 180, 
           remarks: 'ICU Dispense', 
@@ -610,19 +611,19 @@
         ? `₱${Number(log.unitPrice).toFixed(2)}` 
         : '₱0.00';
 
-      const totalValueFormatted = Number(log.totalCost || 0) > 0 
-        ? `₱${Number(log.totalCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-        : '₱0.00';
+      const dateOutStr = log.dateOut 
+        ? `<span style="font-weight:600; color:#1e293b; font-size:12px;">${escapeHtml(log.dateOut)}</span>` 
+        : '<span style="color:#94a3b8; font-style:italic;">--</span>';
 
       tr.innerHTML = `
         <td style="font-size:11px; color:#64748b; white-space:nowrap;">${log.timestamp}</td>
+        <td style="text-align:center;">${dateOutStr}</td>
         <td style="font-family:monospace; font-weight:600;">${escapeHtml(log.itemCode)}</td>
         <td>${escapeHtml(log.itemDesc)}</td>
         <td>${brandStr}</td>
         <td><span class="badge badge-neutral">${log.expDate}</span></td>
         <td style="text-align:right; font-family:monospace;">${unitPriceFormatted}</td>
         <td style="text-align:right; font-weight:700; color:#dc2626;">-${Number(log.qtyOut).toLocaleString()}</td>
-        <td style="text-align:right; font-family:monospace; font-weight:700; color:#047857;">${totalValueFormatted}</td>
         <td style="text-align:right; font-family:monospace;">${Number(log.remainingBalance).toLocaleString()}</td>
         <td style="font-size:12px; color:#475569;">${escapeHtml(log.remarks || '')}</td>
       `;

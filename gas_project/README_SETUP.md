@@ -8,15 +8,15 @@ This custom Google Apps Script application connects directly to the ARMMC pharma
 
 For optimal tracking, your master inventory sheet is organized as follows:
 
-| Column A | Column B | Column C | Column D | Column E | Column F |
-| :---: | :---: | :---: | :---: | :---: | :---: |
-| **ITEM CODE** | **ITEM DESCRIPTION** | **BRAND NAME** | **QTY STORAGE** | **EXP DATE** | **ACQUISITION PRICE** |
-| `DMR000451` | `FLUCONAZOLE 200MG CAPSULE` | `Diflucan` | `200` | `Jun-28` | `₱125.00` |
-| `DMR000451` | `FLUCONAZOLE 200MG CAPSULE` | `Flucan` | `2,000` | `Apr-29` | `₱45.00` |
+| Column A | Column B | Column C | Column D | Column E | Column F | Column G |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **ITEM CODE** | **ITEM DESCRIPTION** | **BRAND NAME** | **QTY STORAGE** | **EXP DATE** | **ACQUISITION PRICE** | **DATE OUT** |
+| `DMR000451` | `FLUCONAZOLE 200MG CAPSULE` | `Diflucan` | `200` | `Jun-28` | `₱125.00` | `2026-10-14` |
+| `DMR000451` | `FLUCONAZOLE 200MG CAPSULE` | `Flucan` | `2,000` | `Apr-29` | `₱45.00` | `2026-10-10` |
 
 > [!TIP]
 > **1-Click Column Upgrade:**  
-> If your existing sheet only has 4 columns (`ITEM CODE`, `ITEM DESCRIPTION`, `QTY STORAGE`, `EXP DATE`), simply click **`🏥 Pharmacy Expiry Monitoring` > `🛠️ Ensure / Upgrade Sheet Columns (Option A)`** in the Google Sheets menu. The system will automatically insert the `BRAND NAME` and `ACQUISITION PRICE` columns for you without overwriting any existing data!
+> If your existing sheet only has 4 columns (`ITEM CODE`, `ITEM DESCRIPTION`, `QTY STORAGE`, `EXP DATE`), simply click **`🏥 Pharmacy Expiry Monitoring` > `🛠️ Ensure / Upgrade Sheet Columns (Option A)`** in the Google Sheets menu. The system will automatically insert the `BRAND NAME`, `ACQUISITION PRICE`, and `DATE OUT` columns for you without overwriting any existing data!
 
 ---
 
@@ -74,14 +74,15 @@ Inside the Apps Script editor, copy and paste the code from each of the files in
 ### 2. ➖ Quick Stock-Out / Dispensing by Brand & Batch
 * In the **Inventory & Stock-Out** tab, search by Generic Name, Item Code, Brand Name (e.g. `Diflucan`), or Expiry.
 * Click **➖ Out** on the target batch.
-* The modal clearly displays the **Brand Name**, **Batch Expiry**, and **Unit Acquisition Price**.
+* The modal clearly displays the **Brand Name**, **Batch Expiry**, and **Current Storage Stock**.
 * Enter how many units were dispensed.
-* The modal dynamically calculates the **Total Dispensed Value** (`Qty Out × Unit Price`).
+* Select the **Date When Item Was Out** using the date picker (defaults to today's date).
 * Click **Confirm Stock-Out**:
   * Updates `QTY STORAGE` in Google Sheets.
-  * Writes a complete financial audit record to **`STOCK_OUT_LOG`**.
+  * Records the selected date into the **`DATE OUT`** column (Column G) in Google Sheets.
+  * Writes a complete audit record to **`STOCK_OUT_LOG`**.
 
-### 3. 🔄 Restocking & Editing 0-Quantity Items
+### 3. 🔄 Restocking 0-Quantity Items
 * Go to the **Restock 0-Qty Items** tab.
 * Click **Restock & Update** on any out-of-stock medicine.
 * Enter the incoming **Brand Name**, **New Expiry Date**, **Updated Price**, and **Quantity**.
@@ -89,13 +90,13 @@ Inside the Apps Script editor, copy and paste the code from each of the files in
 ### 4. 📋 Audit Log Sheet (`STOCK_OUT_LOG`)
 * Automatically maintains an audit trail with:
   * `TIMESTAMP`
+  * `DATE OUT`
   * `ITEM CODE`
   * `GENERIC NAME`
   * `BRAND NAME`
   * `EXPIRY DATE`
-  * `UNIT PRICE (₱)`
+  * `UNIT PRICE (₱)` *(Repository reference)*
   * `QTY OUT`
-  * `TOTAL VALUE (₱)`
   * `PREVIOUS QTY` & `REMAINING BALANCE`
   * `REMARKS / DEPARTMENT`
   * `DISPENSED BY`

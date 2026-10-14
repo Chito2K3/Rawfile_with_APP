@@ -124,8 +124,9 @@
                 <th style="width:140px;">Brand Name</th>
                 <th style="width:110px; text-align:right;">Storage Qty</th>
                 <th style="width:145px;">Expiry Status</th>
-                <th style="width:125px; text-align:right;">Acq. Price</th>
-                <th style="width:140px; text-align:right;">Quick Actions</th>
+                <th style="width:115px; text-align:right;">Acq. Price</th>
+                <th style="width:110px; text-align:center;">Date Out</th>
+                <th style="width:95px; text-align:center;">Quick Action</th>
               </tr>
             </thead>
             <tbody id="inventory-table-body">
@@ -290,13 +291,13 @@
             <thead>
               <tr>
                 <th style="width:150px;">Timestamp</th>
+                <th style="width:110px; text-align:center;">Date Out</th>
                 <th style="width:120px;">Item Code</th>
                 <th>Generic Name</th>
                 <th style="width:130px;">Brand Name</th>
                 <th style="width:100px;">Batch Expiry</th>
                 <th style="width:110px; text-align:right;">Unit Price</th>
                 <th style="width:90px; text-align:right;">Qty Out</th>
-                <th style="width:120px; text-align:right;">Total Value (₱)</th>
                 <th style="width:100px; text-align:right;">Remaining</th>
                 <th>Remarks</th>
               </tr>
@@ -327,7 +328,6 @@
           <div style="font-size:14px; font-weight:700; color:#0f172a; margin:4px 0;" id="so-desc"></div>
           <div style="display:flex; justify-content:space-between; font-size:12px; color:#475569; margin-top:6px; border-top:1px dashed #e2e8f0; padding-top:6px;">
             <span>Batch Expiry: <strong id="so-exp"></strong></span>
-            <span>Unit Price: <strong id="so-price" style="color:#047857;">₱0.00</strong></span>
             <span>Current Stock: <strong id="so-current-qty" style="color:#2563eb;"></strong></span>
           </div>
         </div>
@@ -338,18 +338,19 @@
         </div>
 
         <div class="form-group">
+          <label class="form-label" for="so-date-out">Date When Item Was Out *</label>
+          <input type="date" id="so-date-out" class="form-input" required>
+        </div>
+
+        <div class="form-group">
           <label class="form-label" for="so-remarks">Department / Ward / Remarks</label>
           <input type="text" id="so-remarks" class="form-input" placeholder="e.g. OR / ICU / Ward 3 / Outpatient">
         </div>
 
-        <div class="cost-callout">
+        <div class="cost-callout" style="background:#f0fdf4; border:1px solid #bbf7d0;">
           <div>
-            <div style="font-size:11px; color:#64748b; font-weight:600;">NEW BALANCE IN STORAGE</div>
-            <div id="so-remaining-preview" style="font-size:14px; font-weight:700; color:#0f172a;">--</div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-size:11px; color:#047857; font-weight:600;">TOTAL DISPENSED VALUE</div>
-            <div id="so-cost-preview" style="font-size:16px; font-weight:800; color:#047857;">₱0.00</div>
+            <div style="font-size:11px; color:#166534; font-weight:600;">NEW BALANCE IN STORAGE</div>
+            <div id="so-remaining-preview" style="font-size:15px; font-weight:800; color:#15803d;">--</div>
           </div>
         </div>
       </div>

@@ -17,7 +17,8 @@ const CONFIG = {
     BRAND: 'BRAND NAME',
     QTY: 'QTY STORAGE',
     EXP: 'EXP DATE',
-    PRICE: 'ACQUISITION PRICE'
+    PRICE: 'ACQUISITION PRICE',
+    DATE_OUT: 'DATE OUT'
   }
 };
 
@@ -164,7 +165,7 @@ function getInventorySheetInfo() {
 
   // Find column indices
   const headerRow = values[0];
-  let colCode = -1, colDesc = -1, colBrand = -1, colQty = -1, colExp = -1, colPrice = -1;
+  let colCode = -1, colDesc = -1, colBrand = -1, colQty = -1, colExp = -1, colPrice = -1, colDateOut = -1;
 
   for (let j = 0; j < headerRow.length; j++) {
     const h = String(headerRow[j]).trim().toUpperCase();
@@ -172,19 +173,21 @@ function getInventorySheetInfo() {
     if (colDesc === -1 && (h.includes('DESC') || h.includes('DESCRIPTION') || h.includes('GENERIC'))) colDesc = j;
     if (colBrand === -1 && (h.includes('BRAND') || h.includes('TRADE'))) colBrand = j;
     if (colQty === -1 && (h.includes('QTY') || h.includes('STORAGE') || h.includes('QUANTITY'))) colQty = j;
-    if (colExp === -1 && (h.includes('EXP') || h.includes('DATE') || h.includes('EXPIRY'))) colExp = j;
+    if (colExp === -1 && (h.includes('EXP') || h.includes('DATE') || h.includes('EXPIRY')) && !h.includes('OUT')) colExp = j;
     if (colPrice === -1 && (h.includes('PRICE') || h.includes('COST') || h.includes('ACQUISITION'))) colPrice = j;
+    if (colDateOut === -1 && (h.includes('DATE OUT') || h.includes('DATE_OUT') || h.includes('OUT DATE') || h.includes('DISPENSED DATE'))) colDateOut = j;
   }
 
   // Fallbacks if columns are not explicitly labeled
   if (colCode === -1) colCode = 0;
   if (colDesc === -1) colDesc = 1;
 
-  // If Option A 6-column layout is present or Brand was found:
+  // If Option A layout is present or Brand was found:
   if (colBrand !== -1) {
     if (colQty === -1) colQty = 3;
     if (colExp === -1) colExp = 4;
     if (colPrice === -1) colPrice = 5;
+    if (colDateOut === -1 && headerRow.length >= 7) colDateOut = 6;
   } else {
     // Legacy 4-column fallback: Code(0), Desc(1), Qty(2), Exp(3)
     if (colQty === -1) colQty = 2;
@@ -200,7 +203,8 @@ function getInventorySheetInfo() {
     colBrand: colBrand,
     colQty: colQty,
     colExp: colExp,
-    colPrice: colPrice
+    colPrice: colPrice,
+    colDateOut: colDateOut
   };
 }
 
@@ -211,7 +215,8 @@ function getInventorySheetInfo() {
  * Column C: BRAND NAME
  * Column D: QTY STORAGE
  * Column E: EXP DATE
- * Column F: ACQUISITION PRICE
+ * Column F: ACQUISITION PRICE (Repository only)
+ * Column G: DATE OUT (Last Dispensed Date)
  */
 function migrateSheetToOptionA() {
   const ui = SpreadsheetApp.getUi();
@@ -219,12 +224,12 @@ function migrateSheetToOptionA() {
     const info = getInventorySheetInfo();
     const sheet = info.sheet;
 
-    // Ensure sheet has at least 6 columns
-    while (sheet.getMaxColumns() < 6) {
+    // Ensure sheet has at least 7 columns
+    while (sheet.getMaxColumns() < 7) {
       sheet.insertColumnAfter(sheet.getMaxColumns());
     }
 
-    const checkCols = Math.max(sheet.getLastColumn(), 10);
+    const checkCols = Math.max(sheet.getLastColumn(), 12);
     const headerRow = sheet.getRange(1, 1, 1, checkCols).getValues()[0];
     const upperHeaders = headerRow.map(h => String(h).trim().toUpperCase());
 
@@ -239,8 +244,8 @@ function migrateSheetToOptionA() {
       sheet.getRange(1, 3).setValue('BRAND NAME').setFontWeight('bold');
     }
 
-    // 2. Clear any stray ACQUISITION PRICE headers that may have landed in Column G, H, I, J
-    for (let c = 7; c <= Math.max(sheet.getLastColumn(), 12); c++) {
+    // 2. Clear any stray ACQUISITION PRICE headers that may have landed in Column H, I, J
+    for (let c = 8; c <= Math.max(sheet.getLastColumn(), 12); c++) {
       const val = String(sheet.getRange(1, c).getValue()).trim().toUpperCase();
       if (val.includes('PRICE') || val.includes('ACQUISITION')) {
         sheet.getRange(1, c).clearContent();
@@ -256,6 +261,12 @@ function migrateSheetToOptionA() {
       sheet.getRange(2, 6, maxRows - 1, 1).setNumberFormat('"₱"#,##0.00');
     }
 
+    // 5. Explicitly place DATE OUT in Column G (Column 7)
+    sheet.getRange(1, 7).setValue('DATE OUT').setFontWeight('bold').setHorizontalAlignment('center');
+    if (maxRows > 1) {
+      sheet.getRange(2, 7, maxRows - 1, 1).setNumberFormat('@').setHorizontalAlignment('center');
+    }
+
     ui.alert(
       'Option A Setup Complete',
       'The sheet columns have been confirmed:\n\n' +
@@ -264,8 +275,9 @@ function migrateSheetToOptionA() {
       '• Column C: BRAND NAME\n' +
       '• Column D: QTY STORAGE\n' +
       '• Column E: EXP DATE\n' +
-      '• Column F: ACQUISITION PRICE\n\n' +
-      'Both Brand Name and Acquisition Price are now active!',
+      '• Column F: ACQUISITION PRICE (Repository only)\n' +
+      '• Column G: DATE OUT (Last Dispensed Date)\n\n' +
+      'Brand Name, Acquisition Price, and Date Out are now active!',
       ui.ButtonSet.OK
     );
   } catch (err) {
@@ -356,6 +368,17 @@ function getInventoryData() {
 
       const isDonation = code.startsWith('DMDON') || code.startsWith('DMCSP');
 
+      // Format Date Out cleanly (YYYY-MM-DD)
+      let dateOutStr = '';
+      if (info.colDateOut !== -1 && row[info.colDateOut]) {
+        const rawDateOut = row[info.colDateOut];
+        if (rawDateOut instanceof Date) {
+          dateOutStr = Utilities.formatDate(rawDateOut, ssTz, 'yyyy-MM-dd');
+        } else {
+          dateOutStr = String(rawDateOut).trim();
+        }
+      }
+
       rows.push({
         rowIndex: i + 1, // 1-based row index in Google Sheet
         itemCode: code,
@@ -366,6 +389,7 @@ function getInventoryData() {
         expYear: expYear,
         expStatus: expStatus,
         acquisitionPrice: cleanPrice,
+        dateOut: dateOutStr,
         isDonation: isDonation,
         isZeroStock: cleanQty <= 0
       });
@@ -379,6 +403,7 @@ function getInventoryData() {
       totalCount: rows.length,
       hasBrandColumn: info.colBrand !== -1,
       hasPriceColumn: info.colPrice !== -1,
+      hasDateOutColumn: info.colDateOut !== -1,
       items: rows,
       catalog: masterCatalogRes.catalog || []
     };
@@ -548,6 +573,13 @@ function addNewMedicineOrBatch(payload) {
         .setHorizontalAlignment('right');
     }
 
+    // 7. Date Out (Empty for newly added batch)
+    if (info.colDateOut !== -1) {
+      sheet.getRange(insertedRowIndex, info.colDateOut + 1)
+        .setValue('')
+        .setHorizontalAlignment('center');
+    }
+
     return {
       success: true,
       message: `Successfully saved: [${cleanCode}] ${cleanDesc} (${cleanBrand})`,
@@ -593,7 +625,7 @@ function normalizeExpiryString(inputVal, tz) {
  */
 function recordStockOut(payload) {
   try {
-    const { rowIndex, itemCode, qtyOut, remarks, user } = payload;
+    const { rowIndex, itemCode, qtyOut, dateOut, remarks, user } = payload;
     const deductQty = parseFloat(qtyOut);
 
     if (isNaN(deductQty) || deductQty <= 0) {
@@ -615,7 +647,7 @@ function recordStockOut(payload) {
     const ssTz = sheet.getParent().getSpreadsheetTimeZone();
     const expDate = normalizeExpiryString(rawExp, ssTz);
     
-    // Read batch unit price
+    // Read batch unit price (repository only, not for computation)
     const rawPrice = info.colPrice !== -1 ? sheet.getRange(rowIndex, info.colPrice + 1).getValue() : 0;
     const price = typeof rawPrice === 'number' ? rawPrice : (parseFloat(String(rawPrice).replace(/[^0-9.-]/g, '')) || 0);
 
@@ -627,7 +659,7 @@ function recordStockOut(payload) {
     }
 
     const newQty = currentQty - deductQty;
-    const totalCost = deductQty * price;
+    const cleanDateOut = String(dateOut || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
 
     // Update inventory sheet quantity
     sheet.getRange(rowIndex, info.colQty + 1)
@@ -635,23 +667,30 @@ function recordStockOut(payload) {
       .setNumberFormat('#,##0')
       .setHorizontalAlignment('right');
 
-    // Log the transaction with Brand Name and Financial impact
+    // Update DATE OUT in inventory sheet
+    if (info.colDateOut !== -1) {
+      sheet.getRange(rowIndex, info.colDateOut + 1)
+        .setNumberFormat('@')
+        .setValue(cleanDateOut)
+        .setHorizontalAlignment('center');
+    }
+
+    // Log the transaction
     logStockOutTransaction({
       timestamp: new Date(),
+      dateOut: cleanDateOut,
       itemCode: targetCode,
       itemDesc: desc,
       brandName: brandName,
       expDate: expDate,
       unitPrice: price,
       qtyOut: deductQty,
-      totalCost: totalCost,
       previousQty: currentQty,
       remainingBalance: newQty,
       remarks: remarks || 'Normal Dispense',
       user: user || Session.getActiveUser().getEmail() || 'User'
     });
 
-    const formattedCost = '₱' + totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return {
       success: true,
       itemCode: targetCode,
@@ -660,10 +699,10 @@ function recordStockOut(payload) {
       expDate: expDate,
       unitPrice: price,
       qtyDeducted: deductQty,
-      totalCost: totalCost,
+      dateOut: cleanDateOut,
       previousQty: currentQty,
       newQty: newQty,
-      message: `Deducted ${deductQty.toLocaleString()} units of ${desc} [${brandName || 'Batch'}] (${formattedCost}). Remaining: ${newQty.toLocaleString()}`
+      message: `Deducted ${deductQty.toLocaleString()} units of ${desc} [${brandName || 'Batch'}]. Date Out: ${cleanDateOut}. Remaining: ${newQty.toLocaleString()}`
     };
   } catch (err) {
     return { success: false, error: err.message };
@@ -734,19 +773,19 @@ function updateMedicineBatch(payload) {
 }
 
 /**
- * Initializes and formats the STOCK_OUT_LOG sheet with Brand and Financial columns
+ * Initializes and formats the STOCK_OUT_LOG sheet with Brand and Date Out columns (No computed total cost)
  */
 function initLogSheet(ss) {
   const logSheet = ss.insertSheet(CONFIG.LOG_SHEET_NAME);
   const headers = [
     'TIMESTAMP',
+    'DATE OUT',
     'ITEM CODE',
     'GENERIC NAME',
     'BRAND NAME',
     'EXPIRY DATE',
     'UNIT PRICE (₱)',
     'QTY OUT',
-    'TOTAL VALUE (₱)',
     'PREVIOUS QTY',
     'REMAINING BALANCE',
     'REMARKS',
@@ -761,13 +800,13 @@ function initLogSheet(ss) {
 
   logSheet.setFrozenRows(1);
   logSheet.setColumnWidth(1, 160); // Timestamp
-  logSheet.setColumnWidth(2, 130); // Code
-  logSheet.setColumnWidth(3, 260); // Generic
-  logSheet.setColumnWidth(4, 150); // Brand
-  logSheet.setColumnWidth(5, 110); // Expiry
-  logSheet.setColumnWidth(6, 120); // Unit Price
-  logSheet.setColumnWidth(7, 90);  // Qty Out
-  logSheet.setColumnWidth(8, 130); // Total Value
+  logSheet.setColumnWidth(2, 110); // Date Out
+  logSheet.setColumnWidth(3, 130); // Code
+  logSheet.setColumnWidth(4, 260); // Generic
+  logSheet.setColumnWidth(5, 150); // Brand
+  logSheet.setColumnWidth(6, 110); // Expiry
+  logSheet.setColumnWidth(7, 120); // Unit Price (Repository)
+  logSheet.setColumnWidth(8, 90);  // Qty Out
   logSheet.setColumnWidth(9, 100); // Prev
   logSheet.setColumnWidth(10, 120); // Rem
   logSheet.setColumnWidth(11, 180); // Remarks
@@ -777,7 +816,7 @@ function initLogSheet(ss) {
 }
 
 /**
- * Appends transaction record to STOCK_OUT_LOG with Brand Name and Price details
+ * Appends transaction record to STOCK_OUT_LOG with Date Out and Brand Name
  */
 function logStockOutTransaction(data) {
   try {
@@ -789,13 +828,13 @@ function logStockOutTransaction(data) {
 
     const row = [
       Utilities.formatDate(data.timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
+      data.dateOut || Utilities.formatDate(data.timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
       data.itemCode,
       data.itemDesc,
       data.brandName || '',
       data.expDate,
       data.unitPrice || 0,
       data.qtyOut,
-      data.totalCost || 0,
       data.previousQty,
       data.remainingBalance,
       data.remarks,
@@ -806,12 +845,12 @@ function logStockOutTransaction(data) {
     const lastRow = logSheet.getLastRow();
     
     // Formatting:
-    // Col 6: Unit Price
-    logSheet.getRange(lastRow, 6).setNumberFormat('"₱"#,##0.00');
-    // Col 7: Qty Out
-    logSheet.getRange(lastRow, 7).setNumberFormat('#,##0');
-    // Col 8: Total Cost
-    logSheet.getRange(lastRow, 8).setNumberFormat('"₱"#,##0.00');
+    // Col 2: Date Out
+    logSheet.getRange(lastRow, 2).setNumberFormat('@').setHorizontalAlignment('center');
+    // Col 7: Unit Price
+    logSheet.getRange(lastRow, 7).setNumberFormat('"₱"#,##0.00');
+    // Col 8: Qty Out
+    logSheet.getRange(lastRow, 8).setNumberFormat('#,##0');
     // Col 9-10: Prev & Remaining
     logSheet.getRange(lastRow, 9, 1, 2).setNumberFormat('#,##0');
   } catch (err) {
@@ -834,43 +873,42 @@ function getRecentLogs(limit) {
     const values = logSheet.getDataRange().getValues();
     const logs = [];
 
-    // Check whether this sheet has 9 legacy headers or 12 modern headers
     const headerRow = values[0].map(h => String(h).toUpperCase());
-    const isModern = headerRow.includes('BRAND NAME') || headerRow.length >= 12;
+    const hasDateOut = headerRow.includes('DATE OUT') || headerRow.includes('DATE_OUT');
 
     // Read in reverse chronological order
     for (let i = values.length - 1; i >= 1 && logs.length < max; i--) {
       const r = values[i];
-      if (isModern) {
+      if (hasDateOut) {
         logs.push({
           timestamp: r[0],
-          itemCode: r[1],
-          itemDesc: r[2],
-          brandName: r[3] || '',
-          expDate: r[4],
-          unitPrice: r[5] || 0,
-          qtyOut: r[6],
-          totalCost: r[7] || 0,
+          dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
+          itemCode: r[2],
+          itemDesc: r[3],
+          brandName: r[4] || '',
+          expDate: r[5],
+          unitPrice: r[6] || 0,
+          qtyOut: r[7],
           previousQty: r[8],
           remainingBalance: r[9],
           remarks: r[10],
           user: r[11]
         });
       } else {
-        // Legacy 9-column format
+        // Fallback for older log schema
         logs.push({
           timestamp: r[0],
+          dateOut: '',
           itemCode: r[1],
           itemDesc: r[2],
-          brandName: '',
-          expDate: r[3],
-          unitPrice: 0,
-          qtyOut: r[4],
-          totalCost: 0,
-          previousQty: r[5],
-          remainingBalance: r[6],
-          remarks: r[7],
-          user: r[8]
+          brandName: r[3] || '',
+          expDate: r[4],
+          unitPrice: r[5] || 0,
+          qtyOut: r[6],
+          previousQty: r[8] || r[7],
+          remainingBalance: r[9] || r[8],
+          remarks: r[10] || r[9],
+          user: r[11] || r[10]
         });
       }
     }
