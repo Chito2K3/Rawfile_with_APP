@@ -170,7 +170,7 @@
                 <span class="label-hint">(e.g. DMR000002, DMR000451)</span>
               </label>
               <div class="combobox-wrapper" id="combobox-code-wrapper">
-                <input type="text" id="add-code" class="form-input combobox-input" list="dci-codes-datalist" placeholder="Search or type DCI code..." autocomplete="off" spellcheck="false">
+                <input type="text" id="add-code" class="form-input combobox-input" placeholder="Search or type DCI code..." autocomplete="off" spellcheck="false">
                 <div class="combobox-actions">
                   <button type="button" class="combobox-btn btn-clear" id="btn-clear-code" onclick="clearAddInput('add-code')" title="Clear DCI Code" style="display:none;">✕</button>
                   <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-code" onclick="toggleComboboxDropdown('code', event)" title="Browse Master Catalog">▼</button>
@@ -184,9 +184,7 @@
                   <div class="dropdown-list" id="list-code"></div>
                 </div>
               </div>
-              <datalist id="dci-codes-datalist">
-                <!-- Dynamically populated fallback -->
-              </datalist>
+              <div id="match-hint-code" class="match-hint" style="display:none;"></div>
             </div>
 
             <!-- 2. Generic Description Combobox -->
@@ -196,7 +194,7 @@
                 <span class="label-hint">(e.g. SODIUM CHLORIDE, FLUCONAZOLE)</span>
               </label>
               <div class="combobox-wrapper" id="combobox-desc-wrapper">
-                <input type="text" id="add-desc" class="form-input combobox-input" list="generic-names-datalist" placeholder="Search or type generic description..." autocomplete="off" spellcheck="false">
+                <input type="text" id="add-desc" class="form-input combobox-input" placeholder="Search or type generic description..." autocomplete="off" spellcheck="false">
                 <div class="combobox-actions">
                   <button type="button" class="combobox-btn btn-clear" id="btn-clear-desc" onclick="clearAddInput('add-desc')" title="Clear Generic Name" style="display:none;">✕</button>
                   <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-desc" onclick="toggleComboboxDropdown('desc', event)" title="Browse Master Catalog">▼</button>
@@ -210,9 +208,7 @@
                   <div class="dropdown-list" id="list-desc"></div>
                 </div>
               </div>
-              <datalist id="generic-names-datalist">
-                <!-- Dynamically populated fallback -->
-              </datalist>
+              <div id="match-hint-desc" class="match-hint" style="display:none;"></div>
             </div>
           </div>
 

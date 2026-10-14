@@ -709,6 +709,66 @@
     margin-top: 4px;
   }
 
+  /* Live Match Hint */
+  .match-hint {
+    margin-top: 5px;
+    font-size: 11.5px;
+    color: var(--primary);
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .match-hint:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+  }
+  .match-hint-badge {
+    font-family: monospace;
+    font-weight: 700;
+    font-size: 11px;
+    color: #1d4ed8;
+    background: #bfdbfe;
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .match-hint-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #1e3a8a;
+  }
+  .match-hint-action {
+    font-size: 10px;
+    color: #3b82f6;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* Flash Highlight Animation for Auto-Filled Fields */
+  .input-highlight-flash {
+    animation: fieldFlash 1.2s ease-out;
+  }
+  @keyframes fieldFlash {
+    0% {
+      background-color: #dbeafe;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+    }
+    100% {
+      background-color: #ffffff;
+      border-color: var(--border-color);
+      box-shadow: none;
+    }
+  }
+
   .batch-preview-box {
     background: var(--slate-50);
     border: 1px dashed var(--slate-300);
@@ -1025,7 +1085,7 @@
                 <span class="label-hint">(e.g. DMR000002, DMR000451)</span>
               </label>
               <div class="combobox-wrapper" id="combobox-code-wrapper">
-                <input type="text" id="add-code" class="form-input combobox-input" list="dci-codes-datalist" placeholder="Search or type DCI code..." autocomplete="off" spellcheck="false">
+                <input type="text" id="add-code" class="form-input combobox-input" placeholder="Search or type DCI code..." autocomplete="off" spellcheck="false">
                 <div class="combobox-actions">
                   <button type="button" class="combobox-btn btn-clear" id="btn-clear-code" onclick="clearAddInput('add-code')" title="Clear DCI Code" style="display:none;">✕</button>
                   <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-code" onclick="toggleComboboxDropdown('code', event)" title="Browse Master Catalog">▼</button>
@@ -1039,9 +1099,7 @@
                   <div class="dropdown-list" id="list-code"></div>
                 </div>
               </div>
-              <datalist id="dci-codes-datalist">
-                <!-- Dynamically populated fallback -->
-              </datalist>
+              <div id="match-hint-code" class="match-hint" style="display:none;"></div>
             </div>
 
             <!-- 2. Generic Description Combobox -->
@@ -1051,7 +1109,7 @@
                 <span class="label-hint">(e.g. SODIUM CHLORIDE, FLUCONAZOLE)</span>
               </label>
               <div class="combobox-wrapper" id="combobox-desc-wrapper">
-                <input type="text" id="add-desc" class="form-input combobox-input" list="generic-names-datalist" placeholder="Search or type generic description..." autocomplete="off" spellcheck="false">
+                <input type="text" id="add-desc" class="form-input combobox-input" placeholder="Search or type generic description..." autocomplete="off" spellcheck="false">
                 <div class="combobox-actions">
                   <button type="button" class="combobox-btn btn-clear" id="btn-clear-desc" onclick="clearAddInput('add-desc')" title="Clear Generic Name" style="display:none;">✕</button>
                   <button type="button" class="combobox-btn btn-toggle" id="btn-toggle-desc" onclick="toggleComboboxDropdown('desc', event)" title="Browse Master Catalog">▼</button>
@@ -1065,9 +1123,7 @@
                   <div class="dropdown-list" id="list-desc"></div>
                 </div>
               </div>
-              <datalist id="generic-names-datalist">
-                <!-- Dynamically populated fallback -->
-              </datalist>
+              <div id="match-hint-desc" class="match-hint" style="display:none;"></div>
             </div>
           </div>
 
@@ -1920,25 +1976,38 @@
   }
 
   // --- MASTER DCI FORMULARY & SEARCHABLE COMBOBOX SYSTEM ---
+  function normalizeMedText(str) {
+    return String(str || '')
+      .toUpperCase()
+      .replace(/[\(\)\[\],.\-\/\\]/g, ' ') // treat brackets, periods, slashes, dashes as space
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function setupComboboxEvents() {
     const codeInput = document.getElementById('add-code');
     const descInput = document.getElementById('add-desc');
     if (!codeInput || !descInput) return;
 
-    // Reset previous listeners
+    // Code input listeners
     codeInput.oninput = handleCodeInput;
+    codeInput.onchange = handleCodeInput;
     codeInput.onfocus = () => {
-      renderDropdownItems('code', codeInput.value.trim());
       openDropdown('code');
+      renderDropdownItems('code', codeInput.value.trim());
     };
     codeInput.onkeydown = (e) => handleComboboxKeydown(e, 'code');
+    codeInput.onblur = () => handleComboboxBlur('code');
 
+    // Desc input listeners
     descInput.oninput = handleDescInput;
+    descInput.onchange = handleDescInput;
     descInput.onfocus = () => {
-      renderDropdownItems('desc', descInput.value.trim());
       openDropdown('desc');
+      renderDropdownItems('desc', descInput.value.trim());
     };
     descInput.onkeydown = (e) => handleComboboxKeydown(e, 'desc');
+    descInput.onblur = () => handleComboboxBlur('desc');
 
     // Global outside click listener to close dropdowns
     document.addEventListener('click', (e) => {
@@ -1953,6 +2022,71 @@
     });
   }
 
+  function handleComboboxBlur(type) {
+    // Slight timeout allows click on dropdown item to fire before blur auto-resolves or closes
+    setTimeout(() => {
+      if (type === 'desc') {
+        autoResolveDescToCode();
+      } else if (type === 'code') {
+        autoResolveCodeToDesc();
+      }
+      if (state.activeDropdown === type) {
+        closeAllDropdowns();
+      }
+    }, 220);
+  }
+
+  function findCatalogMatches(type, query) {
+    const catalog = state.masterCatalog || [];
+    const qRaw = (query || '').trim();
+    if (!qRaw) return catalog;
+
+    const qLower = qRaw.toLowerCase();
+    const qNorm = normalizeMedText(qRaw);
+    const qWords = qNorm.split(' ').filter(w => w.length > 0);
+
+    return catalog.filter(item => {
+      const c = (item.code || '').toLowerCase();
+      const d = (item.desc || '').toLowerCase();
+
+      // Direct substring match
+      if (c.includes(qLower) || d.includes(qLower)) return true;
+
+      // Word-based match (e.g. user typed "SODIUM 0.9%" or "PARACETAMOL 500")
+      if (qWords.length > 1) {
+        const dNorm = normalizeMedText(item.desc);
+        const allWordsMatch = qWords.every(word => dNorm.includes(word) || (item.code || '').toUpperCase().includes(word));
+        if (allWordsMatch) return true;
+      }
+
+      return false;
+    }).sort((a, b) => {
+      const aCodeExact = a.code.toUpperCase() === qRaw.toUpperCase();
+      const bCodeExact = b.code.toUpperCase() === qRaw.toUpperCase();
+      if (aCodeExact && !bCodeExact) return -1;
+      if (!aCodeExact && bCodeExact) return 1;
+
+      const aDescExact = normalizeMedText(a.desc) === qNorm;
+      const bDescExact = normalizeMedText(b.desc) === qNorm;
+      if (aDescExact && !bDescExact) return -1;
+      if (!aDescExact && bDescExact) return 1;
+
+      if (type === 'code') {
+        const aCodeStarts = a.code.toLowerCase().startsWith(qLower);
+        const bCodeStarts = b.code.toLowerCase().startsWith(qLower);
+        if (aCodeStarts && !bCodeStarts) return -1;
+        if (!aCodeStarts && bCodeStarts) return 1;
+      } else {
+        const aDescStarts = a.desc.toLowerCase().startsWith(qLower);
+        const bDescStarts = b.desc.toLowerCase().startsWith(qLower);
+        if (aDescStarts && !bDescStarts) return -1;
+        if (!aDescStarts && bDescStarts) return 1;
+      }
+
+      return a.desc.localeCompare(b.desc);
+    });
+  }
+
   function handleCodeInput(e) {
     const codeInput = document.getElementById('add-code');
     const descInput = document.getElementById('add-desc');
@@ -1961,13 +2095,26 @@
     renderDropdownItems('code', q);
     openDropdown('code');
 
-    // Bi-directional Auto-Sync: Exact match on DCI Code immediately sets Generic Description
+    // Bi-directional Auto-Sync: Exact or match on DCI Code immediately sets Generic Description
     if (q && state.masterCatalog && state.masterCatalog.length > 0) {
       const match = state.masterCatalog.find(item => item.code.toUpperCase() === q.toUpperCase());
       if (match && match.desc) {
-        descInput.value = match.desc;
-        updateClearBtn('add-desc', match.desc);
+        if (descInput.value !== match.desc) {
+          descInput.value = match.desc;
+          updateClearBtn('add-desc', match.desc);
+          flashElement(descInput);
+        }
+        hideMatchHint('code');
+      } else {
+        const matches = findCatalogMatches('code', q);
+        if (matches.length > 0) {
+          showMatchHint('code', matches[0].code, matches[0].desc);
+        } else {
+          hideMatchHint('code');
+        }
       }
+    } else {
+      hideMatchHint('code');
     }
 
     onAddCodeOrDescChange();
@@ -1981,16 +2128,98 @@
     renderDropdownItems('desc', q);
     openDropdown('desc');
 
-    // Bi-directional Auto-Sync: Exact match on Generic Description immediately sets DCI Code
+    // Bi-directional Auto-Sync: When typing generic description
     if (q && state.masterCatalog && state.masterCatalog.length > 0) {
-      const match = state.masterCatalog.find(item => item.desc.toUpperCase() === q.toUpperCase());
-      if (match && match.code) {
-        codeInput.value = match.code;
-        updateClearBtn('add-code', match.code);
+      const qNorm = normalizeMedText(q);
+      const matches = findCatalogMatches('desc', q);
+
+      // Check for exact full match or normalized match
+      const exactMatch = matches.find(item => 
+        item.desc.toUpperCase() === q.toUpperCase() || 
+        normalizeMedText(item.desc) === qNorm
+      );
+
+      if (exactMatch && exactMatch.code) {
+        if (codeInput.value.toUpperCase() !== exactMatch.code.toUpperCase()) {
+          codeInput.value = exactMatch.code;
+          updateClearBtn('add-code', exactMatch.code);
+          flashElement(codeInput);
+          onAddCodeOrDescChange();
+        }
+        hideMatchHint('desc');
+      } else if (matches.length > 0) {
+        // Show live match hint with top result
+        const top = matches[0];
+        showMatchHint('desc', top.code, top.desc);
+      } else {
+        hideMatchHint('desc');
       }
+    } else {
+      hideMatchHint('desc');
     }
 
     onAddCodeOrDescChange();
+  }
+
+  function autoResolveDescToCode() {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    if (!descInput) return;
+    const q = descInput.value.trim();
+    if (!q) return;
+
+    // If DCI code already filled, nothing needed
+    if (codeInput && codeInput.value.trim()) return;
+
+    const matches = findCatalogMatches('desc', q);
+    if (matches.length > 0) {
+      const top = matches[0];
+      selectDciItem(top.code, top.desc);
+    }
+  }
+
+  function autoResolveCodeToDesc() {
+    const codeInput = document.getElementById('add-code');
+    const descInput = document.getElementById('add-desc');
+    if (!codeInput) return;
+    const q = codeInput.value.trim();
+    if (!q) return;
+
+    if (descInput && descInput.value.trim()) return;
+
+    const matches = findCatalogMatches('code', q);
+    if (matches.length > 0) {
+      const top = matches[0];
+      selectDciItem(top.code, top.desc);
+    }
+  }
+
+  function showMatchHint(type, code, desc) {
+    const hintEl = document.getElementById(`match-hint-${type}`);
+    if (!hintEl) return;
+    hintEl.innerHTML = `
+      <span class="match-hint-badge">${escapeHtml(code)}</span>
+      <span class="match-hint-text">${escapeHtml(desc)}</span>
+      <span class="match-hint-action">↵ Press Enter / Tab to select</span>
+    `;
+    hintEl.style.display = 'flex';
+    hintEl.onclick = (e) => {
+      e.stopPropagation();
+      selectDciItem(code, desc);
+    };
+  }
+
+  function hideMatchHint(type) {
+    const hintEl = document.getElementById(`match-hint-${type}`);
+    if (hintEl) hintEl.style.display = 'none';
+  }
+
+  function flashElement(el) {
+    if (!el) return;
+    el.classList.remove('input-highlight-flash');
+    void el.offsetWidth; // trigger reflow
+    el.classList.add('input-highlight-flash');
+    setTimeout(() => el.classList.remove('input-highlight-flash'), 1200);
   }
 
   function toggleComboboxDropdown(type, event) {
@@ -2043,33 +2272,8 @@
     const countEl = document.getElementById(`count-${type}-matches`);
     if (!listEl) return;
 
-    const catalog = state.masterCatalog || [];
+    const matches = findCatalogMatches(type, query);
     const qLower = (query || '').toLowerCase().trim();
-
-    let matches = [];
-    if (!qLower) {
-      matches = catalog;
-    } else {
-      matches = catalog.filter(item => {
-        const c = item.code.toLowerCase();
-        const d = item.desc.toLowerCase();
-        return c.includes(qLower) || d.includes(qLower);
-      }).sort((a, b) => {
-        const aCodeMatch = a.code.toLowerCase().startsWith(qLower);
-        const bCodeMatch = b.code.toLowerCase().startsWith(qLower);
-        const aDescMatch = a.desc.toLowerCase().startsWith(qLower);
-        const bDescMatch = b.desc.toLowerCase().startsWith(qLower);
-
-        if (type === 'code') {
-          if (aCodeMatch && !bCodeMatch) return -1;
-          if (!aCodeMatch && bCodeMatch) return 1;
-        } else {
-          if (aDescMatch && !bDescMatch) return -1;
-          if (!aDescMatch && bDescMatch) return 1;
-        }
-        return a.desc.localeCompare(b.desc);
-      });
-    }
 
     if (countEl) {
       countEl.textContent = `${matches.length} item${matches.length !== 1 ? 's' : ''}`;
@@ -2093,14 +2297,14 @@
 
       if (type === 'code') {
         return `
-          <div class="dropdown-item" data-index="${idx}" onclick="selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
+          <div class="dropdown-item" data-index="${idx}" onmousedown="event.preventDefault(); selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
             <span class="dropdown-item-code">${codeHtml}</span>
             <span class="dropdown-item-desc">${descHtml}</span>
           </div>
         `;
       } else {
         return `
-          <div class="dropdown-item" data-index="${idx}" onclick="selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
+          <div class="dropdown-item" data-index="${idx}" onmousedown="event.preventDefault(); selectDciItem('${escapeJs(item.code)}', '${escapeJs(item.desc)}')">
             <span class="dropdown-item-desc">${descHtml}</span>
             <span class="dropdown-item-code">${codeHtml}</span>
           </div>
@@ -2111,31 +2315,57 @@
 
   function handleComboboxKeydown(e, type) {
     const dropdown = document.getElementById(`dropdown-${type}`);
-    if (!dropdown || dropdown.style.display === 'none') {
-      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+    const isOpen = dropdown && dropdown.style.display !== 'none';
+    const items = dropdown ? dropdown.querySelectorAll('.dropdown-item') : [];
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!isOpen) {
         openDropdown(type);
         renderDropdownItems(type, e.target.value.trim());
+      } else if (items.length > 0) {
+        state.focusedIndex = (state.focusedIndex + 1) % items.length;
+        updateDropdownFocus(items);
       }
       return;
     }
 
-    const items = dropdown.querySelectorAll('.dropdown-item');
-    if (items.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'ArrowUp') {
       e.preventDefault();
-      state.focusedIndex = (state.focusedIndex + 1) % items.length;
-      updateDropdownFocus(items);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      state.focusedIndex = (state.focusedIndex - 1 + items.length) % items.length;
-      updateDropdownFocus(items);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (state.focusedIndex >= 0 && state.focusedIndex < items.length) {
-        items[state.focusedIndex].click();
+      if (isOpen && items.length > 0) {
+        state.focusedIndex = (state.focusedIndex - 1 + items.length) % items.length;
+        updateDropdownFocus(items);
       }
-    } else if (e.key === 'Escape') {
+      return;
+    }
+
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      // 1. If an item is explicitly focused with arrow keys, select it
+      if (isOpen && state.focusedIndex >= 0 && state.focusedIndex < items.length) {
+        e.preventDefault();
+        items[state.focusedIndex].dispatchEvent(new MouseEvent('mousedown'));
+        return;
+      }
+
+      // 2. If dropdown is open and has items, and user typed something, auto-select top match on Enter or Tab
+      if (isOpen && items.length > 0 && e.target.value.trim().length > 0) {
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          e.preventDefault();
+          items[0].dispatchEvent(new MouseEvent('mousedown'));
+          return;
+        }
+      }
+
+      // 3. If closed but user typed something and hit Enter, try resolving
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (type === 'desc') autoResolveDescToCode();
+        else autoResolveCodeToDesc();
+        return;
+      }
+    }
+
+    if (e.key === 'Escape') {
       e.preventDefault();
       closeAllDropdowns();
     }
@@ -2160,18 +2390,22 @@
     if (codeInput) {
       codeInput.value = code;
       updateClearBtn('add-code', code);
+      flashElement(codeInput);
     }
     if (descInput) {
       descInput.value = desc;
       updateClearBtn('add-desc', desc);
+      flashElement(descInput);
     }
 
+    hideMatchHint('code');
+    hideMatchHint('desc');
     closeAllDropdowns();
     onAddCodeOrDescChange();
 
-    // Smooth workflow: focus brand name for incoming delivery
+    // Smooth workflow: advance focus to brand name for incoming delivery
     if (brandInput && !brandInput.value) {
-      setTimeout(() => brandInput.focus(), 60);
+      setTimeout(() => brandInput.focus(), 80);
     }
   }
 
@@ -2180,6 +2414,7 @@
     if (input) {
       input.value = '';
       updateClearBtn(inputId, '');
+      hideMatchHint(inputId === 'add-code' ? 'code' : 'desc');
       input.focus();
       closeAllDropdowns();
       onAddCodeOrDescChange();
@@ -2199,12 +2434,14 @@
       descInput.value = '';
       updateClearBtn('add-desc', '');
     }
+    hideMatchHint('code');
+    hideMatchHint('desc');
     if (previewBox) {
       previewBox.style.display = 'none';
     }
 
     closeAllDropdowns();
-    if (codeInput) codeInput.focus();
+    if (descInput) descInput.focus();
   }
 
   function highlightText(text, query) {
@@ -2221,23 +2458,8 @@
   }
 
   function populateCatalogDatalists() {
-    const codeList = document.getElementById('dci-codes-datalist');
-    const descList = document.getElementById('generic-names-datalist');
     const badge = document.getElementById('catalog-count-badge');
-
     if (!state.masterCatalog || state.masterCatalog.length === 0) return;
-
-    if (codeList) {
-      codeList.innerHTML = state.masterCatalog.map(item => 
-        `<option value="${escapeHtml(item.code)}">${escapeHtml(item.desc)}</option>`
-      ).join('');
-    }
-
-    if (descList) {
-      descList.innerHTML = state.masterCatalog.map(item => 
-        `<option value="${escapeHtml(item.desc)}">${escapeHtml(item.code)}</option>`
-      ).join('');
-    }
 
     if (badge) {
       badge.textContent = `📋 ${state.masterCatalog.length} in Sheet1`;
