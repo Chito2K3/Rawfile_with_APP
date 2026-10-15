@@ -9,18 +9,50 @@
 // Target or active sheet configuration
 const CONFIG = {
   MAIN_SHEET_NAME: null, // null will auto-detect active inventory sheet or look for standard headers
-  MASTER_DCI_SHEET_NAME: 'Sheet1', // Master catalog tab with Col A: DCI Code, Col B: Generic Description
+  MASTER_DCI_SHEET_NAME: 'Medicine', // Master catalog tab with Col A: DCI Code, Col B: Generic Description (supports 'Medicine', 'Sheet1', etc.)
   LOG_SHEET_NAME: 'STOCK_OUT_LOG',
   COLUMN_KEYS: {
     CODE: 'ITEM CODE',
     DESC: 'ITEM DESCRIPTION',
     BRAND: 'BRAND NAME',
+    UOM: 'UOM',
     QTY: 'QTY STORAGE',
     EXP: 'EXP DATE',
     PRICE: 'ACQUISITION PRICE',
     DATE_OUT: 'DATE OUT'
-  }
+  },
+  STANDARD_UOM_LIST: [
+    'Tablet',
+    'Capsule',
+    'Vial',
+    'Ampule',
+    'Bottle',
+    'Tube',
+    'Nebule',
+    'Syringe',
+    'Sachet'
+  ]
 };
+
+/**
+ * Automatically infers standard hospital UOM from medicine description
+ */
+function inferUomFromDescription(desc) {
+  if (!desc) return 'Tablet';
+  const u = String(desc).toUpperCase();
+
+  if (u.includes('CAPSULE') || u.includes(' CAP ') || u.endsWith(' CAP')) return 'Capsule';
+  if (u.includes('VIAL')) return 'Vial';
+  if (u.includes('AMPULE') || u.includes('AMP ') || u.endsWith(' AMP')) return 'Ampule';
+  if (u.includes('NEBULE') || u.includes('RESPIRATORY SOLUTION')) return 'Nebule';
+  if (u.includes('SYRINGE') || u.includes('PRE-FILLED') || u.includes('PREFILLED')) return 'Syringe';
+  if (u.includes('SACHET') || u.includes('POWDER FOR SUSPENSION')) return 'Sachet';
+  if (u.includes('TUBE') || u.includes('OINTMENT') || u.includes('CREAM') || u.includes('GEL')) return 'Tube';
+  if (u.includes('BOTTLE') || u.includes('SYRUP') || u.includes('SUSPENSION') || u.includes('ELIXIR') || u.includes('DROPS') || u.includes('OPHTHALMIC') || u.includes('SOLUTION') || u.includes('SHAMPOO')) return 'Bottle';
+  if (u.includes('TABLET') || u.includes('TAB ') || u.endsWith(' TAB') || u.includes('CAPLET')) return 'Tablet';
+
+  return 'Tablet';
+}
 
 /**
  * Automatically creates custom menu on spreadsheet open
@@ -33,10 +65,12 @@ function onOpen() {
     .addSeparator()
     .addItem('➖ Quick Stock-Out / Dispense', 'showStockOutDialog')
     .addItem('➕ Add Medicine or New Batch', 'showAddBatchDialog')
+    .addItem('📑 Register Item in Master Formulary', 'showAddCatalogDialog')
     .addItem('🔄 Restock 0-Qty Items', 'showRestockDialog')
     .addSeparator()
     .addItem('📋 View Stock-Out Audit Log', 'openLogSheet')
-    .addItem('🛠️ Ensure / Upgrade Sheet Columns (Option A)', 'migrateSheetToOptionA')
+    .addItem('🛠️ Ensure / Upgrade Sheet Columns (Option A + UOM)', 'migrateSheetToOptionA')
+    .addItem('🧹 Clean Blank Rows & Consolidate Sheet', 'cleanAndConsolidateSheet')
     .addToUi();
 }
 
@@ -81,6 +115,9 @@ function showAddBatchDialog() {
 function showRestockDialog() {
   showDialog();
 }
+function showAddCatalogDialog() {
+  showDialog();
+}
 
 /**
  * Helper to include HTML sub-files (CSS, JS)
@@ -103,7 +140,8 @@ function openLogSheet() {
 
 /**
  * Resolves the primary Inventory sheet and locates its headers
- * Option A Standard: ITEM CODE | ITEM DESCRIPTION | BRAND NAME | QTY STORAGE | EXP DATE | ACQUISITION PRICE
+ * Option A Standard with UOM:
+ * ITEM CODE | ITEM DESCRIPTION | BRAND NAME | UOM | QTY STORAGE | EXP DATE | ACQUISITION PRICE | DATE OUT
  */
 function getInventorySheetInfo() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -114,17 +152,17 @@ function getInventorySheetInfo() {
   }
   
   if (!sheet) {
-    // Check if 'STORAGE' inventory sheet exists
     sheet = ss.getSheetByName('STORAGE') || ss.getSheetByName('Storage');
   }
 
   if (!sheet) {
-    // Try to find the inventory sheet that has ITEM CODE and QTY STORAGE, avoiding the master DCI catalog tab
     const sheets = ss.getSheets();
     for (let s of sheets) {
       const name = s.getName();
-      if (name === CONFIG.LOG_SHEET_NAME) continue;
+      const lower = name.trim().toLowerCase();
+      if (name === CONFIG.LOG_SHEET_NAME || lower.includes('log')) continue;
       if (CONFIG.MASTER_DCI_SHEET_NAME && name === CONFIG.MASTER_DCI_SHEET_NAME) continue;
+      if (lower === 'medicine' || lower === 'medicines' || lower === 'sheet1' || lower === 'sheet 1' || lower.includes('catalog') || lower.includes('dci')) continue;
       
       const data = s.getDataRange().getValues();
       if (data.length > 0) {
@@ -138,10 +176,14 @@ function getInventorySheetInfo() {
   }
 
   if (!sheet) {
-    // Fallback: check any sheet with ITEM CODE header
     const sheets = ss.getSheets();
     for (let s of sheets) {
-      if (s.getName() === CONFIG.LOG_SHEET_NAME) continue;
+      const name = s.getName();
+      const lower = name.trim().toLowerCase();
+      if (name === CONFIG.LOG_SHEET_NAME || lower.includes('log')) continue;
+      if (CONFIG.MASTER_DCI_SHEET_NAME && name === CONFIG.MASTER_DCI_SHEET_NAME) continue;
+      if (lower === 'medicine' || lower === 'medicines' || lower === 'sheet1' || lower === 'sheet 1' || lower.includes('catalog') || lower.includes('dci')) continue;
+      
       const data = s.getDataRange().getValues();
       if (data.length > 0) {
         const headerRow = data[0].map(c => String(c).trim().toUpperCase());
@@ -154,24 +196,51 @@ function getInventorySheetInfo() {
   }
 
   if (!sheet) {
-    sheet = ss.getSheets()[0]; // Fallback to first sheet
+    sheet = ss.getSheets()[0];
   }
 
   const dataRange = sheet.getDataRange();
-  const values = dataRange.getValues();
-  if (values.length === 0) {
-    throw new Error("Inventory sheet is empty.");
+  let values = dataRange.getValues();
+  
+  // If sheet is completely blank or Row 1 is empty, auto-initialize standard headers
+  const isSheetEmpty = values.length === 0 || (values.length === 1 && values[0].every(c => !String(c).trim()));
+  if (isSheetEmpty) {
+    const standardHeaders = [
+      'ITEM CODE', 'ITEM DESCRIPTION', 'BRAND NAME', 'UOM',
+      'QTY STORAGE', 'EXP DATE', 'ACQUISITION PRICE', 'DATE OUT'
+    ];
+    sheet.getRange(1, 1, 1, 8).setValues([standardHeaders])
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center')
+      .setBackground('#f3f4f6');
+    sheet.setFrozenRows(1);
+    values = sheet.getDataRange().getValues();
   }
 
   // Find column indices
-  const headerRow = values[0];
-  let colCode = -1, colDesc = -1, colBrand = -1, colQty = -1, colExp = -1, colPrice = -1, colDateOut = -1;
+  let headerRow = values[0];
+  const hasCodeHeader = headerRow.some(h => String(h).toUpperCase().includes('CODE'));
+  if (!hasCodeHeader && headerRow.every(h => !String(h).trim())) {
+    const standardHeaders = [
+      'ITEM CODE', 'ITEM DESCRIPTION', 'BRAND NAME', 'UOM',
+      'QTY STORAGE', 'EXP DATE', 'ACQUISITION PRICE', 'DATE OUT'
+    ];
+    sheet.getRange(1, 1, 1, 8).setValues([standardHeaders])
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center')
+      .setBackground('#f3f4f6');
+    sheet.setFrozenRows(1);
+    values = sheet.getDataRange().getValues();
+    headerRow = values[0];
+  }
+  let colCode = -1, colDesc = -1, colBrand = -1, colUom = -1, colQty = -1, colExp = -1, colPrice = -1, colDateOut = -1;
 
   for (let j = 0; j < headerRow.length; j++) {
     const h = String(headerRow[j]).trim().toUpperCase();
     if (colCode === -1 && (h.includes('CODE') || h.includes('ITEM CODE'))) colCode = j;
     if (colDesc === -1 && (h.includes('DESC') || h.includes('DESCRIPTION') || h.includes('GENERIC'))) colDesc = j;
     if (colBrand === -1 && (h.includes('BRAND') || h.includes('TRADE'))) colBrand = j;
+    if (colUom === -1 && (h === 'UOM' || h.includes('UNIT OF MEASURE') || h === 'UNIT' || h.includes('MEASURE'))) colUom = j;
     if (colQty === -1 && (h.includes('QTY') || h.includes('STORAGE') || h.includes('QUANTITY'))) colQty = j;
     if (colExp === -1 && (h.includes('EXP') || h.includes('DATE') || h.includes('EXPIRY')) && !h.includes('OUT')) colExp = j;
     if (colPrice === -1 && (h.includes('PRICE') || h.includes('COST') || h.includes('ACQUISITION'))) colPrice = j;
@@ -182,8 +251,14 @@ function getInventorySheetInfo() {
   if (colCode === -1) colCode = 0;
   if (colDesc === -1) colDesc = 1;
 
-  // If Option A layout is present or Brand was found:
-  if (colBrand !== -1) {
+  // If Option A layout with UOM is present:
+  if (colBrand !== -1 && colUom !== -1) {
+    if (colQty === -1) colQty = 4;
+    if (colExp === -1) colExp = 5;
+    if (colPrice === -1) colPrice = 6;
+    if (colDateOut === -1 && headerRow.length >= 8) colDateOut = 7;
+  } else if (colBrand !== -1) {
+    // Option A without UOM fallback
     if (colQty === -1) colQty = 3;
     if (colExp === -1) colExp = 4;
     if (colPrice === -1) colPrice = 5;
@@ -201,6 +276,7 @@ function getInventorySheetInfo() {
     colCode: colCode,
     colDesc: colDesc,
     colBrand: colBrand,
+    colUom: colUom,
     colQty: colQty,
     colExp: colExp,
     colPrice: colPrice,
@@ -209,14 +285,15 @@ function getInventorySheetInfo() {
 }
 
 /**
- * Migration Helper: Upgrades the current inventory sheet to Option A layout:
+ * Migration Helper: Upgrades the current inventory sheet to Option A layout with UOM:
  * Column A: ITEM CODE
  * Column B: ITEM DESCRIPTION
  * Column C: BRAND NAME
- * Column D: QTY STORAGE
- * Column E: EXP DATE
- * Column F: ACQUISITION PRICE (Repository only)
- * Column G: DATE OUT (Last Dispensed Date)
+ * Column D: UOM (Dropdown list: Tablet, Capsule, Vial, etc.)
+ * Column E: QTY STORAGE
+ * Column F: EXP DATE
+ * Column G: ACQUISITION PRICE (Repository only)
+ * Column H: DATE OUT (Last Dispensed Date)
  */
 function migrateSheetToOptionA() {
   const ui = SpreadsheetApp.getUi();
@@ -224,47 +301,104 @@ function migrateSheetToOptionA() {
     const info = getInventorySheetInfo();
     const sheet = info.sheet;
 
-    // Ensure sheet has at least 7 columns
-    while (sheet.getMaxColumns() < 7) {
+    // Ensure sheet has at least 8 columns
+    while (sheet.getMaxColumns() < 8) {
       sheet.insertColumnAfter(sheet.getMaxColumns());
     }
 
-    const checkCols = Math.max(sheet.getLastColumn(), 12);
+    const checkCols = Math.max(sheet.getLastColumn(), 14);
     const headerRow = sheet.getRange(1, 1, 1, checkCols).getValues()[0];
     const upperHeaders = headerRow.map(h => String(h).trim().toUpperCase());
 
     // 1. Ensure BRAND NAME is at Column C (index 3)
     const brandColIdx = upperHeaders.findIndex(h => h.includes('BRAND'));
     if (brandColIdx === -1) {
-      // Insert BRAND NAME after Column B (Description)
       sheet.insertColumnAfter(2);
       sheet.getRange(1, 3).setValue('BRAND NAME').setFontWeight('bold');
     } else if (brandColIdx !== 2) {
-      // Ensure Column C has BRAND NAME
       sheet.getRange(1, 3).setValue('BRAND NAME').setFontWeight('bold');
     }
 
-    // 2. Clear any stray ACQUISITION PRICE headers that may have landed in Column H, I, J
-    for (let c = 8; c <= Math.max(sheet.getLastColumn(), 12); c++) {
+    // Refresh headers after possible brand insertion
+    const curHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 14)).getValues()[0];
+    const curUpper = curHeaders.map(h => String(h).trim().toUpperCase());
+
+    // 2. Ensure UOM is at Column D (index 4)
+    const uomColIdx = curUpper.findIndex(h => h === 'UOM' || h.includes('UNIT OF MEASURE') || h === 'UNIT');
+    if (uomColIdx === -1) {
+      sheet.insertColumnAfter(3);
+      sheet.getRange(1, 4).setValue('UOM').setFontWeight('bold').setHorizontalAlignment('center');
+    } else if (uomColIdx !== 3) {
+      sheet.getRange(1, 4).setValue('UOM').setFontWeight('bold').setHorizontalAlignment('center');
+    }
+
+    // Apply native Google Sheets Data Validation dropdown (Tablet, Capsule, Vial, etc.) to Column D
+    const maxRows = sheet.getMaxRows();
+    if (maxRows > 1) {
+      const uomRule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(CONFIG.STANDARD_UOM_LIST, true)
+        .setAllowInvalid(true)
+        .build();
+      sheet.getRange(2, 4, maxRows - 1, 1).setDataValidation(uomRule).setHorizontalAlignment('center');
+
+      // Pre-fill empty UOMs for existing rows by auto-detecting from Description
+      const dataVals = sheet.getRange(2, 1, maxRows - 1, 4).getValues();
+      for (let r = 0; r < dataVals.length; r++) {
+        const itemCode = String(dataVals[r][0] || '').trim();
+        if (!itemCode) continue;
+        const currentUom = String(dataVals[r][3] || '').trim();
+        if (!currentUom) {
+          const desc = String(dataVals[r][1] || '').trim();
+          const detected = inferUomFromDescription(desc);
+          if (detected) {
+            sheet.getRange(r + 2, 4).setValue(detected);
+          }
+        }
+      }
+    }
+
+    // 3. Clear any stray ACQUISITION PRICE headers that may have landed in Column I, J, K
+    for (let c = 9; c <= Math.max(sheet.getLastColumn(), 14); c++) {
       const val = String(sheet.getRange(1, c).getValue()).trim().toUpperCase();
       if (val.includes('PRICE') || val.includes('ACQUISITION')) {
         sheet.getRange(1, c).clearContent();
       }
     }
 
-    // 3. Explicitly place ACQUISITION PRICE in Column F (Column 6)
-    sheet.getRange(1, 6).setValue('ACQUISITION PRICE').setFontWeight('bold');
-
-    // 4. Format Column F as Currency (₱#,##0.00)
-    const maxRows = sheet.getMaxRows();
+    // 4. Ensure Column E is QTY STORAGE
+    sheet.getRange(1, 5).setValue('QTY STORAGE').setFontWeight('bold').setHorizontalAlignment('right');
     if (maxRows > 1) {
-      sheet.getRange(2, 6, maxRows - 1, 1).setNumberFormat('"₱"#,##0.00');
+      sheet.getRange(2, 5, maxRows - 1, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
     }
 
-    // 5. Explicitly place DATE OUT in Column G (Column 7)
-    sheet.getRange(1, 7).setValue('DATE OUT').setFontWeight('bold').setHorizontalAlignment('center');
+    // 5. Ensure Column F is EXP DATE with mmm-yy date format and upgrade existing text dates to true Date objects
+    sheet.getRange(1, 6).setValue('EXP DATE').setFontWeight('bold').setHorizontalAlignment('center');
     if (maxRows > 1) {
-      sheet.getRange(2, 7, maxRows - 1, 1).setNumberFormat('@').setHorizontalAlignment('center');
+      sheet.getRange(2, 6, maxRows - 1, 1).setNumberFormat('mmm-yy').setHorizontalAlignment('center');
+      const ssTz = sheet.getParent().getSpreadsheetTimeZone();
+      const expRange = sheet.getRange(2, 6, maxRows - 1, 1);
+      const expValues = expRange.getValues();
+      for (let r = 0; r < expValues.length; r++) {
+        const raw = expValues[r][0];
+        if (raw && !(raw instanceof Date)) {
+          const parsed = getExpiryDateObject(raw, ssTz);
+          if (parsed) {
+            sheet.getRange(r + 2, 6).setValue(parsed);
+          }
+        }
+      }
+    }
+
+    // 6. Explicitly place ACQUISITION PRICE in Column G (Column 7)
+    sheet.getRange(1, 7).setValue('ACQUISITION PRICE').setFontWeight('bold').setHorizontalAlignment('right');
+    if (maxRows > 1) {
+      sheet.getRange(2, 7, maxRows - 1, 1).setNumberFormat('"₱"#,##0.00');
+    }
+
+    // 7. Explicitly place DATE OUT in Column H (Column 8)
+    sheet.getRange(1, 8).setValue('DATE OUT').setFontWeight('bold').setHorizontalAlignment('center');
+    if (maxRows > 1) {
+      sheet.getRange(2, 8, maxRows - 1, 1).setNumberFormat('@').setHorizontalAlignment('center');
     }
 
     ui.alert(
@@ -273,11 +407,12 @@ function migrateSheetToOptionA() {
       '• Column A: ITEM CODE\n' +
       '• Column B: ITEM DESCRIPTION\n' +
       '• Column C: BRAND NAME\n' +
-      '• Column D: QTY STORAGE\n' +
-      '• Column E: EXP DATE\n' +
-      '• Column F: ACQUISITION PRICE (Repository only)\n' +
-      '• Column G: DATE OUT (Last Dispensed Date)\n\n' +
-      'Brand Name, Acquisition Price, and Date Out are now active!',
+      '• Column D: UOM (Dropdown list: Tablet, Capsule, Vial, etc.)\n' +
+      '• Column E: QTY STORAGE\n' +
+      '• Column F: EXP DATE\n' +
+      '• Column G: ACQUISITION PRICE (Repository only)\n' +
+      '• Column H: DATE OUT (Last Dispensed Date)\n\n' +
+      'Unit of Measure (UOM) dropdown is now active in Google Sheets!',
       ui.ButtonSet.OK
     );
   } catch (err) {
@@ -301,6 +436,7 @@ function getInventoryData() {
 
       const desc = String(row[info.colDesc] || '').trim();
       const brand = info.colBrand !== -1 ? String(row[info.colBrand] || '').trim() : '';
+      const uom = info.colUom !== -1 ? String(row[info.colUom] || '').trim() : '';
       const rawQty = row[info.colQty];
       const rawExpVal = row[info.colExp];
       const rawPrice = info.colPrice !== -1 ? row[info.colPrice] : 0;
@@ -384,6 +520,7 @@ function getInventoryData() {
         itemCode: code,
         itemDesc: desc,
         brandName: brand,
+        uom: uom || inferUomFromDescription(desc),
         qty: cleanQty,
         expDate: expLabel,
         expYear: expYear,
@@ -402,10 +539,12 @@ function getInventoryData() {
       sheetName: info.sheetName,
       totalCount: rows.length,
       hasBrandColumn: info.colBrand !== -1,
+      hasUomColumn: info.colUom !== -1,
       hasPriceColumn: info.colPrice !== -1,
       hasDateOutColumn: info.colDateOut !== -1,
       items: rows,
-      catalog: masterCatalogRes.catalog || []
+      catalog: masterCatalogRes.catalog || [],
+      uomList: CONFIG.STANDARD_UOM_LIST
     };
   } catch (err) {
     return { success: false, error: err.message };
@@ -413,19 +552,26 @@ function getInventoryData() {
 }
 
 /**
- * Fetches the master list of DCI Codes and Generic Descriptions from 'Sheet1'
+ * Fetches the master list of DCI Codes and Generic Descriptions from 'Medicine' (or 'Sheet1')
  * Column A: DCI Code (Item Code)
  * Column B: Generic Description & Strength
  */
 function getMasterDciCatalog() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(CONFIG.MASTER_DCI_SHEET_NAME || 'Sheet1');
+    let sheet = null;
+
+    if (CONFIG.MASTER_DCI_SHEET_NAME) {
+      sheet = ss.getSheetByName(CONFIG.MASTER_DCI_SHEET_NAME);
+    }
+    if (!sheet) {
+      sheet = ss.getSheetByName('Medicine') || ss.getSheetByName('medicine') || ss.getSheetByName('Sheet1') || ss.getSheetByName('Sheet 1');
+    }
     if (!sheet) {
       const sheets = ss.getSheets();
       for (let s of sheets) {
         const sName = s.getName().trim().toLowerCase();
-        if (sName === 'sheet1' || sName === 'sheet 1' || sName.includes('catalog') || sName.includes('dci')) {
+        if (sName === 'medicine' || sName === 'medicines' || sName === 'sheet1' || sName === 'sheet 1' || sName.includes('catalog') || sName.includes('dci') || sName.includes('formulary')) {
           sheet = s;
           break;
         }
@@ -433,7 +579,7 @@ function getMasterDciCatalog() {
     }
 
     if (!sheet) {
-      return { success: false, catalog: [], message: "Master DCI tab ('Sheet1') not found." };
+      return { success: false, catalog: [], message: "Master DCI tab ('Medicine' or 'Sheet1') not found." };
     }
 
     const data = sheet.getDataRange().getValues();
@@ -480,6 +626,98 @@ function getMasterDciCatalog() {
 }
 
 /**
+ * Adds a new medicine (DCI Code and Generic Description) to the 'Medicine' master catalog tab.
+ * Column A: DCI Code (Item Code)
+ * Column B: Generic Description & Strength
+ * Prevents duplicates by case-insensitive DCI Code check.
+ */
+function addMedicineToMasterCatalog(payload) {
+  try {
+    const { itemCode, itemDesc } = payload || {};
+    if (!itemCode || !String(itemCode).trim()) {
+      throw new Error("Item Code / DCI Code is required.");
+    }
+    if (!itemDesc || !String(itemDesc).trim()) {
+      throw new Error("Generic Description & Strength is required.");
+    }
+
+    const cleanCode = String(itemCode).trim().toUpperCase();
+    const cleanDesc = String(itemDesc).trim().toUpperCase();
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = null;
+    if (CONFIG.MASTER_DCI_SHEET_NAME) {
+      sheet = ss.getSheetByName(CONFIG.MASTER_DCI_SHEET_NAME);
+    }
+    if (!sheet) {
+      sheet = ss.getSheetByName('Medicine') || ss.getSheetByName('medicine') || ss.getSheetByName('Sheet1') || ss.getSheetByName('Sheet 1');
+    }
+    if (!sheet) {
+      const sheets = ss.getSheets();
+      for (let s of sheets) {
+        const sName = s.getName().trim().toLowerCase();
+        if (sName === 'medicine' || sName === 'medicines' || sName === 'sheet1' || sName === 'sheet 1' || sName.includes('catalog') || sName.includes('dci') || sName.includes('formulary')) {
+          sheet = s;
+          break;
+        }
+      }
+    }
+
+    if (!sheet) {
+      // If no catalog sheet exists at all, create 'Medicine' tab
+      sheet = ss.insertSheet('Medicine');
+      sheet.getRange(1, 1, 1, 2).setValues([['DCI CODE', 'GENERIC DESCRIPTION & STRENGTH']])
+        .setFontWeight('bold')
+        .setBackground('#f3f4f6');
+      sheet.setFrozenRows(1);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    let codeColIdx = 0;
+    let descColIdx = 1;
+    let startRow = 0;
+
+    if (data.length > 0) {
+      const h0 = String(data[0][0] || '').trim().toUpperCase();
+      const h1 = String(data[0][1] || '').trim().toUpperCase();
+      if (h0.includes('CODE') || h1.includes('DESC')) {
+        startRow = 1;
+      }
+
+      // Check for duplicate code
+      for (let i = startRow; i < data.length; i++) {
+        const existingCode = String(data[i][codeColIdx] || '').trim().toUpperCase();
+        if (existingCode === cleanCode) {
+          const existingDesc = String(data[i][descColIdx] || '').trim();
+          return {
+            success: true,
+            alreadyExisted: true,
+            code: cleanCode,
+            desc: existingDesc || cleanDesc,
+            message: `[${cleanCode}] already exists in Master Catalog: ${existingDesc || cleanDesc}`
+          };
+        }
+      }
+    }
+
+    // Append to the last row of the catalog sheet
+    const nextRow = sheet.getLastRow() + 1;
+    sheet.getRange(nextRow, 1).setValue(cleanCode).setHorizontalAlignment('left');
+    sheet.getRange(nextRow, 2).setValue(cleanDesc).setHorizontalAlignment('left');
+
+    return {
+      success: true,
+      alreadyExisted: false,
+      code: cleanCode,
+      desc: cleanDesc,
+      message: `Successfully registered [${cleanCode}] ${cleanDesc} into Medicine Master Catalog!`
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Smart Add Medicine or New Batch
  * If itemCode exists, finds the last occurrence and inserts a row directly below it!
  * If itemCode does not exist, appends to the end of the inventory list.
@@ -498,43 +736,67 @@ function addNewMedicineOrBatch(payload) {
     const cleanCode = String(itemCode).trim();
     const cleanDesc = String(itemDesc).trim();
     const cleanBrand = String(brandName).trim();
+    const cleanUom = String(payload.uom || inferUomFromDescription(cleanDesc)).trim();
     const cleanQty = parseFloat(String(qty).replace(/[^0-9.-]/g, '')) || 0;
     const cleanExp = String(expDate || '').trim();
     const cleanPrice = parseFloat(String(acquisitionPrice || '0').replace(/[^0-9.-]/g, '')) || 0;
+
+    // Auto-enroll into Medicine Master Catalog if not already registered
+    try {
+      addMedicineToMasterCatalog({ itemCode: cleanCode, itemDesc: cleanDesc });
+    } catch (catErr) {
+      console.warn("Could not auto-enroll into master catalog: " + catErr.message);
+    }
 
     const info = getInventorySheetInfo();
     const sheet = info.sheet;
     const values = info.values;
 
-    // Search for existing item occurrences
-    let lastMatchingRowIndex = -1;
-    let existingCount = 0;
+    // Search for existing item occurrences and their expiry scores for FEFO ordering
+    const existingBatches = [];
+    const ssTz = sheet.getParent().getSpreadsheetTimeZone();
+    const formattedExp = normalizeExpiryString(cleanExp, ssTz);
+    const newExpScore = getExpiryComparableScore(cleanExp, ssTz);
 
     for (let i = 1; i < values.length; i++) {
       const code = String(values[i][info.colCode] || '').trim().toUpperCase();
       if (code === cleanCode.toUpperCase()) {
-        lastMatchingRowIndex = i + 1; // 1-based index in sheet
-        existingCount++;
+        const rawExp = values[i][info.colExp];
+        const score = getExpiryComparableScore(rawExp, ssTz);
+        existingBatches.push({
+          rowIndex: i + 1, // 1-based index in sheet
+          expScore: score,
+          brand: info.colBrand !== -1 ? String(values[i][info.colBrand] || '').trim() : '',
+          uom: info.colUom !== -1 ? String(values[i][info.colUom] || '').trim() : '',
+          expStr: normalizeExpiryString(rawExp, ssTz)
+        });
       }
     }
 
     let insertedRowIndex = -1;
     let mode = '';
 
-    if (lastMatchingRowIndex !== -1) {
-      // Existing item: Insert directly below the last existing batch row
-      sheet.insertRowAfter(lastMatchingRowIndex);
-      insertedRowIndex = lastMatchingRowIndex + 1;
-      mode = `Added as new batch #${existingCount + 1} below row ${lastMatchingRowIndex}`;
-    } else {
-      // New item: Append to the end of sheet
-      insertedRowIndex = sheet.getLastRow() + 1;
-      mode = `Added as brand new medicine at row ${insertedRowIndex}`;
-    }
+    if (existingBatches.length > 0) {
+      // FEFO (First-Expired, First-Out): Find first existing batch that expires LATER than new incoming batch
+      const laterBatch = existingBatches.find(b => b.expScore > newExpScore);
 
-    // Set values and explicit alignments for the new row
-    const ssTz = sheet.getParent().getSpreadsheetTimeZone();
-    const formattedExp = normalizeExpiryString(cleanExp, ssTz);
+      if (laterBatch) {
+        // Insert directly ABOVE the later expiring batch so nearest expiry appears first
+        sheet.insertRowBefore(laterBatch.rowIndex);
+        insertedRowIndex = laterBatch.rowIndex;
+        mode = `FEFO Priority: Placed at Row ${insertedRowIndex} above ${laterBatch.brand || 'existing batch'} [${laterBatch.expStr}]`;
+      } else {
+        // If new batch expires later than or equal to all existing batches, insert below the last batch
+        const lastBatch = existingBatches[existingBatches.length - 1];
+        sheet.insertRowAfter(lastBatch.rowIndex);
+        insertedRowIndex = lastBatch.rowIndex + 1;
+        mode = `FEFO Placed: Inserted at Row ${insertedRowIndex} below existing batches`;
+      }
+    } else {
+      // New item: Find first available empty data row (starts at Row 2, never skips down)
+      insertedRowIndex = findNextAvailableRow(sheet, info);
+      mode = `Added as brand new medicine at Row ${insertedRowIndex}`;
+    }
 
     // 1. Item Code (Left)
     sheet.getRange(insertedRowIndex, info.colCode + 1)
@@ -553,19 +815,38 @@ function addNewMedicineOrBatch(payload) {
         .setHorizontalAlignment('left');
     }
 
-    // 4. Storage Quantity (Right aligned, formatted as #,##0)
+    // 4. Unit of Measure (UOM) (Center)
+    if (info.colUom !== -1) {
+      const uomCell = sheet.getRange(insertedRowIndex, info.colUom + 1);
+      uomCell.setValue(cleanUom).setHorizontalAlignment('center');
+      const uomRule = SpreadsheetApp.newDataValidation()
+        .requireValueInList(CONFIG.STANDARD_UOM_LIST, true)
+        .setAllowInvalid(true)
+        .build();
+      uomCell.setDataValidation(uomRule);
+    }
+
+    // 5. Storage Quantity (Right aligned, formatted as #,##0)
     sheet.getRange(insertedRowIndex, info.colQty + 1)
       .setValue(cleanQty)
       .setNumberFormat('#,##0')
       .setHorizontalAlignment('right');
     
-    // 5. Expiry Date (Plain text '@' centered to avoid timezone date shifts)
-    sheet.getRange(insertedRowIndex, info.colExp + 1)
-      .setNumberFormat('@')
-      .setValue(formattedExp)
-      .setHorizontalAlignment('center');
+    // 6. Expiry Date (Proper Date object with mmm-yy number format for true Sheet date representation)
+    const expDateObj = getExpiryDateObject(cleanExp, ssTz);
+    if (expDateObj) {
+      sheet.getRange(insertedRowIndex, info.colExp + 1)
+        .setValue(expDateObj)
+        .setNumberFormat('mmm-yy')
+        .setHorizontalAlignment('center');
+    } else {
+      sheet.getRange(insertedRowIndex, info.colExp + 1)
+        .setNumberFormat('@')
+        .setValue(formattedExp)
+        .setHorizontalAlignment('center');
+    }
 
-    // 6. Acquisition Price (Right aligned, formatted as ₱#,##0.00)
+    // 7. Acquisition Price (Right aligned, formatted as ₱#,##0.00)
     if (info.colPrice !== -1) {
       sheet.getRange(insertedRowIndex, info.colPrice + 1)
         .setValue(cleanPrice)
@@ -573,7 +854,7 @@ function addNewMedicineOrBatch(payload) {
         .setHorizontalAlignment('right');
     }
 
-    // 7. Date Out (Empty for newly added batch)
+    // 8. Date Out (Empty for newly added batch)
     if (info.colDateOut !== -1) {
       sheet.getRange(insertedRowIndex, info.colDateOut + 1)
         .setValue('')
@@ -582,13 +863,77 @@ function addNewMedicineOrBatch(payload) {
 
     return {
       success: true,
-      message: `Successfully saved: [${cleanCode}] ${cleanDesc} (${cleanBrand})`,
+      message: `Successfully saved: [${cleanCode}] ${cleanDesc} (${cleanBrand} - ${cleanUom})`,
       mode: mode,
       insertedRowIndex: insertedRowIndex
     };
   } catch (err) {
     return { success: false, error: err.message };
   }
+}
+
+/**
+ * Converts any expiry value (Date object, 'YYYY-MM', 'YYYY-MM-DD', 'MMM-yy') into a JavaScript Date object.
+ * By pharmaceutical convention, expiration is anchored to the last day of the given month.
+ */
+function getExpiryDateObject(val, tz) {
+  if (!val) return null;
+  if (val instanceof Date) return val;
+  const s = String(val).trim();
+  if (!s || s.toUpperCase() === 'NO EXPIRY' || s.toUpperCase() === 'N/A') return null;
+
+  const monthMap = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+  };
+
+  // 1. Check YYYY-MM (e.g. '2028-12')
+  const mIsoMonth = s.match(/^(\d{4})-(\d{1,2})$/);
+  if (mIsoMonth) {
+    const yr = parseInt(mIsoMonth[1], 10);
+    const mo = parseInt(mIsoMonth[2], 10);
+    const lastDay = new Date(yr, mo, 0).getDate();
+    return new Date(yr, mo - 1, lastDay, 12, 0, 0); // midday avoids timezone boundary drift
+  }
+
+  // 2. Check YYYY-MM-DD
+  const mIsoDay = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (mIsoDay) {
+    const yr = parseInt(mIsoDay[1], 10);
+    const mo = parseInt(mIsoDay[2], 10);
+    const day = parseInt(mIsoDay[3], 10);
+    return new Date(yr, mo - 1, day, 12, 0, 0);
+  }
+
+  // 3. Check MMM-yy (e.g. 'Feb-28', 'Dec-28')
+  const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
+  if (mShort) {
+    const mo = monthMap[mShort[1].toLowerCase()];
+    if (mo) {
+      const yr = 2000 + parseInt(mShort[2], 10);
+      const lastDay = new Date(yr, mo, 0).getDate();
+      return new Date(yr, mo - 1, lastDay, 12, 0, 0);
+    }
+  }
+
+  // 4. Check MMM-yyyy (e.g. 'Feb-2028')
+  const mLong = s.match(/^([A-Za-z]{3})-(\d{4})$/);
+  if (mLong) {
+    const mo = monthMap[mLong[1].toLowerCase()];
+    if (mo) {
+      const yr = parseInt(mLong[2], 10);
+      const lastDay = new Date(yr, mo, 0).getDate();
+      return new Date(yr, mo - 1, lastDay, 12, 0, 0);
+    }
+  }
+
+  // 5. Fallback date parse
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  return null;
 }
 
 /**
@@ -620,6 +965,65 @@ function normalizeExpiryString(inputVal, tz) {
 }
 
 /**
+ * Converts expiry values (Date object or strings like 'Feb-28', 'Jan-30', '2028-02-01')
+ * into a comparable integer score YYYYMM (e.g. Feb-28 -> 202802, Jan-30 -> 203001)
+ * for FEFO (First-Expired, First-Out) sorting.
+ */
+function getExpiryComparableScore(val, tz) {
+  if (!val) return 999999;
+  if (val instanceof Date) {
+    const y = parseInt(Utilities.formatDate(val, tz || Session.getScriptTimeZone(), 'yyyy'), 10);
+    const m = parseInt(Utilities.formatDate(val, tz || Session.getScriptTimeZone(), 'MM'), 10);
+    return y * 100 + m;
+  }
+  const s = String(val).trim();
+  if (!s || s.toUpperCase() === 'NO EXPIRY' || s.toUpperCase() === 'N/A') return 999999;
+
+  const monthMap = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+  };
+
+  // Format MMM-yy (e.g. Feb-28, Jan-30)
+  const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
+  if (mShort) {
+    const mo = monthMap[mShort[1].toLowerCase()] || 0;
+    const yr = 2000 + parseInt(mShort[2], 10);
+    return yr * 100 + mo;
+  }
+
+  // Format MMM-yyyy (e.g. Feb-2028)
+  const mLong = s.match(/^([A-Za-z]{3})-(\d{4})$/);
+  if (mLong) {
+    const mo = monthMap[mLong[1].toLowerCase()] || 0;
+    const yr = parseInt(mLong[2], 10);
+    return yr * 100 + mo;
+  }
+
+  // Format yyyy-MM or yyyy-MM-dd
+  const mIso = s.match(/^(\d{4})-(\d{1,2})/);
+  if (mIso) {
+    const yr = parseInt(mIso[1], 10);
+    const mo = parseInt(mIso[2], 10);
+    return yr * 100 + mo;
+  }
+
+  // Standard date parsing fallback
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d.getFullYear() * 100 + (d.getMonth() + 1);
+  }
+
+  // Fallback: match 4-digit year
+  const mYr = s.match(/20(\d{2})/);
+  if (mYr) {
+    return (2000 + parseInt(mYr[1], 10)) * 100 + 12;
+  }
+
+  return 999999;
+}
+
+/**
  * Records Stock-Out (Deduction of Quantity from specific Brand & Expiry batch)
  * Reduces QTY STORAGE and logs transaction with financial details into STOCK_OUT_LOG sheet
  */
@@ -643,6 +1047,7 @@ function recordStockOut(payload) {
 
     const desc = String(sheet.getRange(rowIndex, info.colDesc + 1).getValue()).trim();
     const brandName = info.colBrand !== -1 ? String(sheet.getRange(rowIndex, info.colBrand + 1).getValue()).trim() : '';
+    const uom = info.colUom !== -1 ? String(sheet.getRange(rowIndex, info.colUom + 1).getValue()).trim() : '';
     const rawExp = sheet.getRange(rowIndex, info.colExp + 1).getValue();
     const ssTz = sheet.getParent().getSpreadsheetTimeZone();
     const expDate = normalizeExpiryString(rawExp, ssTz);
@@ -660,6 +1065,7 @@ function recordStockOut(payload) {
 
     const newQty = currentQty - deductQty;
     const cleanDateOut = String(dateOut || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
+    const resolvedUom = uom || inferUomFromDescription(desc);
 
     // Update inventory sheet quantity
     sheet.getRange(rowIndex, info.colQty + 1)
@@ -682,6 +1088,7 @@ function recordStockOut(payload) {
       itemCode: targetCode,
       itemDesc: desc,
       brandName: brandName,
+      uom: resolvedUom,
       expDate: expDate,
       unitPrice: price,
       qtyOut: deductQty,
@@ -696,13 +1103,14 @@ function recordStockOut(payload) {
       itemCode: targetCode,
       itemDesc: desc,
       brandName: brandName,
+      uom: resolvedUom,
       expDate: expDate,
       unitPrice: price,
       qtyDeducted: deductQty,
       dateOut: cleanDateOut,
       previousQty: currentQty,
       newQty: newQty,
-      message: `Deducted ${deductQty.toLocaleString()} units of ${desc} [${brandName || 'Batch'}]. Date Out: ${cleanDateOut}. Remaining: ${newQty.toLocaleString()}`
+      message: `Deducted ${deductQty.toLocaleString()} ${resolvedUom} of ${desc} [${brandName || 'Batch'}]. Date Out: ${cleanDateOut}. Remaining: ${newQty.toLocaleString()}`
     };
   } catch (err) {
     return { success: false, error: err.message };
@@ -710,11 +1118,11 @@ function recordStockOut(payload) {
 }
 
 /**
- * Updates an existing row (useful for restocking 0-qty lines with new brand, expiry, price, and qty)
+ * Updates an existing row (useful for restocking 0-qty lines with new brand, uom, expiry, price, and qty)
  */
 function updateMedicineBatch(payload) {
   try {
-    const { rowIndex, itemCode, itemDesc, brandName, newQty, newExpDate, acquisitionPrice } = payload;
+    const { rowIndex, itemCode, itemDesc, brandName, uom, newQty, newExpDate, acquisitionPrice } = payload;
     const info = getInventorySheetInfo();
     const sheet = info.sheet;
 
@@ -743,17 +1151,32 @@ function updateMedicineBatch(payload) {
         .setHorizontalAlignment('left');
     }
 
+    if (info.colUom !== -1 && (uom || itemDesc)) {
+      const targetUom = String(uom || inferUomFromDescription(itemDesc)).trim();
+      sheet.getRange(rowIndex, info.colUom + 1)
+        .setValue(targetUom)
+        .setHorizontalAlignment('center');
+    }
+
     // Set Quantity (Right-aligned, number format #,##0)
     sheet.getRange(rowIndex, info.colQty + 1)
       .setValue(cleanQty)
       .setNumberFormat('#,##0')
       .setHorizontalAlignment('right');
     
-    // Set Expiry Date (Plain text '@' centered)
-    sheet.getRange(rowIndex, info.colExp + 1)
-      .setNumberFormat('@')
-      .setValue(formattedExp)
-      .setHorizontalAlignment('center');
+    // Set Expiry Date (Proper Date object with mmm-yy number format)
+    const expDateObj = getExpiryDateObject(newExpDate, ssTz);
+    if (expDateObj) {
+      sheet.getRange(rowIndex, info.colExp + 1)
+        .setValue(expDateObj)
+        .setNumberFormat('mmm-yy')
+        .setHorizontalAlignment('center');
+    } else {
+      sheet.getRange(rowIndex, info.colExp + 1)
+        .setNumberFormat('@')
+        .setValue(formattedExp)
+        .setHorizontalAlignment('center');
+    }
 
     // Set Acquisition Price (Right-aligned, currency format ₱#,##0.00)
     if (info.colPrice !== -1) {
@@ -773,7 +1196,7 @@ function updateMedicineBatch(payload) {
 }
 
 /**
- * Initializes and formats the STOCK_OUT_LOG sheet with Brand and Date Out columns (No computed total cost)
+ * Initializes and formats the STOCK_OUT_LOG sheet with Brand, UOM, and Date Out columns
  */
 function initLogSheet(ss) {
   const logSheet = ss.insertSheet(CONFIG.LOG_SHEET_NAME);
@@ -783,6 +1206,7 @@ function initLogSheet(ss) {
     'ITEM CODE',
     'GENERIC NAME',
     'BRAND NAME',
+    'UOM',
     'EXPIRY DATE',
     'UNIT PRICE (₱)',
     'QTY OUT',
@@ -803,20 +1227,21 @@ function initLogSheet(ss) {
   logSheet.setColumnWidth(2, 110); // Date Out
   logSheet.setColumnWidth(3, 130); // Code
   logSheet.setColumnWidth(4, 260); // Generic
-  logSheet.setColumnWidth(5, 150); // Brand
-  logSheet.setColumnWidth(6, 110); // Expiry
-  logSheet.setColumnWidth(7, 120); // Unit Price (Repository)
-  logSheet.setColumnWidth(8, 90);  // Qty Out
-  logSheet.setColumnWidth(9, 100); // Prev
-  logSheet.setColumnWidth(10, 120); // Rem
-  logSheet.setColumnWidth(11, 180); // Remarks
-  logSheet.setColumnWidth(12, 150); // User
+  logSheet.setColumnWidth(5, 140); // Brand
+  logSheet.setColumnWidth(6, 90);  // UOM
+  logSheet.setColumnWidth(7, 110); // Expiry
+  logSheet.setColumnWidth(8, 120); // Unit Price (Repository)
+  logSheet.setColumnWidth(9, 90);  // Qty Out
+  logSheet.setColumnWidth(10, 100); // Prev
+  logSheet.setColumnWidth(11, 120); // Rem
+  logSheet.setColumnWidth(12, 180); // Remarks
+  logSheet.setColumnWidth(13, 150); // User
 
   return logSheet;
 }
 
 /**
- * Appends transaction record to STOCK_OUT_LOG with Date Out and Brand Name
+ * Appends transaction record to STOCK_OUT_LOG with Date Out, Brand Name, and UOM
  */
 function logStockOutTransaction(data) {
   try {
@@ -832,6 +1257,7 @@ function logStockOutTransaction(data) {
       data.itemCode,
       data.itemDesc,
       data.brandName || '',
+      data.uom || '',
       data.expDate,
       data.unitPrice || 0,
       data.qtyOut,
@@ -847,12 +1273,14 @@ function logStockOutTransaction(data) {
     // Formatting:
     // Col 2: Date Out
     logSheet.getRange(lastRow, 2).setNumberFormat('@').setHorizontalAlignment('center');
-    // Col 7: Unit Price
-    logSheet.getRange(lastRow, 7).setNumberFormat('"₱"#,##0.00');
-    // Col 8: Qty Out
-    logSheet.getRange(lastRow, 8).setNumberFormat('#,##0');
-    // Col 9-10: Prev & Remaining
-    logSheet.getRange(lastRow, 9, 1, 2).setNumberFormat('#,##0');
+    // Col 6: UOM
+    logSheet.getRange(lastRow, 6).setHorizontalAlignment('center');
+    // Col 8: Unit Price
+    logSheet.getRange(lastRow, 8).setNumberFormat('"₱"#,##0.00');
+    // Col 9: Qty Out
+    logSheet.getRange(lastRow, 9).setNumberFormat('#,##0');
+    // Col 10-11: Prev & Remaining
+    logSheet.getRange(lastRow, 10, 1, 2).setNumberFormat('#,##0');
   } catch (err) {
     Logger.log("Error logging stock-out: " + err.message);
   }
@@ -874,18 +1302,36 @@ function getRecentLogs(limit) {
     const logs = [];
 
     const headerRow = values[0].map(h => String(h).toUpperCase());
+    const hasUom = headerRow.includes('UOM') || headerRow.includes('UNIT');
     const hasDateOut = headerRow.includes('DATE OUT') || headerRow.includes('DATE_OUT');
 
     // Read in reverse chronological order
     for (let i = values.length - 1; i >= 1 && logs.length < max; i--) {
       const r = values[i];
-      if (hasDateOut) {
+      if (hasUom) {
         logs.push({
           timestamp: r[0],
           dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
           itemCode: r[2],
           itemDesc: r[3],
           brandName: r[4] || '',
+          uom: r[5] || '',
+          expDate: r[6],
+          unitPrice: r[7] || 0,
+          qtyOut: r[8],
+          previousQty: r[9],
+          remainingBalance: r[10],
+          remarks: r[11],
+          user: r[12]
+        });
+      } else if (hasDateOut) {
+        logs.push({
+          timestamp: r[0],
+          dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
+          itemCode: r[2],
+          itemDesc: r[3],
+          brandName: r[4] || '',
+          uom: '',
           expDate: r[5],
           unitPrice: r[6] || 0,
           qtyOut: r[7],
@@ -902,6 +1348,7 @@ function getRecentLogs(limit) {
           itemCode: r[1],
           itemDesc: r[2],
           brandName: r[3] || '',
+          uom: '',
           expDate: r[4],
           unitPrice: r[5] || 0,
           qtyOut: r[6],
@@ -915,6 +1362,187 @@ function getRecentLogs(limit) {
 
     return { success: true, logs: logs };
   } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Finds the first available row for a new medicine:
+ * 1. Checks if Row 2 is empty. If Row 2 is empty, returns 2.
+ * 2. Checks subsequent rows for the first row with empty Item Code AND Description.
+ * 3. If no empty rows exist within the data bounds, appends to the row after the last actual data row.
+ */
+function findNextAvailableRow(sheet, info) {
+  const maxRows = sheet.getMaxRows();
+  if (maxRows <= 1) {
+    if (maxRows === 1) sheet.insertRowAfter(1);
+    return 2;
+  }
+
+  const colCodeIdx = (info && info.colCode !== undefined && info.colCode !== -1) ? info.colCode + 1 : 1;
+  const colDescIdx = (info && info.colDesc !== undefined && info.colDesc !== -1) ? info.colDesc + 1 : 2;
+
+  const colCodeVals = sheet.getRange(1, colCodeIdx, maxRows, 1).getValues();
+  const colDescVals = sheet.getRange(1, colDescIdx, maxRows, 1).getValues();
+
+  // Find the first completely empty data row below header (Row 2 onwards)
+  for (let r = 1; r < maxRows; r++) { // r=1 corresponds to Row 2
+    const code = String(colCodeVals[r][0] || '').trim();
+    const desc = String(colDescVals[r][0] || '').trim();
+    if (code === '' && desc === '') {
+      return r + 1; // 1-based index in sheet (e.g. Row 2)
+    }
+  }
+
+  // If all rows down to maxRows are filled, insert a new row
+  sheet.insertRowAfter(maxRows);
+  return maxRows + 1;
+}
+
+/**
+ * Finds the actual last row containing medicine data in the sheet.
+ * Ignores empty rows with borders, data validation, or ghost formatting.
+ * Returns 1 (header row) if the sheet has no medicine entries.
+ */
+function getLastActualDataRow(sheet, info) {
+  const maxRows = sheet.getMaxRows();
+  if (maxRows <= 1) return 1;
+
+  const colCodeIdx = (info && info.colCode !== undefined && info.colCode !== -1) ? info.colCode + 1 : 1;
+  const colDescIdx = (info && info.colDesc !== undefined && info.colDesc !== -1) ? info.colDesc + 1 : 2;
+
+  const colCodeVals = sheet.getRange(1, colCodeIdx, maxRows, 1).getValues();
+  const colDescVals = sheet.getRange(1, colDescIdx, maxRows, 1).getValues();
+
+  for (let r = maxRows - 1; r >= 1; r--) {
+    const code = String(colCodeVals[r][0] || '').trim();
+    const desc = String(colDescVals[r][0] || '').trim();
+    if (code !== '' || desc !== '') {
+      return r + 1; // 1-based row index in sheet
+    }
+  }
+
+  return 1; // Only header row exists
+}
+
+/**
+ * Clean Blank Rows & Consolidate Sheet
+ * Removes all empty ghost rows and shifts entries (e.g., stranded at Row 75)
+ * up to Row 2 so the sheet is cleanly packed without any blank row gaps.
+ */
+function cleanAndConsolidateSheet() {
+  let ui = null;
+  try {
+    ui = SpreadsheetApp.getUi();
+  } catch (e) {
+    // Running in standalone web app without spreadsheet UI
+  }
+
+  try {
+    const info = getInventorySheetInfo();
+    const sheet = info.sheet;
+    const maxRows = sheet.getMaxRows();
+    if (maxRows <= 1) {
+      if (ui) ui.alert('Consolidation', 'The inventory sheet is empty. Nothing to consolidate.', ui.ButtonSet.OK);
+      return { success: true, message: 'Sheet is empty.' };
+    }
+
+    const lastCol = Math.max(sheet.getLastColumn(), 8);
+    const range = sheet.getRange(2, 1, maxRows - 1, lastCol);
+    const values = range.getValues();
+
+    const cleanRows = [];
+    let emptyCount = 0;
+
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const code = String(row[info.colCode] || '').trim();
+      const desc = String(row[info.colDesc] || '').trim();
+
+      if (code !== '' || desc !== '') {
+        cleanRows.push(row);
+      } else {
+        emptyCount++;
+      }
+    }
+
+    if (emptyCount === 0) {
+      if (ui) ui.alert('Consolidation', 'The sheet is already clean! No empty rows were found.', ui.ButtonSet.OK);
+      return { success: true, message: 'No blank rows found.', consolidatedCount: cleanRows.length };
+    }
+
+    // Clear existing data range below headers
+    range.clearContent();
+    range.clearDataValidations();
+
+    // Write back non-empty rows starting at Row 2
+    if (cleanRows.length > 0) {
+      sheet.getRange(2, 1, cleanRows.length, lastCol).setValues(cleanRows);
+
+      // Re-apply UOM dropdown validation to Column D
+      if (info.colUom !== -1) {
+        const uomRule = SpreadsheetApp.newDataValidation()
+          .requireValueInList(CONFIG.STANDARD_UOM_LIST, true)
+          .setAllowInvalid(true)
+          .build();
+        sheet.getRange(2, info.colUom + 1, cleanRows.length, 1)
+          .setDataValidation(uomRule)
+          .setHorizontalAlignment('center');
+      }
+
+      // Re-apply Qty format
+      if (info.colQty !== -1) {
+        sheet.getRange(2, info.colQty + 1, cleanRows.length, 1)
+          .setNumberFormat('#,##0')
+          .setHorizontalAlignment('right');
+      }
+
+      // Re-apply Expiry format
+      if (info.colExp !== -1) {
+        sheet.getRange(2, info.colExp + 1, cleanRows.length, 1)
+          .setNumberFormat('mmm-yy')
+          .setHorizontalAlignment('center');
+      }
+
+      // Re-apply Price format
+      if (info.colPrice !== -1) {
+        sheet.getRange(2, info.colPrice + 1, cleanRows.length, 1)
+          .setNumberFormat('"₱"#,##0.00')
+          .setHorizontalAlignment('right');
+      }
+
+      // Re-apply Date Out format
+      if (info.colDateOut !== -1) {
+        sheet.getRange(2, info.colDateOut + 1, cleanRows.length, 1)
+          .setNumberFormat('@')
+          .setHorizontalAlignment('center');
+      }
+    }
+
+    // Optionally trim excessive trailing blank rows to keep the sheet compact
+    const targetRowCount = Math.max(cleanRows.length + 25, 50);
+    const curMaxRows = sheet.getMaxRows();
+    if (curMaxRows > targetRowCount + 15) {
+      try {
+        sheet.deleteRows(targetRowCount + 1, curMaxRows - targetRowCount);
+      } catch (e) {}
+    }
+
+    const msg = 'Consolidation Complete!\n\n' +
+      '• Removed: ' + emptyCount + ' blank/ghost rows\n' +
+      '• Consolidated: ' + cleanRows.length + ' medicine records\n' +
+      '• Inventory is now organized starting cleanly at Row 2.';
+
+    if (ui) ui.alert('Clean & Consolidate', msg, ui.ButtonSet.OK);
+
+    return {
+      success: true,
+      message: msg,
+      emptyCount: emptyCount,
+      activeCount: cleanRows.length
+    };
+  } catch (err) {
+    if (ui) ui.alert('Error', 'Failed to consolidate sheet: ' + err.message, ui.ButtonSet.OK);
     return { success: false, error: err.message };
   }
 }

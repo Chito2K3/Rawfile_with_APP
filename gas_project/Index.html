@@ -121,7 +121,8 @@
               <tr>
                 <th style="width:120px;">Item Code</th>
                 <th>Generic Description</th>
-                <th style="width:140px;">Brand Name</th>
+                <th style="width:130px;">Brand Name</th>
+                <th style="width:85px; text-align:center;">UOM</th>
                 <th style="width:110px; text-align:right;">Storage Qty</th>
                 <th style="width:145px;">Expiry Status</th>
                 <th style="width:115px; text-align:right;">Acq. Price</th>
@@ -143,7 +144,7 @@
             <div>
               <h2 class="form-title" style="margin-bottom:4px;">Add Medicine or New Batch Delivery</h2>
               <p class="form-desc" style="margin-bottom:0;">
-                Select from the <strong>Sheet1 Master Catalog</strong> or enter a new medicine. Deliveries for existing medicines are <strong>automatically grouped and inserted directly below the last batch</strong> in Google Sheets!
+                Select from the <strong>Medicine Master Catalog</strong> or enter a new medicine. Deliveries for existing medicines are <strong>automatically grouped and inserted in FEFO order</strong> in Google Sheets!
               </p>
             </div>
             <span id="catalog-count-badge" class="badge badge-brand" style="font-size:11px; padding:6px 12px; white-space:nowrap; display:none;"></span>
@@ -154,12 +155,17 @@
             <div style="display:flex; align-items:center; gap:8px;">
               <span class="sync-banner-icon">⚡</span>
               <span class="sync-banner-text">
-                <strong>Bi-Directional Auto-Sync:</strong> Selecting or typing either <strong>DCI Code</strong> or <strong>Generic Description</strong> automatically searches, matches, and fills the corresponding field from <strong>Sheet1</strong>.
+                <strong>Bi-Directional Auto-Sync:</strong> Selecting or typing either <strong>DCI Code</strong> or <strong>Generic Description</strong> automatically searches, matches, and fills the corresponding field from the <strong>Medicine master list</strong>.
               </span>
             </div>
-            <button type="button" class="btn btn-sm btn-ghost" onclick="resetDciSelection()" title="Clear and reset both fields">
-              ↺ Reset Fields
-            </button>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn btn-sm btn-primary" onclick="openAddMasterCatalogModal()" title="Register a new medicine directly into the Medicine master catalog tab">
+                ➕ Add to Master Catalog
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" onclick="resetDciSelection()" title="Clear and reset both fields">
+                ↺ Reset Fields
+              </button>
+            </div>
           </div>
 
           <!-- Dual Synchronized Searchable Comboboxes -->
@@ -179,7 +185,7 @@
                 <!-- Custom Floating Dropdown Menu -->
                 <div class="combobox-dropdown" id="dropdown-code" style="display:none;">
                   <div class="dropdown-header">
-                    <span class="dropdown-title">Sheet1 Master Catalog</span>
+                    <span class="dropdown-title">Medicine Master Catalog</span>
                     <span class="dropdown-count" id="count-code-matches">0 items</span>
                   </div>
                   <div class="dropdown-list" id="list-code"></div>
@@ -203,7 +209,7 @@
                 <!-- Custom Floating Dropdown Menu -->
                 <div class="combobox-dropdown" id="dropdown-desc" style="display:none;">
                   <div class="dropdown-header">
-                    <span class="dropdown-title">Sheet1 Master Catalog</span>
+                    <span class="dropdown-title">Medicine Master Catalog</span>
                     <span class="dropdown-count" id="count-desc-matches">0 items</span>
                   </div>
                   <div class="dropdown-list" id="list-desc"></div>
@@ -218,20 +224,55 @@
             <div id="add-batch-preview-content"></div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="add-brand">Brand Name (Commercial / Trade Name) *</label>
-            <input type="text" id="add-brand" class="form-input" placeholder="e.g. Diflucan, Flucan, Pfizer, etc.">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label" for="add-brand">Brand Name (Commercial / Trade Name) *</label>
+              <input type="text" id="add-brand" class="form-input" placeholder="e.g. Diflucan, Flucan, Indirab, etc.">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="add-uom">Unit of Measure (UOM) *</label>
+              <select id="add-uom" class="form-select" onchange="onUomSelectionChange()">
+                <option value="Tablet">Tablet</option>
+                <option value="Capsule">Capsule</option>
+                <option value="Vial">Vial</option>
+                <option value="Ampule">Ampule</option>
+                <option value="Bottle">Bottle</option>
+                <option value="Tube">Tube</option>
+                <option value="Nebule">Nebule</option>
+                <option value="Syringe">Syringe</option>
+                <option value="Sachet">Sachet</option>
+              </select>
+            </div>
           </div>
 
           <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
             <div class="form-group">
-              <label class="form-label" for="add-qty">Storage Quantity *</label>
+              <label class="form-label" for="add-qty">Storage Quantity (<span id="add-qty-uom-hint">Units</span>) *</label>
               <input type="number" id="add-qty" class="form-input" placeholder="e.g. 500" min="0">
             </div>
 
-            <div class="form-group">
-              <label class="form-label" for="add-exp">Expiry Date *</label>
-              <input type="text" id="add-exp" class="form-input" placeholder="MMM-YY (e.g. Dec-28)">
+            <div class="form-group" style="position:relative;">
+              <label class="form-label" for="add-exp-display">Expiry Date (Month & Year) *</label>
+              <div class="month-picker-input-wrap">
+                <input type="text" id="add-exp-display" class="form-input month-picker-input" placeholder="Select Month & Year..." readonly onclick="toggleMonthPicker('add')">
+                <button type="button" class="month-picker-btn" onclick="toggleMonthPicker('add')" title="Open Month & Year Picker">📅</button>
+              </div>
+              <input type="hidden" id="add-exp" value="">
+              <div id="add-exp-badge" class="exp-preview-badge" style="display:none; margin-top:6px;"></div>
+
+              <!-- Custom Month & Year Picker Card -->
+              <div id="month-picker-popup-add" class="month-picker-popup" style="display:none;">
+                <div class="month-picker-header">
+                  <button type="button" class="picker-nav-btn" onclick="changePickerYear('add', -1)">◀</button>
+                  <div class="picker-year-select-wrap">
+                    <select id="picker-year-select-add" class="picker-year-select" onchange="onPickerYearSelect('add')"></select>
+                  </div>
+                  <button type="button" class="picker-nav-btn" onclick="changePickerYear('add', 1)">▶</button>
+                </div>
+                <div class="picker-quick-years" id="picker-quick-years-add"></div>
+                <div class="month-picker-grid" id="picker-months-grid-add"></div>
+              </div>
             </div>
 
             <div class="form-group">
@@ -260,13 +301,14 @@
           <table>
             <thead>
               <tr>
-                <th style="width:130px;">Item Code</th>
+                <th style="width:120px;">Item Code</th>
                 <th>Generic Description</th>
-                <th style="width:140px;">Brand Name</th>
-                <th style="width:120px;">Old Expiry</th>
-                <th style="width:120px; text-align:right;">Last Price</th>
+                <th style="width:130px;">Brand Name</th>
+                <th style="width:85px; text-align:center;">UOM</th>
+                <th style="width:110px;">Old Expiry</th>
+                <th style="width:110px; text-align:right;">Last Price</th>
                 <th style="width:110px;">Current Stock</th>
-                <th style="width:180px; text-align:right;">Action</th>
+                <th style="width:170px; text-align:right;">Action</th>
               </tr>
             </thead>
             <tbody id="restock-table-body">
@@ -290,15 +332,16 @@
           <table>
             <thead>
               <tr>
-                <th style="width:150px;">Timestamp</th>
-                <th style="width:110px; text-align:center;">Date Out</th>
-                <th style="width:120px;">Item Code</th>
+                <th style="width:140px;">Timestamp</th>
+                <th style="width:100px; text-align:center;">Date Out</th>
+                <th style="width:110px;">Item Code</th>
                 <th>Generic Name</th>
-                <th style="width:130px;">Brand Name</th>
-                <th style="width:100px;">Batch Expiry</th>
-                <th style="width:110px; text-align:right;">Unit Price</th>
-                <th style="width:90px; text-align:right;">Qty Out</th>
-                <th style="width:100px; text-align:right;">Remaining</th>
+                <th style="width:120px;">Brand Name</th>
+                <th style="width:85px; text-align:center;">UOM</th>
+                <th style="width:95px;">Batch Expiry</th>
+                <th style="width:105px; text-align:right;">Unit Price</th>
+                <th style="width:85px; text-align:right;">Qty Out</th>
+                <th style="width:95px; text-align:right;">Remaining</th>
                 <th>Remarks</th>
               </tr>
             </thead>
@@ -323,7 +366,10 @@
         <div style="background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <span style="font-size:11px; font-weight:700; color:#64748b; font-family:monospace;" id="so-code"></span>
-            <span id="so-brand-badge" class="badge badge-brand"></span>
+            <div style="display:flex; gap:6px;">
+              <span id="so-brand-badge" class="badge badge-brand"></span>
+              <span id="so-uom-badge" class="badge badge-uom"></span>
+            </div>
           </div>
           <div style="font-size:14px; font-weight:700; color:#0f172a; margin:4px 0;" id="so-desc"></div>
           <div style="display:flex; justify-content:space-between; font-size:12px; color:#475569; margin-top:6px; border-top:1px dashed #e2e8f0; padding-top:6px;">
@@ -333,7 +379,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="so-input-qty">Quantity Taken Out (Deducted) *</label>
+          <label class="form-label" for="so-input-qty">Quantity Taken Out (<span id="so-uom-label">Units</span>) *</label>
           <input type="number" id="so-input-qty" class="form-input" placeholder="Enter number of units..." min="1" oninput="updateStockOutPreview()">
         </div>
 
@@ -381,9 +427,26 @@
           <input type="text" id="edit-desc" class="form-input">
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Brand Name *</label>
-          <input type="text" id="edit-brand" class="form-input" placeholder="e.g. Diflucan, Tegretol...">
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Brand Name *</label>
+            <input type="text" id="edit-brand" class="form-input" placeholder="e.g. Diflucan, Tegretol...">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Unit of Measure (UOM) *</label>
+            <select id="edit-uom" class="form-select">
+              <option value="Tablet">Tablet</option>
+              <option value="Capsule">Capsule</option>
+              <option value="Vial">Vial</option>
+              <option value="Ampule">Ampule</option>
+              <option value="Bottle">Bottle</option>
+              <option value="Tube">Tube</option>
+              <option value="Nebule">Nebule</option>
+              <option value="Syringe">Syringe</option>
+              <option value="Sachet">Sachet</option>
+            </select>
+          </div>
         </div>
 
         <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
@@ -392,9 +455,27 @@
             <input type="number" id="edit-qty" class="form-input" min="0">
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Expiry Date</label>
-            <input type="text" id="edit-exp" class="form-input" placeholder="e.g. Feb-28">
+          <div class="form-group" style="position:relative;">
+            <label class="form-label" for="edit-exp-display">Expiry Date (Month & Year)</label>
+            <div class="month-picker-input-wrap">
+              <input type="text" id="edit-exp-display" class="form-input month-picker-input" placeholder="Select Month & Year..." readonly onclick="toggleMonthPicker('edit')">
+              <button type="button" class="month-picker-btn" onclick="toggleMonthPicker('edit')" title="Open Month & Year Picker">📅</button>
+            </div>
+            <input type="hidden" id="edit-exp" value="">
+            <div id="edit-exp-badge" class="exp-preview-badge" style="display:none; margin-top:6px;"></div>
+
+            <!-- Custom Month & Year Picker Card -->
+            <div id="month-picker-popup-edit" class="month-picker-popup" style="display:none;">
+              <div class="month-picker-header">
+                <button type="button" class="picker-nav-btn" onclick="changePickerYear('edit', -1)">◀</button>
+                <div class="picker-year-select-wrap">
+                  <select id="picker-year-select-edit" class="picker-year-select" onchange="onPickerYearSelect('edit')"></select>
+                </div>
+                <button type="button" class="picker-nav-btn" onclick="changePickerYear('edit', 1)">▶</button>
+              </div>
+              <div class="picker-quick-years" id="picker-quick-years-edit"></div>
+              <div class="month-picker-grid" id="picker-months-grid-edit"></div>
+            </div>
           </div>
 
           <div class="form-group">
@@ -406,6 +487,53 @@
       <div class="modal-footer">
         <button class="btn btn-outline" onclick="closeModal('modal-edit-batch')">Cancel</button>
         <button class="btn btn-primary" onclick="submitEditBatch()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add New Medicine to Master Catalog -->
+  <div id="modal-add-catalog" class="modal-overlay" style="display:none;">
+    <div class="modal-card" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title">➕ Register New Medicine into Master Catalog</h3>
+        <button type="button" class="modal-close" onclick="closeModal('modal-add-catalog')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+          This will permanently register the medicine into your spreadsheet's <strong>Medicine</strong> catalog tab, making it instantly searchable for all future deliveries.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="cat-add-code">Item Code / DCI Code *</label>
+          <input type="text" id="cat-add-code" class="form-input" placeholder="e.g. DMC000648" autocomplete="off" spellcheck="false" style="text-transform: uppercase;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cat-add-desc">Generic Description & Strength *</label>
+          <input type="text" id="cat-add-desc" class="form-input" placeholder="e.g. LEVOTHYROXINE SODIUM 100MCG" autocomplete="off" spellcheck="false" style="text-transform: uppercase;" oninput="onCatDescInput()">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="cat-add-uom">Standard Unit of Measure (UOM)</label>
+          <select id="cat-add-uom" class="form-select">
+            <option value="Tablet">Tablet</option>
+            <option value="Capsule">Capsule</option>
+            <option value="Vial">Vial</option>
+            <option value="Ampule">Ampule</option>
+            <option value="Bottle">Bottle</option>
+            <option value="Tube">Tube</option>
+            <option value="Nebule">Nebule</option>
+            <option value="Syringe">Syringe</option>
+            <option value="Sachet">Sachet</option>
+          </select>
+          <span class="label-hint" style="margin-top:4px; display:block;">Hospital packaging unit (inferred automatically from description)</span>
+        </div>
+
+        <div id="cat-add-error" class="alert alert-danger" style="display:none; font-size:12px; margin-top:12px; padding:8px 12px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-add-catalog')">Cancel</button>
+        <button type="button" id="btn-save-catalog" class="btn btn-primary" onclick="submitAddMasterCatalog()">Save to Master Catalog</button>
       </div>
     </div>
   </div>

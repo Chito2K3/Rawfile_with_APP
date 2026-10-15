@@ -399,6 +399,188 @@
     border: 1px solid #c7d2fe;
     font-weight: 700;
   }
+  .badge-uom {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .exp-preview-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 9px;
+    border-radius: 6px;
+    line-height: 1.3;
+    animation: fadeIn 0.2s ease-in-out;
+  }
+  .exp-preview-critical {
+    background: #fef2f2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+  }
+  .exp-preview-near {
+    background: #fffbeb;
+    color: #92400e;
+    border: 1px solid #fde68a;
+  }
+  .exp-preview-safe {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+  .exp-preview-expired {
+    background: #475569;
+    color: #ffffff;
+    border: 1px solid #334155;
+  }
+
+  /* Custom Month-Year Picker Component */
+  .month-picker-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+  .month-picker-input {
+    cursor: pointer;
+    background-color: #ffffff !important;
+    padding-right: 38px;
+    font-weight: 600;
+    color: var(--slate-800);
+  }
+  .month-picker-btn {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .month-picker-btn:hover {
+    background: #f1f5f9;
+  }
+  .month-picker-popup {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 295px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.12);
+    padding: 12px;
+    z-index: 1050;
+    animation: fadeIn 0.15s ease-out;
+  }
+  .month-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .picker-nav-btn {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--slate-700);
+    transition: all 0.15s;
+  }
+  .picker-nav-btn:hover {
+    background: #e2e8f0;
+    color: var(--slate-900);
+  }
+  .picker-year-select-wrap {
+    flex: 1;
+    text-align: center;
+    margin: 0 6px;
+  }
+  .picker-year-select {
+    width: 100%;
+    text-align: center;
+    padding: 5px 8px;
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--slate-900);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: #ffffff;
+    cursor: pointer;
+  }
+  .picker-year-select:focus {
+    border-color: var(--primary);
+    outline: none;
+  }
+  .picker-quick-years {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+    justify-content: space-between;
+  }
+  .picker-quick-year-btn {
+    flex: 1;
+    background: #f1f5f9;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 5px 2px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--slate-600);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .picker-quick-year-btn:hover {
+    background: #e2e8f0;
+    color: var(--slate-900);
+  }
+  .picker-quick-year-btn.active {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+  }
+  .month-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .picker-month-btn {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 9px 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--slate-700);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .picker-month-btn:hover {
+    background: #e0f2fe;
+    color: var(--primary);
+    border-color: #bae6fd;
+    transform: translateY(-1px);
+  }
+  .picker-month-btn.selected {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+  }
 
   .qty-display {
     font-family: monospace;
@@ -462,7 +644,7 @@
     margin-bottom: 6px;
   }
 
-  .form-input, .form-textarea, .form-select-full {
+  .form-input, .form-textarea, .form-select, .form-select-full {
     width: 100%;
     padding: 10px 12px;
     border: 1px solid var(--border-color);
@@ -470,8 +652,10 @@
     font-size: 13px;
     outline: none;
     transition: all 0.2s;
+    background-color: #ffffff;
+    color: var(--slate-800);
   }
-  .form-input:focus, .form-textarea:focus, .form-select-full:focus {
+  .form-input:focus, .form-textarea:focus, .form-select:focus, .form-select-full:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
@@ -701,6 +885,54 @@
     font-size: 11px;
     color: var(--slate-400);
     margin-top: 4px;
+  }
+
+  /* In-Dropdown Add to Master Formulary Action Card */
+  .dropdown-add-card {
+    padding: 10px 12px;
+    background: #f0fdf4;
+    border-top: 1px solid #bbf7d0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .dropdown-add-card:hover {
+    background: #dcfce7;
+  }
+  .dropdown-add-badge {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: #16a34a;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .dropdown-add-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .dropdown-add-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #15803d;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dropdown-add-subtitle {
+    font-size: 11px;
+    color: #166534;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
   }
 
   /* Live Match Hint */

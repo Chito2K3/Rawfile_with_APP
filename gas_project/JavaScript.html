@@ -17,6 +17,15 @@
     initTabs();
     setupComboboxEvents();
     loadInventory();
+    initMonthPickers();
+    const addUomEl = document.getElementById('add-uom');
+    if (addUomEl) {
+      addUomEl.addEventListener('change', () => {
+        addUomEl.dataset.userEdited = 'true';
+        onUomSelectionChange();
+      });
+    }
+    onUomSelectionChange();
   });
 
   // Tab Navigation Handling
@@ -84,11 +93,11 @@
         onInventoryLoaded({
           success: true,
           items: [
-            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', brandName: 'Tegretol', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 12.50, dateOut: '2026-10-14', isDonation: true, isZeroStock: false },
-            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', brandName: 'Lexapro', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', acquisitionPrice: 28.00, dateOut: '2026-10-12', isDonation: false, isZeroStock: false },
-            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, dateOut: '', isDonation: false, isZeroStock: false },
-            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, dateOut: '2026-10-10', isDonation: false, isZeroStock: false },
-            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, dateOut: '2026-10-08', isDonation: false, isZeroStock: true }
+            { rowIndex: 2, itemCode: 'DMDON001151', itemDesc: '(DON) CARBAMAZEPINE 200MG TABLET', brandName: 'Tegretol', uom: 'Tablet', qty: 3950, expDate: 'Feb-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 12.50, dateOut: '2026-10-14', isDonation: true, isZeroStock: false },
+            { rowIndex: 3, itemCode: 'DMR000422', itemDesc: 'ESCITALOPRAM 10 MG TABLET', brandName: 'Lexapro', uom: 'Tablet', qty: 600, expDate: 'Mar-26', expYear: 2026, expStatus: 'CRITICAL_2026', acquisitionPrice: 28.00, dateOut: '2026-10-12', isDonation: false, isZeroStock: false },
+            { rowIndex: 4, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Diflucan', uom: 'Capsule', qty: 200, expDate: 'Jun-28', expYear: 2028, expStatus: 'SAFE', acquisitionPrice: 125.00, dateOut: '', isDonation: false, isZeroStock: false },
+            { rowIndex: 5, itemCode: 'DMR000451', itemDesc: 'FLUCONAZOLE 200MG CAPSULE', brandName: 'Flucan', uom: 'Capsule', qty: 2000, expDate: 'Apr-29', expYear: 2029, expStatus: 'SAFE', acquisitionPrice: 45.00, dateOut: '2026-10-10', isDonation: false, isZeroStock: false },
+            { rowIndex: 6, itemCode: 'DMR001125', itemDesc: 'ZOLEDRONIC ACID 4MG/5ML VIAL', brandName: 'Zometa', uom: 'Vial', qty: 0, expDate: 'Oct-27', expYear: 2027, expStatus: 'NEAR_2027', acquisitionPrice: 3500.00, dateOut: '2026-10-08', isDonation: false, isZeroStock: true }
           ],
           catalog: DEFAULT_MOCK_DCI_CATALOG
         });
@@ -153,6 +162,7 @@
         item.itemCode.toLowerCase().includes(query) || 
         item.itemDesc.toLowerCase().includes(query) ||
         (item.brandName && item.brandName.toLowerCase().includes(query)) ||
+        (item.uom && item.uom.toLowerCase().includes(query)) ||
         item.expDate.toLowerCase().includes(query);
 
       let matchStatus = true;
@@ -169,13 +179,13 @@
     renderInventoryTable();
   }
 
-  // Render Main Inventory Table (Option A Layout: Code | Generic | Brand | Qty | Expiry | Price | Actions)
+  // Render Main Inventory Table (Option A Layout: Code | Generic | Brand | UOM | Qty | Expiry | Price | Date Out | Actions)
   function renderInventoryTable() {
     const tbody = document.getElementById('inventory-table-body');
     tbody.innerHTML = '';
 
     if (state.filteredItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>`;
       return;
     }
 
@@ -202,6 +212,9 @@
         ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>`
         : `<span style="color:#94a3b8; font-style:italic;">--</span>`;
 
+      const resolvedUom = item.uom || detectUomFromText(item.itemDesc);
+      const uomDisplay = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
+
       const qtyDisplay = item.isZeroStock 
         ? `<span class="qty-zero">0 (Out of Stock)</span>` 
         : `<span class="qty-display">${item.qty.toLocaleString()}</span>`;
@@ -221,6 +234,7 @@
           <div style="font-size:11px; color:#64748b;">Row ${item.rowIndex} in Sheet</div>
         </td>
         <td>${brandBadge}</td>
+        <td style="text-align:center;">${uomDisplay}</td>
         <td style="text-align:right;">${qtyDisplay}</td>
         <td>${badgeHtml}</td>
         <td style="text-align:right;">${priceDisplay}</td>
@@ -246,9 +260,16 @@
     
     const brandEl = document.getElementById('so-brand-badge');
     brandEl.textContent = item.brandName || 'Brand Batch';
+
+    const resolvedUom = item.uom || detectUomFromText(item.itemDesc);
+    const uomBadgeEl = document.getElementById('so-uom-badge');
+    if (uomBadgeEl) uomBadgeEl.textContent = resolvedUom;
+
+    const uomLabelEl = document.getElementById('so-uom-label');
+    if (uomLabelEl) uomLabelEl.textContent = resolvedUom + 's';
     
     document.getElementById('so-exp').textContent = item.expDate;
-    document.getElementById('so-current-qty').textContent = item.qty.toLocaleString() + ' units';
+    document.getElementById('so-current-qty').textContent = `${item.qty.toLocaleString()} ${resolvedUom.toLowerCase()}s`;
     document.getElementById('so-input-qty').value = '';
     document.getElementById('so-input-qty').max = item.qty;
 
@@ -257,7 +278,7 @@
     document.getElementById('so-date-out').value = todayStr;
 
     document.getElementById('so-remarks').value = '';
-    document.getElementById('so-remaining-preview').textContent = item.qty.toLocaleString() + ' units';
+    document.getElementById('so-remaining-preview').textContent = `${item.qty.toLocaleString()} ${resolvedUom.toLowerCase()}s`;
 
     document.getElementById('modal-stock-out').style.display = 'flex';
     document.getElementById('so-input-qty').focus();
@@ -267,6 +288,7 @@
     if (!state.selectedRow) return;
     const outVal = parseFloat(document.getElementById('so-input-qty').value) || 0;
     const rem = state.selectedRow.qty - outVal;
+    const resolvedUom = (state.selectedRow.uom || detectUomFromText(state.selectedRow.itemDesc) || 'unit').toLowerCase();
 
     const previewRem = document.getElementById('so-remaining-preview');
 
@@ -274,7 +296,7 @@
       previewRem.textContent = 'Invalid (Exceeds current stock)';
       previewRem.style.color = '#dc2626';
     } else {
-      previewRem.textContent = rem.toLocaleString() + ' units';
+      previewRem.textContent = `${rem.toLocaleString()} ${resolvedUom}s`;
       previewRem.style.color = '#15803d';
     }
   }
@@ -333,7 +355,8 @@
       state.selectedRow.isZeroStock = state.selectedRow.qty <= 0;
       setModalLoading('modal-stock-out', false);
       closeModal('modal-stock-out');
-      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} units of ${state.selectedRow.itemDesc} [${state.selectedRow.brandName || 'Batch'}]. Date Out: ${dateOut}`, "success");
+      const resolvedUom = state.selectedRow.uom || detectUomFromText(state.selectedRow.itemDesc) || 'units';
+      showToast(`[Mock] Deducted ${qtyOut.toLocaleString()} ${resolvedUom.toLowerCase()}s of ${state.selectedRow.itemDesc} [${state.selectedRow.brandName || 'Batch'}]. Date Out: ${dateOut}`, "success");
       renderStats();
       applyFilter();
     }
@@ -348,8 +371,28 @@
     document.getElementById('edit-code').value = item.itemCode;
     document.getElementById('edit-desc').value = item.itemDesc;
     document.getElementById('edit-brand').value = item.brandName || '';
+    
+    const editUomEl = document.getElementById('edit-uom');
+    if (editUomEl) {
+      editUomEl.value = item.uom || detectUomFromText(item.itemDesc);
+    }
+
     document.getElementById('edit-qty').value = item.qty;
-    document.getElementById('edit-exp').value = item.expDate === 'NO EXPIRY' ? '' : item.expDate;
+    const expVal = item.expDate === 'NO EXPIRY' ? '' : (item.expDate || '');
+    document.getElementById('edit-exp').value = expVal;
+    if (expVal) {
+      const details = getExpiryDateDetails(expVal);
+      if (details) {
+        pickerState.edit.year = details.year;
+        pickerState.edit.month = details.month;
+        document.getElementById('edit-exp-display').value = `${details.mmmYy} (${MONTH_NAMES_SHORT[details.month - 1]} ${details.year})`;
+      } else {
+        document.getElementById('edit-exp-display').value = expVal;
+      }
+    } else {
+      document.getElementById('edit-exp-display').value = '';
+    }
+    onExpiryChange('edit');
     document.getElementById('edit-price').value = item.acquisitionPrice || '';
     document.getElementById('edit-row-info').textContent = `Editing Google Sheet Row #${item.rowIndex}`;
 
@@ -360,8 +403,9 @@
     if (!state.selectedRow) return;
     const newDesc = document.getElementById('edit-desc').value.trim();
     const newBrand = document.getElementById('edit-brand').value.trim();
+    const newUom = document.getElementById('edit-uom') ? document.getElementById('edit-uom').value : 'Tablet';
     const newQty = parseFloat(document.getElementById('edit-qty').value) || 0;
-    const newExp = document.getElementById('edit-exp').value.trim();
+    const rawExp = document.getElementById('edit-exp').value.trim();
     const newPrice = parseFloat(document.getElementById('edit-price').value) || 0;
 
     if (!newBrand) {
@@ -369,11 +413,19 @@
       return;
     }
 
+    if (!rawExp) {
+      showToast("Please select an Expiration Month & Year.", "error");
+      return;
+    }
+
+    const newExp = formatIsoMonthToMmmYy(rawExp);
+
     const payload = {
       rowIndex: state.selectedRow.rowIndex,
       itemCode: state.selectedRow.itemCode,
       itemDesc: newDesc,
       brandName: newBrand,
+      uom: newUom,
       newQty: newQty,
       newExpDate: newExp,
       acquisitionPrice: newPrice
@@ -402,6 +454,7 @@
       state.selectedRow.expDate = newExp;
       state.selectedRow.itemDesc = newDesc;
       state.selectedRow.brandName = newBrand;
+      state.selectedRow.uom = newUom;
       state.selectedRow.acquisitionPrice = newPrice;
       state.selectedRow.isZeroStock = newQty <= 0;
       setModalLoading('modal-edit-batch', false);
@@ -412,11 +465,318 @@
     }
   }
 
+  // --- EXPIRY DATE CONVERSION & PICKER HELPERS ---
+  const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const pickerState = {
+    add: { year: 2028, month: 12 },
+    edit: { year: 2027, month: 10 }
+  };
+
+  function initMonthPickers() {
+    renderPickerYearOptions('add');
+    renderPickerYearOptions('edit');
+    renderQuickYears('add');
+    renderQuickYears('edit');
+    renderMonthGrid('add');
+    renderMonthGrid('edit');
+
+    // Close picker when clicking outside
+    document.addEventListener('click', (e) => {
+      const popupAdd = document.getElementById('month-picker-popup-add');
+      const inputAdd = document.getElementById('add-exp-display');
+      const btnAdd = inputAdd ? inputAdd.nextElementSibling : null;
+
+      const popupEdit = document.getElementById('month-picker-popup-edit');
+      const inputEdit = document.getElementById('edit-exp-display');
+      const btnEdit = inputEdit ? inputEdit.nextElementSibling : null;
+
+      if (popupAdd && popupAdd.style.display !== 'none') {
+        if (!popupAdd.contains(e.target) && e.target !== inputAdd && e.target !== btnAdd) {
+          popupAdd.style.display = 'none';
+        }
+      }
+      if (popupEdit && popupEdit.style.display !== 'none') {
+        if (!popupEdit.contains(e.target) && e.target !== inputEdit && e.target !== btnEdit) {
+          popupEdit.style.display = 'none';
+        }
+      }
+    });
+  }
+
+  function toggleMonthPicker(type) {
+    const popup = document.getElementById(`month-picker-popup-${type}`);
+    if (!popup) return;
+    const isVisible = popup.style.display !== 'none';
+    closeAllMonthPickers();
+    if (!isVisible) {
+      const currentVal = document.getElementById(`${type}-exp`).value;
+      if (currentVal) {
+        const details = getExpiryDateDetails(currentVal);
+        if (details) {
+          pickerState[type].year = details.year;
+          pickerState[type].month = details.month;
+        }
+      }
+      renderPickerYearOptions(type);
+      renderQuickYears(type);
+      renderMonthGrid(type);
+      popup.style.display = 'block';
+    }
+  }
+
+  function closeAllMonthPickers() {
+    const pAdd = document.getElementById('month-picker-popup-add');
+    const pEdit = document.getElementById('month-picker-popup-edit');
+    if (pAdd) pAdd.style.display = 'none';
+    if (pEdit) pEdit.style.display = 'none';
+  }
+
+  function changePickerYear(type, delta) {
+    pickerState[type].year += delta;
+    if (pickerState[type].year < 2024) pickerState[type].year = 2024;
+    if (pickerState[type].year > 2036) pickerState[type].year = 2036;
+    renderPickerYearOptions(type);
+    renderQuickYears(type);
+    renderMonthGrid(type);
+  }
+
+  function setPickerYear(type, year) {
+    pickerState[type].year = parseInt(year, 10);
+    renderPickerYearOptions(type);
+    renderQuickYears(type);
+    renderMonthGrid(type);
+  }
+
+  function onPickerYearSelect(type) {
+    const select = document.getElementById(`picker-year-select-${type}`);
+    if (select) {
+      pickerState[type].year = parseInt(select.value, 10);
+      renderQuickYears(type);
+      renderMonthGrid(type);
+    }
+  }
+
+  function renderPickerYearOptions(type) {
+    const select = document.getElementById(`picker-year-select-${type}`);
+    if (!select) return;
+    const curYear = pickerState[type].year;
+    let html = '';
+    for (let y = 2024; y <= 2036; y++) {
+      html += `<option value="${y}" ${y === curYear ? 'selected' : ''}>Year ${y}</option>`;
+    }
+    select.innerHTML = html;
+  }
+
+  function renderQuickYears(type) {
+    const container = document.getElementById(`picker-quick-years-${type}`);
+    if (!container) return;
+    const curYear = pickerState[type].year;
+    const quickYears = [2026, 2027, 2028, 2029, 2030];
+    container.innerHTML = quickYears.map(y => `
+      <button type="button" class="picker-quick-year-btn ${y === curYear ? 'active' : ''}" onclick="setPickerYear('${type}', ${y})">
+        ${y}
+      </button>
+    `).join('');
+  }
+
+  function renderMonthGrid(type) {
+    const container = document.getElementById(`picker-months-grid-${type}`);
+    if (!container) return;
+    const curYear = pickerState[type].year;
+    const currentSelectedVal = document.getElementById(`${type}-exp`).value;
+    const currentDetails = getExpiryDateDetails(currentSelectedVal);
+
+    container.innerHTML = MONTH_NAMES_SHORT.map((mName, idx) => {
+      const monthNum = idx + 1;
+      const isSelected = currentDetails && currentDetails.year === curYear && currentDetails.month === monthNum;
+      return `
+        <button type="button" class="picker-month-btn ${isSelected ? 'selected' : ''}" onclick="selectPickerMonth('${type}', ${monthNum})">
+          ${mName}
+        </button>
+      `;
+    }).join('');
+  }
+
+  function selectPickerMonth(type, monthNum) {
+    pickerState[type].month = monthNum;
+    const yr = pickerState[type].year;
+    const mShort = MONTH_NAMES_SHORT[monthNum - 1];
+    const mmmYy = `${mShort}-${String(yr).slice(-2)}`;
+
+    const expHidden = document.getElementById(`${type}-exp`);
+    const expDisplay = document.getElementById(`${type}-exp-display`);
+    if (expHidden) expHidden.value = mmmYy;
+    if (expDisplay) expDisplay.value = mmmYy;
+
+    closeAllMonthPickers();
+    onExpiryChange(type);
+  }
+
+  function formatIsoMonthToMmmYy(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    // If format is YYYY-MM (e.g. 2028-12)
+    const mIso = s.match(/^(\d{4})-(\d{1,2})$/);
+    if (mIso) {
+      const yr = parseInt(mIso[1], 10);
+      const mo = parseInt(mIso[2], 10);
+      if (mo >= 1 && mo <= 12) {
+        return `${MONTH_NAMES_SHORT[mo - 1]}-${String(yr).slice(-2)}`;
+      }
+    }
+    // If format is already MMM-YY (e.g. Dec-28)
+    const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
+    if (mShort) {
+      const mStr = mShort[1].charAt(0).toUpperCase() + mShort[1].slice(1).toLowerCase();
+      return `${mStr}-${mShort[2]}`;
+    }
+    return s;
+  }
+
+  function formatMmmYyToIsoMonth(val) {
+    if (!val) return '';
+    const s = String(val).trim();
+    if (/^\d{4}-\d{2}$/.test(s)) return s;
+
+    const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
+    if (mShort) {
+      const mLower = mShort[1].toLowerCase();
+      const mIdx = MONTH_NAMES_SHORT.findIndex(m => m.toLowerCase() === mLower);
+      if (mIdx !== -1) {
+        const yr = 2000 + parseInt(mShort[2], 10);
+        const mm = String(mIdx + 1).padStart(2, '0');
+        return `${yr}-${mm}`;
+      }
+    }
+    return '';
+  }
+
+  function getExpiryDateDetails(val) {
+    if (!val) return null;
+    const s = String(val).trim();
+    let yr = null;
+    let mo = null; // 1-12
+
+    const mIso = s.match(/^(\d{4})-(\d{1,2})/);
+    if (mIso) {
+      yr = parseInt(mIso[1], 10);
+      mo = parseInt(mIso[2], 10);
+    } else {
+      const mShort = s.match(/^([A-Za-z]{3})-(\d{2})/);
+      if (mShort) {
+        yr = 2000 + parseInt(mShort[2], 10);
+        const mIdx = MONTH_NAMES_SHORT.findIndex(m => m.toLowerCase() === mShort[1].toLowerCase());
+        if (mIdx !== -1) mo = mIdx + 1;
+      }
+    }
+
+    if (!yr || !mo || mo < 1 || mo > 12) return null;
+
+    const lastDay = new Date(yr, mo, 0).getDate();
+    const mShortName = MONTH_NAMES_SHORT[mo - 1];
+    const mmmYy = `${mShortName}-${String(yr).slice(-2)}`;
+    const isoMonth = `${yr}-${String(mo).padStart(2, '0')}`;
+    const fullDateStr = `${mShortName} ${lastDay}, ${yr}`;
+
+    let status = 'SAFE';
+    let statusClass = 'exp-preview-safe';
+    let icon = '🟢';
+    let statusLabel = 'Safe Stock';
+
+    if (yr < 2026) {
+      status = 'EXPIRED';
+      statusClass = 'exp-preview-expired';
+      icon = '⚠️';
+      statusLabel = 'Expired Batch';
+    } else if (yr === 2026) {
+      status = 'CRITICAL_2026';
+      statusClass = 'exp-preview-critical';
+      icon = '🔴';
+      statusLabel = '2026 Critical Risk';
+    } else if (yr === 2027) {
+      status = 'NEAR_2027';
+      statusClass = 'exp-preview-near';
+      icon = '🟠';
+      statusLabel = '2027 Near-Term';
+    }
+
+    return {
+      isoMonth,
+      mmmYy,
+      year: yr,
+      month: mo,
+      lastDay,
+      fullDateStr,
+      status,
+      statusClass,
+      icon,
+      statusLabel
+    };
+  }
+
+  function onExpiryChange(type) {
+    const inputId = `${type}-exp`;
+    const badgeId = `${type}-exp-badge`;
+    const input = document.getElementById(inputId);
+    const badge = document.getElementById(badgeId);
+    if (!input || !badge) return;
+
+    const val = input.value;
+    const details = getExpiryDateDetails(val);
+
+    if (!details) {
+      badge.style.display = 'none';
+      badge.className = 'exp-preview-badge';
+      badge.innerHTML = '';
+      return;
+    }
+
+    badge.className = `exp-preview-badge ${details.statusClass}`;
+    badge.innerHTML = `${details.icon} <strong>${details.mmmYy}</strong> • Valid thru ${details.fullDateStr} (${details.statusLabel})`;
+    badge.style.display = 'inline-flex';
+  }
+
+  // --- ADD MEDICINE / NEW BATCH SMART CHECK ---
+  // --- UOM SELECTION & AUTO-DETECTION ---
+  function detectUomFromText(text) {
+    if (!text) return 'Tablet';
+    const s = String(text).toUpperCase();
+    if (/\b(CAPSULE|CAPSULES|CAP|CAPS)\b/.test(s)) return 'Capsule';
+    if (/\b(VIAL|VIALS)\b/.test(s)) return 'Vial';
+    if (/\b(AMPULE|AMPULES|AMP|AMPS)\b/.test(s)) return 'Ampule';
+    if (/\b(NEBULE|NEBULES|RESPIRATORY SOLUTION|FOR NEBULIZATION)\b/.test(s)) return 'Nebule';
+    if (/\b(PRE-FILLED SYRINGE|PREFILLED SYRINGE|PRE-FILED SYRINGE|SYRINGE)\b/.test(s)) return 'Syringe';
+    if (/\b(SACHET|SACHETS)\b/.test(s)) return 'Sachet';
+    if (/\b(TUBE|TUBES|CREAM|OINTMENT|GEL)\b/.test(s)) return 'Tube';
+    if (/\b(BOTTLE|BOTTLES|SUSPENSION|SYRUP|DROPS|SOLN|SOLUTION|ELIXIR|DPI|MDI)\b/.test(s)) return 'Bottle';
+    return 'Tablet';
+  }
+
+  function onUomSelectionChange() {
+    const uomEl = document.getElementById('add-uom');
+    const uom = uomEl ? uomEl.value : 'Tablet';
+    const hintEl = document.getElementById('add-qty-uom-hint');
+    if (hintEl) {
+      hintEl.textContent = uom + 's';
+    }
+  }
+
   // --- ADD MEDICINE / NEW BATCH SMART CHECK ---
   function onAddCodeOrDescChange() {
     const codeInput = document.getElementById('add-code').value.trim().toUpperCase();
+    const descVal = document.getElementById('add-desc').value.trim();
     const previewBox = document.getElementById('add-batch-preview');
     const previewContent = document.getElementById('add-batch-preview-content');
+
+    // Auto-detect UOM if user hasn't explicitly changed dropdown
+    if (descVal) {
+      const uomEl = document.getElementById('add-uom');
+      if (uomEl && (!uomEl.dataset.userEdited || uomEl.dataset.userEdited === 'false')) {
+        uomEl.value = detectUomFromText(descVal);
+        onUomSelectionChange();
+      }
+    }
 
     if (!codeInput) {
       previewBox.style.display = 'none';
@@ -427,20 +787,19 @@
     const existingBatches = state.items.filter(i => i.itemCode.toUpperCase() === codeInput);
 
     if (existingBatches.length > 0) {
-      const lastRow = Math.max(...existingBatches.map(b => b.rowIndex));
-      
       let html = `<div style="color:#2563eb; font-weight:700; margin-bottom:4px;">
         📌 Existing DCI Code Found (${existingBatches.length} batch${existingBatches.length > 1 ? 'es' : ''} in inventory):
       </div>`;
       html += `<ul style="padding-left:16px; margin-bottom:6px; line-height:1.6;">`;
       existingBatches.forEach(b => {
         const brandStr = b.brandName ? `Brand: <strong>${escapeHtml(b.brandName)}</strong>` : 'Generic';
+        const uomStr = b.uom ? ` | UOM: <strong>${escapeHtml(b.uom)}</strong>` : '';
         const priceStr = b.acquisitionPrice ? ` | Price: <strong>₱${Number(b.acquisitionPrice).toFixed(2)}</strong>` : '';
-        html += `<li>Row ${b.rowIndex}: ${brandStr} | Qty <strong>${b.qty.toLocaleString()}</strong> | Expiry <strong>${b.expDate}</strong>${priceStr}</li>`;
+        html += `<li>Row ${b.rowIndex}: ${brandStr}${uomStr} | Qty <strong>${b.qty.toLocaleString()}</strong> | Expiry <strong>${b.expDate}</strong>${priceStr}</li>`;
       });
       html += `</ul>`;
       html += `<div style="background:#e0f2fe; padding:8px 12px; border-radius:6px; color:#0369a1; font-weight:600;">
-        ✨ Smart Batch Grouping: This new brand delivery will be automatically inserted at <strong>Row ${lastRow + 1}</strong> (directly grouped below the last batch of this medicine).
+        ✨ <strong>Smart FEFO Batch Insertion:</strong> Batches are automatically ordered by <strong>First-Expired, First-Out (FEFO)</strong>. If this incoming delivery has a nearer expiry date, it will be automatically placed in the first row above later batches!
       </div>`;
 
       previewContent.innerHTML = html;
@@ -451,12 +810,37 @@
     }
   }
 
+  function getMockExpiryComparableScore(val) {
+    if (!val) return 999999;
+    const s = String(val).trim();
+    if (!s || s.toUpperCase() === 'NO EXPIRY') return 999999;
+    const monthMap = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+    const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
+    if (mShort) {
+      return (2000 + parseInt(mShort[2], 10)) * 100 + (monthMap[mShort[1].toLowerCase()] || 0);
+    }
+    const mLong = s.match(/^([A-Za-z]{3})-(\d{4})$/);
+    if (mLong) {
+      return parseInt(mLong[2], 10) * 100 + (monthMap[mLong[1].toLowerCase()] || 0);
+    }
+    const mIso = s.match(/^(\d{4})-(\d{1,2})/);
+    if (mIso) {
+      return parseInt(mIso[1], 10) * 100 + parseInt(mIso[2], 10);
+    }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return d.getFullYear() * 100 + (d.getMonth() + 1);
+    }
+    return 999999;
+  }
+
   function submitAddNew() {
     const code = document.getElementById('add-code').value.trim();
     const desc = document.getElementById('add-desc').value.trim();
     const brand = document.getElementById('add-brand').value.trim();
+    const uom = document.getElementById('add-uom') ? document.getElementById('add-uom').value : 'Tablet';
     const qty = parseFloat(document.getElementById('add-qty').value) || 0;
-    const exp = document.getElementById('add-exp').value.trim();
+    const rawExp = document.getElementById('add-exp').value.trim();
     const price = parseFloat(document.getElementById('add-price').value) || 0;
 
     if (!code || !desc) {
@@ -469,10 +853,18 @@
       return;
     }
 
+    if (!rawExp) {
+      showToast("Please select an Expiration Month & Year using the date picker.", "error");
+      return;
+    }
+
+    const exp = formatIsoMonthToMmmYy(rawExp);
+
     const payload = {
       itemCode: code,
       itemDesc: desc,
       brandName: brand,
+      uom: uom,
       qty: qty,
       expDate: exp,
       acquisitionPrice: price
@@ -490,7 +882,16 @@
             document.getElementById('add-brand').value = '';
             document.getElementById('add-qty').value = '';
             document.getElementById('add-exp').value = '';
+            document.getElementById('add-exp-display').value = '';
+            const addExpBadge = document.getElementById('add-exp-badge');
+            if (addExpBadge) addExpBadge.style.display = 'none';
             document.getElementById('add-price').value = '';
+            const uomEl = document.getElementById('add-uom');
+            if (uomEl) {
+              uomEl.value = 'Tablet';
+              uomEl.dataset.userEdited = 'false';
+              onUomSelectionChange();
+            }
             document.getElementById('add-batch-preview').style.display = 'none';
             // Switch to inventory tab and reload
             switchTab('tab-inventory');
@@ -506,13 +907,80 @@
         .addNewMedicineOrBatch(payload);
     } else {
       setLoading(false);
-      showToast(`[Mock] Successfully saved ${code} - ${desc} [${brand}] (₱${price.toFixed(2)})`, "success");
+      const newScore = getMockExpiryComparableScore(exp);
+      const existingIndices = [];
+      state.items.forEach((item, idx) => {
+        if (item.itemCode.toUpperCase() === code.toUpperCase()) {
+          existingIndices.push(idx);
+        }
+      });
+
+      const yrMatch = exp.match(/\d{2,4}/);
+      const parsedYr = yrMatch ? (yrMatch[0].length === 2 ? 2000 + parseInt(yrMatch[0], 10) : parseInt(yrMatch[0], 10)) : 2028;
+      let expStatus = 'SAFE';
+      if (parsedYr === 2026) expStatus = 'CRITICAL_2026';
+      else if (parsedYr === 2027) expStatus = 'NEAR_2027';
+
+      const newItem = {
+        rowIndex: state.items.length + 2,
+        itemCode: code,
+        itemDesc: desc,
+        brandName: brand,
+        uom: uom,
+        qty: qty,
+        expDate: exp,
+        expYear: parsedYr,
+        expStatus: expStatus,
+        acquisitionPrice: price,
+        dateOut: '',
+        isDonation: code.startsWith('DMDON') || code.startsWith('DMCSP'),
+        isZeroStock: qty <= 0
+      };
+
+      let placementNotice = '';
+      if (existingIndices.length > 0) {
+        let insertPos = -1;
+        for (const idx of existingIndices) {
+          const itemScore = getMockExpiryComparableScore(state.items[idx].expDate);
+          if (itemScore > newScore) {
+            insertPos = idx;
+            break;
+          }
+        }
+        if (insertPos !== -1) {
+          const targetExp = state.items[insertPos].expDate;
+          state.items.splice(insertPos, 0, newItem);
+          placementNotice = `FEFO Priority (Placed above later batch [${targetExp}])`;
+        } else {
+          const lastIdx = existingIndices[existingIndices.length - 1];
+          state.items.splice(lastIdx + 1, 0, newItem);
+          placementNotice = `FEFO Placed (Placed below existing batches)`;
+        }
+        state.items.forEach((it, i) => it.rowIndex = i + 2);
+      } else {
+        state.items.push(newItem);
+        placementNotice = 'New medicine entry';
+      }
+
+      showToast(`[FEFO Auto-Placed] Saved ${code} - ${desc} [${brand}] (${uom}, ${exp}) — ${placementNotice}`, "success");
       resetDciSelection();
       document.getElementById('add-brand').value = '';
       document.getElementById('add-qty').value = '';
       document.getElementById('add-exp').value = '';
+      document.getElementById('add-exp-display').value = '';
+      const addExpBadge = document.getElementById('add-exp-badge');
+      if (addExpBadge) addExpBadge.style.display = 'none';
       document.getElementById('add-price').value = '';
+      const uomEl = document.getElementById('add-uom');
+      if (uomEl) {
+        uomEl.value = 'Tablet';
+        uomEl.dataset.userEdited = 'false';
+        onUomSelectionChange();
+      }
+      document.getElementById('add-batch-preview').style.display = 'none';
       switchTab('tab-inventory');
+      renderStats();
+      applyFilter();
     }
   }
 
@@ -523,7 +991,7 @@
     tbody.innerHTML = '';
 
     if (zeroItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:30px; color:#16a34a; font-weight:600;">🎉 No 0-quantity items! All inventory lines currently have stock.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#16a34a; font-weight:600;">🎉 No 0-quantity items! All inventory lines currently have stock.</td></tr>`;
       return;
     }
 
@@ -532,6 +1000,8 @@
       const brandBadge = item.brandName 
         ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>` 
         : '<span style="color:#94a3b8;">--</span>';
+      const resolvedUom = item.uom || detectUomFromText(item.itemDesc);
+      const uomBadge = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
       const priceDisplay = (item.acquisitionPrice > 0)
         ? `₱${item.acquisitionPrice.toFixed(2)}`
         : '₱0.00';
@@ -540,9 +1010,10 @@
         <td style="font-family:monospace; font-weight:600;">${escapeHtml(item.itemCode)}</td>
         <td><strong>${escapeHtml(item.itemDesc)}</strong></td>
         <td>${brandBadge}</td>
+        <td style="text-align:center;">${uomBadge}</td>
         <td><span class="badge badge-neutral">${item.expDate}</span></td>
         <td style="text-align:right; font-family:monospace;">${priceDisplay}</td>
-        <td><span class="qty-zero">0 units</span></td>
+        <td><span class="qty-zero">0 ${escapeHtml(resolvedUom.toLowerCase())}s</span></td>
         <td style="text-align:right;">
           <button class="btn btn-sm btn-primary" onclick="openEditBatchModal(${item.rowIndex})">
             🔄 Restock & Update
@@ -556,7 +1027,7 @@
   // --- STOCK OUT AUDIT LOGS ---
   function loadLogs() {
     const tbody = document.getElementById('logs-table-body');
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:20px;">Loading audit logs...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px;">Loading audit logs...</td></tr>`;
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run
@@ -564,11 +1035,11 @@
           if (res.success) {
             renderLogsTable(res.logs || []);
           } else {
-            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#dc2626;">${res.error}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#dc2626;">${res.error}</td></tr>`;
           }
         })
         .withFailureHandler(err => {
-          tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
         })
         .getRecentLogs(50);
     } else {
@@ -580,6 +1051,7 @@
           itemCode: 'DMR000451', 
           itemDesc: 'FLUCONAZOLE 200MG CAPSULE', 
           brandName: 'Diflucan', 
+          uom: 'Capsule',
           expDate: 'Jun-28', 
           unitPrice: 125.00, 
           qtyOut: 20, 
@@ -597,7 +1069,7 @@
     tbody.innerHTML = '';
 
     if (logs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px; color:#64748b;">No stock-out transactions recorded yet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:30px; color:#64748b;">No stock-out transactions recorded yet.</td></tr>`;
       return;
     }
 
@@ -607,6 +1079,9 @@
         ? `<span class="badge badge-brand">${escapeHtml(log.brandName)}</span>` 
         : '<span style="color:#94a3b8;">--</span>';
       
+      const resolvedUom = log.uom || detectUomFromText(log.itemDesc);
+      const uomBadge = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
+
       const unitPriceFormatted = Number(log.unitPrice || 0) > 0 
         ? `₱${Number(log.unitPrice).toFixed(2)}` 
         : '₱0.00';
@@ -621,6 +1096,7 @@
         <td style="font-family:monospace; font-weight:600;">${escapeHtml(log.itemCode)}</td>
         <td>${escapeHtml(log.itemDesc)}</td>
         <td>${brandStr}</td>
+        <td style="text-align:center;">${uomBadge}</td>
         <td><span class="badge badge-neutral">${log.expDate}</span></td>
         <td style="text-align:right; font-family:monospace;">${unitPriceFormatted}</td>
         <td style="text-align:right; font-weight:700; color:#dc2626;">-${Number(log.qtyOut).toLocaleString()}</td>
@@ -651,10 +1127,13 @@
       .trim();
   }
 
+  let comboboxEventsInitialized = false;
   function setupComboboxEvents() {
+    if (comboboxEventsInitialized) return;
     const codeInput = document.getElementById('add-code');
     const descInput = document.getElementById('add-desc');
     if (!codeInput || !descInput) return;
+    comboboxEventsInitialized = true;
 
     // Code input listeners
     codeInput.oninput = handleCodeInput;
@@ -985,19 +1464,36 @@
       countEl.textContent = `${matches.length} item${matches.length !== 1 ? 's' : ''}`;
     }
 
+    const codeVal = document.getElementById('add-code')?.value.trim() || (type === 'code' ? (query || '') : '');
+    const descVal = document.getElementById('add-desc')?.value.trim() || (type === 'desc' ? (query || '') : '');
+    const typedSafe = escapeHtml((query || '').trim());
+
     if (matches.length === 0) {
       listEl.innerHTML = `
         <div class="dropdown-empty">
-          <div>🔍 No exact matches in Sheet1 Master Catalog.</div>
+          <div>🔍 No exact matches in Medicine Master Catalog.</div>
           <div class="dropdown-empty-hint">You can still use this as a brand new medicine entry.</div>
+        </div>
+        <div class="dropdown-add-card" onmousedown="event.preventDefault(); openAddMasterCatalogModal('${escapeJs(codeVal)}', '${escapeJs(descVal)}')">
+          <div class="dropdown-add-badge">➕</div>
+          <div class="dropdown-add-content">
+            <div class="dropdown-add-title">Add to Master Formulary</div>
+            <div class="dropdown-add-subtitle">Click to register "${typedSafe || 'New Medicine'}" into Medicine tab</div>
+          </div>
         </div>
       `;
       return;
     }
 
+    // Check if there is an exact match
+    const hasExactMatch = matches.some(m => 
+      (type === 'code' ? m.code.toUpperCase() === (query || '').toUpperCase().trim() : 
+       m.desc.toUpperCase() === (query || '').toUpperCase().trim())
+    );
+
     // Render top 60 matches for optimal scrolling performance
     const displayList = matches.slice(0, 60);
-    listEl.innerHTML = displayList.map((item, idx) => {
+    let itemsHtml = displayList.map((item, idx) => {
       const codeHtml = highlightText(item.code, qLower);
       const descHtml = highlightText(item.desc, qLower);
 
@@ -1017,6 +1513,20 @@
         `;
       }
     }).join('');
+
+    if (!hasExactMatch && (query || '').trim().length > 0) {
+      itemsHtml += `
+        <div class="dropdown-add-card" onmousedown="event.preventDefault(); openAddMasterCatalogModal('${escapeJs(codeVal)}', '${escapeJs(descVal)}')">
+          <div class="dropdown-add-badge">➕</div>
+          <div class="dropdown-add-content">
+            <div class="dropdown-add-title">Add New Medicine to Master Catalog</div>
+            <div class="dropdown-add-subtitle">Register "${typedSafe}" into Medicine sheet</div>
+          </div>
+        </div>
+      `;
+    }
+
+    listEl.innerHTML = itemsHtml;
   }
 
   function handleComboboxKeydown(e, type) {
@@ -1092,6 +1602,7 @@
     const codeInput = document.getElementById('add-code');
     const descInput = document.getElementById('add-desc');
     const brandInput = document.getElementById('add-brand');
+    const uomEl = document.getElementById('add-uom');
 
     if (codeInput) {
       codeInput.value = code;
@@ -1102,6 +1613,12 @@
       descInput.value = desc;
       updateClearBtn('add-desc', desc);
       flashElement(descInput);
+    }
+
+    if (uomEl && desc) {
+      uomEl.value = detectUomFromText(desc);
+      uomEl.dataset.userEdited = 'false';
+      onUomSelectionChange();
     }
 
     hideMatchHint('code');
@@ -1130,6 +1647,12 @@
       updateClearBtn('add-desc', '');
       hideMatchHint('desc');
     }
+    const uomEl = document.getElementById('add-uom');
+    if (uomEl) {
+      uomEl.value = 'Tablet';
+      uomEl.dataset.userEdited = 'false';
+      onUomSelectionChange();
+    }
     if (previewBox) {
       previewBox.style.display = 'none';
     }
@@ -1150,6 +1673,12 @@
     if (descInput) {
       descInput.value = '';
       updateClearBtn('add-desc', '');
+    }
+    const uomEl = document.getElementById('add-uom');
+    if (uomEl) {
+      uomEl.value = 'Tablet';
+      uomEl.dataset.userEdited = 'false';
+      onUomSelectionChange();
     }
     hideMatchHint('code');
     hideMatchHint('desc');
@@ -1179,7 +1708,7 @@
     if (!state.masterCatalog || state.masterCatalog.length === 0) return;
 
     if (badge) {
-      badge.textContent = `📋 ${state.masterCatalog.length} in Sheet1`;
+      badge.textContent = `📋 ${state.masterCatalog.length} in Catalog`;
       badge.style.display = 'inline-block';
     }
   }
@@ -1192,6 +1721,143 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  // --- MASTER FORMULARY ADD CATALOG MODAL HANDLERS ---
+  function onCatDescInput() {
+    const desc = document.getElementById('cat-add-desc')?.value || '';
+    const uom = detectUomFromText(desc);
+    if (uom) {
+      const select = document.getElementById('cat-add-uom');
+      if (select) select.value = uom;
+    }
+  }
+
+  function openAddMasterCatalogModal(initialCode, initialDesc) {
+    const codeInput = document.getElementById('cat-add-code');
+    const descInput = document.getElementById('cat-add-desc');
+    const uomSelect = document.getElementById('cat-add-uom');
+    const errBox = document.getElementById('cat-add-error');
+    if (errBox) errBox.style.display = 'none';
+
+    // Close any open combobox dropdowns
+    closeAllDropdowns();
+
+    const currCode = initialCode || document.getElementById('add-code')?.value.trim() || '';
+    const currDesc = initialDesc || document.getElementById('add-desc')?.value.trim() || '';
+
+    if (codeInput) codeInput.value = currCode.toUpperCase();
+    if (descInput) descInput.value = currDesc.toUpperCase();
+
+    const uom = detectUomFromText(currDesc);
+    if (uomSelect && uom) {
+      uomSelect.value = uom;
+    }
+
+    document.getElementById('modal-add-catalog').style.display = 'flex';
+    setTimeout(() => {
+      if (!currCode && codeInput) {
+        codeInput.focus();
+      } else if (descInput) {
+        descInput.focus();
+      }
+    }, 50);
+  }
+
+  function submitAddMasterCatalog() {
+    const codeInput = document.getElementById('cat-add-code');
+    const descInput = document.getElementById('cat-add-desc');
+    const uomSelect = document.getElementById('cat-add-uom');
+    const saveBtn = document.getElementById('btn-save-catalog');
+    const errBox = document.getElementById('cat-add-error');
+
+    const code = (codeInput?.value || '').trim().toUpperCase();
+    const desc = (descInput?.value || '').trim().toUpperCase();
+    const uom = uomSelect?.value || 'Tablet';
+
+    if (!code) {
+      showCatError("Item Code / DCI Code is required.");
+      codeInput?.focus();
+      return;
+    }
+    if (!desc) {
+      showCatError("Generic Description & Strength is required.");
+      descInput?.focus();
+      return;
+    }
+
+    if (errBox) errBox.style.display = 'none';
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Registering...';
+    }
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save to Master Catalog';
+          }
+          if (res && res.success) {
+            // 1. Add to local state.masterCatalog if not already there
+            const existingIdx = state.masterCatalog.findIndex(c => c.code.toUpperCase() === code);
+            if (existingIdx === -1) {
+              state.masterCatalog.push({ code: code, desc: desc });
+              state.masterCatalog.sort((a, b) => a.desc.localeCompare(b.desc));
+            }
+
+            // 2. Update catalog badge counter
+            populateCatalogDatalists();
+
+            // 3. Auto-populate into Add Medicine form
+            selectDciItem(code, desc);
+            const formUom = document.getElementById('add-uom');
+            if (formUom && uom) formUom.value = uom;
+
+            // 4. Close modal & show toast
+            closeModal('modal-add-catalog');
+            showToast(res.message || `Successfully registered [${code}] into Master Catalog!`, 'success');
+          } else {
+            showCatError(res ? res.error : 'Failed to register into Master Catalog.');
+          }
+        })
+        .withFailureHandler((err) => {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save to Master Catalog';
+          }
+          showCatError(err.message || 'Error communicating with Google Sheets.');
+        })
+        .addMedicineToMasterCatalog({ itemCode: code, itemDesc: desc });
+    } else {
+      // Preview / offline mode
+      setTimeout(() => {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save to Master Catalog';
+        }
+        const existingIdx = state.masterCatalog.findIndex(c => c.code.toUpperCase() === code);
+        if (existingIdx === -1) {
+          state.masterCatalog.push({ code: code, desc: desc });
+          state.masterCatalog.sort((a, b) => a.desc.localeCompare(b.desc));
+        }
+        populateCatalogDatalists();
+        selectDciItem(code, desc);
+        const formUom = document.getElementById('add-uom');
+        if (formUom && uom) formUom.value = uom;
+        closeModal('modal-add-catalog');
+        showToast(`Registered [${code}] ${desc} into Master Catalog!`, 'success');
+      }, 250);
+    }
+  }
+
+  function showCatError(msg) {
+    const errBox = document.getElementById('cat-add-error');
+    if (errBox) {
+      errBox.textContent = msg;
+      errBox.style.display = 'block';
+    }
   }
 </script>
 
