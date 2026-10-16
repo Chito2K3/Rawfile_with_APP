@@ -20,8 +20,8 @@
         </div>
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <button class="btn btn-outline btn-sm" onclick="loadInventory()" title="Refresh from Sheet">
-          🔄 Refresh
+        <button class="btn btn-outline btn-sm" id="btn-refresh-inventory" onclick="loadInventory()" title="Refresh from Sheet">
+          <span id="icon-refresh">🔄</span> Refresh
         </button>
       </div>
     </header>
@@ -114,8 +114,8 @@
           <div>Loading inventory from Google Sheets...</div>
         </div>
 
-        <!-- Inventory Table -->
-        <div class="table-container">
+        <!-- Desktop Inventory Table (Screens >= 769px) -->
+        <div class="table-container desktop-table-view">
           <table>
             <thead>
               <tr>
@@ -134,6 +134,11 @@
               <!-- Dynamically populated -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile Touch Batch Cards (Screens <= 768px) -->
+        <div id="inventory-cards-container" class="mobile-cards-view">
+          <!-- Dynamically populated for mobile phones -->
         </div>
       </section>
 
@@ -159,7 +164,7 @@
               </span>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
-              <button type="button" class="btn btn-sm btn-primary" onclick="openAddMasterCatalogModal()" title="Register a new medicine directly into the Medicine master catalog tab">
+              <button type="button" id="btn-banner-add-catalog" class="btn btn-sm btn-primary" onclick="openAddMasterCatalogModal()" title="Register a new medicine directly into the Medicine master catalog tab">
                 ➕ Add to Master Catalog
               </button>
               <button type="button" class="btn btn-sm btn-ghost" onclick="resetDciSelection()" title="Clear and reset both fields">
@@ -282,8 +287,8 @@
           </div>
 
           <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
-            <button class="btn btn-outline" onclick="switchTab('tab-inventory')">Cancel</button>
-            <button class="btn btn-primary" onclick="submitAddNew()">✨ Save & Insert into Sheet</button>
+            <button type="button" class="btn btn-outline" onclick="switchTab('tab-inventory')">Cancel</button>
+            <button type="button" id="btn-submit-add" class="btn btn-primary" onclick="submitAddNew()">✨ Save & Insert into Sheet</button>
           </div>
         </div>
       </section>
@@ -401,8 +406,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('modal-stock-out')">Cancel</button>
-        <button class="btn btn-danger" onclick="submitStockOut()">Confirm Stock-Out</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-stock-out')">Cancel</button>
+        <button type="button" id="btn-confirm-stock-out" class="btn btn-danger" onclick="submitStockOut()">Confirm Stock-Out</button>
       </div>
     </div>
   </div>
@@ -485,8 +490,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeModal('modal-edit-batch')">Cancel</button>
-        <button class="btn btn-primary" onclick="submitEditBatch()">Save Changes</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-edit-batch')">Cancel</button>
+        <button type="button" id="btn-save-edit" class="btn btn-primary" onclick="submitEditBatch()">Save Changes</button>
       </div>
     </div>
   </div>

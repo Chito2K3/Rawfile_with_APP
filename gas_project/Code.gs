@@ -7,8 +7,10 @@
  */
 
 // Target or active sheet configuration
+// Target or active sheet configuration
 const CONFIG = {
-  MAIN_SHEET_NAME: null, // null will auto-detect active inventory sheet or look for standard headers
+  MAIN_SHEET_NAME: 'Stocks', // Primary inventory sheet name (supports 'Stocks', 'STORAGE', etc.)
+  STORAGE_SHEET_ALIASES: ['Stocks', 'STOCKS', 'stocks', 'Stock', 'STORAGE', 'Storage', 'Inventory', 'INVENTORY'],
   MASTER_DCI_SHEET_NAME: 'Medicine', // Master catalog tab with Col A: DCI Code, Col B: Generic Description (supports 'Medicine', 'Sheet1', etc.)
   LOG_SHEET_NAME: 'STOCK_OUT_LOG',
   COLUMN_KEYS: {
@@ -69,6 +71,7 @@ function onOpen() {
     .addItem('🔄 Restock 0-Qty Items', 'showRestockDialog')
     .addSeparator()
     .addItem('📋 View Stock-Out Audit Log', 'openLogSheet')
+    .addItem('🛠️ Fix & Upgrade Stock-Out Log Sheet (12 Cols)', 'repairAndMigrateLogSheet')
     .addItem('🛠️ Ensure / Upgrade Sheet Columns (Option A + UOM)', 'migrateSheetToOptionA')
     .addItem('🧹 Clean Blank Rows & Consolidate Sheet', 'cleanAndConsolidateSheet')
     .addToUi();
@@ -147,34 +150,21 @@ function getInventorySheetInfo() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = null;
 
+  // 1. Try CONFIG.MAIN_SHEET_NAME if defined
   if (CONFIG.MAIN_SHEET_NAME) {
     sheet = ss.getSheetByName(CONFIG.MAIN_SHEET_NAME);
   }
   
+  // 2. Try known aliases (Stocks, STORAGE, Stock, Inventory, etc.)
   if (!sheet) {
-    sheet = ss.getSheetByName('STORAGE') || ss.getSheetByName('Storage');
-  }
-
-  if (!sheet) {
-    const sheets = ss.getSheets();
-    for (let s of sheets) {
-      const name = s.getName();
-      const lower = name.trim().toLowerCase();
-      if (name === CONFIG.LOG_SHEET_NAME || lower.includes('log')) continue;
-      if (CONFIG.MASTER_DCI_SHEET_NAME && name === CONFIG.MASTER_DCI_SHEET_NAME) continue;
-      if (lower === 'medicine' || lower === 'medicines' || lower === 'sheet1' || lower === 'sheet 1' || lower.includes('catalog') || lower.includes('dci')) continue;
-      
-      const data = s.getDataRange().getValues();
-      if (data.length > 0) {
-        const headerRow = data[0].map(c => String(c).trim().toUpperCase());
-        if (headerRow.some(h => h.includes('ITEM CODE') || h.includes('ITEM_CODE'))) {
-          sheet = s;
-          break;
-        }
-      }
+    const aliases = CONFIG.STORAGE_SHEET_ALIASES || ['Stocks', 'STOCKS', 'stocks', 'Stock', 'STORAGE', 'Storage', 'Inventory', 'INVENTORY'];
+    for (let alias of aliases) {
+      sheet = ss.getSheetByName(alias);
+      if (sheet) break;
     }
   }
 
+  // 3. Fallback: Scan sheets, skipping logs, catalogs, warehouses, and backups
   if (!sheet) {
     const sheets = ss.getSheets();
     for (let s of sheets) {
@@ -182,12 +172,13 @@ function getInventorySheetInfo() {
       const lower = name.trim().toLowerCase();
       if (name === CONFIG.LOG_SHEET_NAME || lower.includes('log')) continue;
       if (CONFIG.MASTER_DCI_SHEET_NAME && name === CONFIG.MASTER_DCI_SHEET_NAME) continue;
-      if (lower === 'medicine' || lower === 'medicines' || lower === 'sheet1' || lower === 'sheet 1' || lower.includes('catalog') || lower.includes('dci')) continue;
+      if (lower === 'medicine' || lower === 'medicines' || lower === 'sheet1' || lower === 'sheet 1' || lower.includes('catalog') || lower.includes('dci') || lower.includes('formulary')) continue;
+      if (lower.includes('backup') || lower.includes('copy') || lower.includes('old') || lower.includes('archive') || lower.includes('warehouse') || lower.includes('temp')) continue;
       
       const data = s.getDataRange().getValues();
       if (data.length > 0) {
         const headerRow = data[0].map(c => String(c).trim().toUpperCase());
-        if (headerRow.some(h => h.includes('ITEM CODE') || h.includes('ITEM_CODE'))) {
+        if (headerRow.some(h => h.includes('ITEM CODE') || h.includes('ITEM_CODE') || h.includes('CODE'))) {
           sheet = s;
           break;
         }
@@ -207,9 +198,9 @@ function getInventorySheetInfo() {
   if (isSheetEmpty) {
     const standardHeaders = [
       'ITEM CODE', 'ITEM DESCRIPTION', 'BRAND NAME', 'UOM',
-      'QTY STORAGE', 'EXP DATE', 'ACQUISITION PRICE', 'DATE OUT'
+      'QTY STORAGE', 'EXP DATE', 'ACQUISITION PRICE', 'DATE OUT', 'BATCH ID'
     ];
-    sheet.getRange(1, 1, 1, 8).setValues([standardHeaders])
+    sheet.getRange(1, 1, 1, 9).setValues([standardHeaders])
       .setFontWeight('bold')
       .setHorizontalAlignment('center')
       .setBackground('#f3f4f6');
@@ -223,9 +214,9 @@ function getInventorySheetInfo() {
   if (!hasCodeHeader && headerRow.every(h => !String(h).trim())) {
     const standardHeaders = [
       'ITEM CODE', 'ITEM DESCRIPTION', 'BRAND NAME', 'UOM',
-      'QTY STORAGE', 'EXP DATE', 'ACQUISITION PRICE', 'DATE OUT'
+      'QTY STORAGE', 'EXP DATE', 'ACQUISITION PRICE', 'DATE OUT', 'BATCH ID'
     ];
-    sheet.getRange(1, 1, 1, 8).setValues([standardHeaders])
+    sheet.getRange(1, 1, 1, 9).setValues([standardHeaders])
       .setFontWeight('bold')
       .setHorizontalAlignment('center')
       .setBackground('#f3f4f6');
@@ -233,7 +224,7 @@ function getInventorySheetInfo() {
     values = sheet.getDataRange().getValues();
     headerRow = values[0];
   }
-  let colCode = -1, colDesc = -1, colBrand = -1, colUom = -1, colQty = -1, colExp = -1, colPrice = -1, colDateOut = -1;
+  let colCode = -1, colDesc = -1, colBrand = -1, colUom = -1, colQty = -1, colExp = -1, colPrice = -1, colDateOut = -1, colBatchId = -1;
 
   for (let j = 0; j < headerRow.length; j++) {
     const h = String(headerRow[j]).trim().toUpperCase();
@@ -241,10 +232,11 @@ function getInventorySheetInfo() {
     if (colDesc === -1 && (h.includes('DESC') || h.includes('DESCRIPTION') || h.includes('GENERIC'))) colDesc = j;
     if (colBrand === -1 && (h.includes('BRAND') || h.includes('TRADE'))) colBrand = j;
     if (colUom === -1 && (h === 'UOM' || h.includes('UNIT OF MEASURE') || h === 'UNIT' || h.includes('MEASURE'))) colUom = j;
-    if (colQty === -1 && (h.includes('QTY') || h.includes('STORAGE') || h.includes('QUANTITY'))) colQty = j;
+    if (colQty === -1 && (h.includes('QTY') || h.includes('STORAGE') || h.includes('QUANTITY') || h.includes('STOCK') || h.includes('COUNT') || h.includes('ACTUAL'))) colQty = j;
     if (colExp === -1 && (h.includes('EXP') || h.includes('DATE') || h.includes('EXPIRY')) && !h.includes('OUT')) colExp = j;
     if (colPrice === -1 && (h.includes('PRICE') || h.includes('COST') || h.includes('ACQUISITION'))) colPrice = j;
     if (colDateOut === -1 && (h.includes('DATE OUT') || h.includes('DATE_OUT') || h.includes('OUT DATE') || h.includes('DISPENSED DATE'))) colDateOut = j;
+    if (colBatchId === -1 && (h.includes('BATCH ID') || h.includes('BATCH_ID') || h === 'UID' || h.includes('UNIQUE ID'))) colBatchId = j;
   }
 
   // Fallbacks if columns are not explicitly labeled
@@ -257,12 +249,14 @@ function getInventorySheetInfo() {
     if (colExp === -1) colExp = 5;
     if (colPrice === -1) colPrice = 6;
     if (colDateOut === -1 && headerRow.length >= 8) colDateOut = 7;
+    if (colBatchId === -1 && headerRow.length >= 9) colBatchId = 8;
   } else if (colBrand !== -1) {
     // Option A without UOM fallback
     if (colQty === -1) colQty = 3;
     if (colExp === -1) colExp = 4;
     if (colPrice === -1) colPrice = 5;
     if (colDateOut === -1 && headerRow.length >= 7) colDateOut = 6;
+    if (colBatchId === -1 && headerRow.length >= 8) colBatchId = 7;
   } else {
     // Legacy 4-column fallback: Code(0), Desc(1), Qty(2), Exp(3)
     if (colQty === -1) colQty = 2;
@@ -280,8 +274,22 @@ function getInventorySheetInfo() {
     colQty: colQty,
     colExp: colExp,
     colPrice: colPrice,
-    colDateOut: colDateOut
+    colDateOut: colDateOut,
+    colBatchId: colBatchId
   };
+}
+
+/**
+ * AppSheet-style Unique ID generator (UNIQUEID())
+ * Produces an 8-character unique alphanumeric key (e.g., BID-7K9F2A41)
+ */
+function generateUniqueBatchId() {
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let uid = 'BID-';
+  for (let i = 0; i < 8; i++) {
+    uid += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return uid;
 }
 
 /**
@@ -515,7 +523,16 @@ function getInventoryData() {
         }
       }
 
+      let batchId = '';
+      if (info.colBatchId !== -1 && row[info.colBatchId]) {
+        batchId = String(row[info.colBatchId]).trim();
+      }
+      if (!batchId) {
+        batchId = `BID-${code.replace(/[^A-Za-z0-9]/g, '').slice(0, 8)}-${(brand || 'GEN').replace(/[^A-Za-z0-9]/g, '').slice(0, 3)}-${i + 1}`;
+      }
+
       rows.push({
+        batchId: batchId,
         rowIndex: i + 1, // 1-based row index in Google Sheet
         itemCode: code,
         itemDesc: desc,
@@ -724,6 +741,8 @@ function addMedicineToMasterCatalog(payload) {
  * Supports Brand Name and Acquisition Price per batch.
  */
 function addNewMedicineOrBatch(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // Concurrency guard for multi-mobile simultaneous encoders
   try {
     const { itemCode, itemDesc, brandName, qty, expDate, acquisitionPrice } = payload;
     if (!itemCode || !itemDesc) {
@@ -861,14 +880,29 @@ function addNewMedicineOrBatch(payload) {
         .setHorizontalAlignment('center');
     }
 
+    // 9. Unique Batch Identifier (AppSheet UNIQUEID style)
+    const newBatchId = generateUniqueBatchId();
+    if (info.colBatchId !== -1) {
+      sheet.getRange(insertedRowIndex, info.colBatchId + 1)
+        .setValue(newBatchId)
+        .setHorizontalAlignment('center');
+    } else if (sheet.getMaxColumns() >= 9) {
+      sheet.getRange(insertedRowIndex, 9)
+        .setValue(newBatchId)
+        .setHorizontalAlignment('center');
+    }
+
     return {
       success: true,
       message: `Successfully saved: [${cleanCode}] ${cleanDesc} (${cleanBrand} - ${cleanUom})`,
       mode: mode,
-      insertedRowIndex: insertedRowIndex
+      insertedRowIndex: insertedRowIndex,
+      batchId: newBatchId
     };
   } catch (err) {
     return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1028,8 +1062,10 @@ function getExpiryComparableScore(val, tz) {
  * Reduces QTY STORAGE and logs transaction with financial details into STOCK_OUT_LOG sheet
  */
 function recordStockOut(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000); // 30-second atomic lock to prevent race conditions among mobile users
   try {
-    const { rowIndex, itemCode, qtyOut, dateOut, remarks, user } = payload;
+    const { batchId, rowIndex, itemCode, qtyOut, dateOut, remarks } = payload;
     const deductQty = parseFloat(qtyOut);
 
     if (isNaN(deductQty) || deductQty <= 0) {
@@ -1038,25 +1074,57 @@ function recordStockOut(payload) {
 
     const info = getInventorySheetInfo();
     const sheet = info.sheet;
+    const values = sheet.getDataRange().getValues();
 
-    // Validate row matches item code
-    const targetCode = String(sheet.getRange(rowIndex, info.colCode + 1).getValue()).trim();
-    if (targetCode.toUpperCase() !== String(itemCode).trim().toUpperCase()) {
-      throw new Error(`Row mismatch! Expected ${itemCode} but found ${targetCode} at row ${rowIndex}. Please refresh list.`);
+    // AppSheet-style UID Resolution: Locate row by BATCH_ID first, preventing index shift collisions
+    let targetRowIndex = -1;
+
+    if (batchId && info.colBatchId !== -1) {
+      for (let r = 1; r < values.length; r++) {
+        if (String(values[r][info.colBatchId] || '').trim() === String(batchId).trim()) {
+          targetRowIndex = r + 1;
+          break;
+        }
+      }
     }
 
-    const desc = String(sheet.getRange(rowIndex, info.colDesc + 1).getValue()).trim();
-    const brandName = info.colBrand !== -1 ? String(sheet.getRange(rowIndex, info.colBrand + 1).getValue()).trim() : '';
-    const uom = info.colUom !== -1 ? String(sheet.getRange(rowIndex, info.colUom + 1).getValue()).trim() : '';
-    const rawExp = sheet.getRange(rowIndex, info.colExp + 1).getValue();
+    // Fallback: Verify rowIndex against itemCode
+    if (targetRowIndex === -1 && rowIndex && rowIndex <= values.length) {
+      const codeAtRow = String(values[rowIndex - 1][info.colCode] || '').trim();
+      if (codeAtRow.toUpperCase() === String(itemCode).trim().toUpperCase()) {
+        targetRowIndex = rowIndex;
+      }
+    }
+
+    // Fallback: Scan sheet for itemCode match
+    if (targetRowIndex === -1) {
+      for (let r = 1; r < values.length; r++) {
+        const c = String(values[r][info.colCode] || '').trim().toUpperCase();
+        if (c === String(itemCode).trim().toUpperCase()) {
+          targetRowIndex = r + 1;
+          break;
+        }
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      throw new Error(`Item [${itemCode}] could not be found. Another mobile user may have modified the row. Please refresh the inventory.`);
+    }
+
+    const targetRowData = values[targetRowIndex - 1];
+    const targetCode = String(targetRowData[info.colCode] || '').trim();
+    const desc = String(targetRowData[info.colDesc] || '').trim();
+    const brandName = info.colBrand !== -1 ? String(targetRowData[info.colBrand] || '').trim() : '';
+    const uom = info.colUom !== -1 ? String(targetRowData[info.colUom] || '').trim() : '';
+    const rawExp = targetRowData[info.colExp];
     const ssTz = sheet.getParent().getSpreadsheetTimeZone();
     const expDate = normalizeExpiryString(rawExp, ssTz);
     
-    // Read batch unit price (repository only, not for computation)
-    const rawPrice = info.colPrice !== -1 ? sheet.getRange(rowIndex, info.colPrice + 1).getValue() : 0;
+    // Read batch unit price
+    const rawPrice = info.colPrice !== -1 ? targetRowData[info.colPrice] : 0;
     const price = typeof rawPrice === 'number' ? rawPrice : (parseFloat(String(rawPrice).replace(/[^0-9.-]/g, '')) || 0);
 
-    const rawCurrentQty = sheet.getRange(rowIndex, info.colQty + 1).getValue();
+    const rawCurrentQty = targetRowData[info.colQty];
     const currentQty = typeof rawCurrentQty === 'number' ? rawCurrentQty : (parseFloat(String(rawCurrentQty).replace(/[^0-9.-]/g, '')) || 0);
 
     if (deductQty > currentQty) {
@@ -1068,20 +1136,20 @@ function recordStockOut(payload) {
     const resolvedUom = uom || inferUomFromDescription(desc);
 
     // Update inventory sheet quantity
-    sheet.getRange(rowIndex, info.colQty + 1)
+    sheet.getRange(targetRowIndex, info.colQty + 1)
       .setValue(newQty)
       .setNumberFormat('#,##0')
       .setHorizontalAlignment('right');
 
     // Update DATE OUT in inventory sheet
     if (info.colDateOut !== -1) {
-      sheet.getRange(rowIndex, info.colDateOut + 1)
+      sheet.getRange(targetRowIndex, info.colDateOut + 1)
         .setNumberFormat('@')
         .setValue(cleanDateOut)
         .setHorizontalAlignment('center');
     }
 
-    // Log the transaction
+    // Log the transaction (Canonical 12-column audit log, NO DISPENSED BY)
     logStockOutTransaction({
       timestamp: new Date(),
       dateOut: cleanDateOut,
@@ -1094,8 +1162,7 @@ function recordStockOut(payload) {
       qtyOut: deductQty,
       previousQty: currentQty,
       remainingBalance: newQty,
-      remarks: remarks || 'Normal Dispense',
-      user: user || Session.getActiveUser().getEmail() || 'User'
+      remarks: remarks || 'Normal Dispense'
     });
 
     return {
@@ -1110,10 +1177,12 @@ function recordStockOut(payload) {
       dateOut: cleanDateOut,
       previousQty: currentQty,
       newQty: newQty,
-      message: `Deducted ${deductQty.toLocaleString()} ${resolvedUom} of ${desc} [${brandName || 'Batch'}]. Date Out: ${cleanDateOut}. Remaining: ${newQty.toLocaleString()}`
+      message: `Deducted ${deductQty.toLocaleString()} ${resolvedUom} of ${desc} [${brandName || 'Batch'}]. Date Out: ${cleanDateOut}. Balance: ${newQty.toLocaleString()}`
     };
   } catch (err) {
     return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1121,14 +1190,33 @@ function recordStockOut(payload) {
  * Updates an existing row (useful for restocking 0-qty lines with new brand, uom, expiry, price, and qty)
  */
 function updateMedicineBatch(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
   try {
-    const { rowIndex, itemCode, itemDesc, brandName, uom, newQty, newExpDate, acquisitionPrice } = payload;
+    const { batchId, rowIndex, itemCode, itemDesc, brandName, uom, newQty, newExpDate, acquisitionPrice } = payload;
     const info = getInventorySheetInfo();
     const sheet = info.sheet;
+    const values = sheet.getDataRange().getValues();
 
-    const targetCode = String(sheet.getRange(rowIndex, info.colCode + 1).getValue()).trim();
-    if (targetCode.toUpperCase() !== String(itemCode).trim().toUpperCase()) {
-      throw new Error(`Row mismatch! Row ${rowIndex} does not match ${itemCode}.`);
+    let targetRowIndex = -1;
+    if (batchId && info.colBatchId !== -1) {
+      for (let r = 1; r < values.length; r++) {
+        if (String(values[r][info.colBatchId] || '').trim() === String(batchId).trim()) {
+          targetRowIndex = r + 1;
+          break;
+        }
+      }
+    }
+
+    if (targetRowIndex === -1 && rowIndex && rowIndex <= values.length) {
+      const codeAtRow = String(values[rowIndex - 1][info.colCode] || '').trim();
+      if (codeAtRow.toUpperCase() === String(itemCode).trim().toUpperCase()) {
+        targetRowIndex = rowIndex;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      throw new Error(`Row mismatch! Item [${itemCode}] could not be located. Please refresh.`);
     }
 
     const cleanQty = parseFloat(String(newQty).replace(/[^0-9.-]/g, '')) || 0;
@@ -1140,47 +1228,47 @@ function updateMedicineBatch(payload) {
     const formattedExp = normalizeExpiryString(cleanExp, ssTz);
 
     if (itemDesc) {
-      sheet.getRange(rowIndex, info.colDesc + 1)
+      sheet.getRange(targetRowIndex, info.colDesc + 1)
         .setValue(String(itemDesc).trim())
         .setHorizontalAlignment('left');
     }
 
     if (info.colBrand !== -1 && cleanBrand) {
-      sheet.getRange(rowIndex, info.colBrand + 1)
+      sheet.getRange(targetRowIndex, info.colBrand + 1)
         .setValue(cleanBrand)
         .setHorizontalAlignment('left');
     }
 
     if (info.colUom !== -1 && (uom || itemDesc)) {
       const targetUom = String(uom || inferUomFromDescription(itemDesc)).trim();
-      sheet.getRange(rowIndex, info.colUom + 1)
+      sheet.getRange(targetRowIndex, info.colUom + 1)
         .setValue(targetUom)
         .setHorizontalAlignment('center');
     }
 
-    // Set Quantity (Right-aligned, number format #,##0)
-    sheet.getRange(rowIndex, info.colQty + 1)
+    // Set Quantity
+    sheet.getRange(targetRowIndex, info.colQty + 1)
       .setValue(cleanQty)
       .setNumberFormat('#,##0')
       .setHorizontalAlignment('right');
     
-    // Set Expiry Date (Proper Date object with mmm-yy number format)
-    const expDateObj = getExpiryDateObject(newExpDate, ssTz);
+    // Set Expiration Date
+    const expDateObj = getExpiryDateObject(cleanExp, ssTz);
     if (expDateObj) {
-      sheet.getRange(rowIndex, info.colExp + 1)
+      sheet.getRange(targetRowIndex, info.colExp + 1)
         .setValue(expDateObj)
         .setNumberFormat('mmm-yy')
         .setHorizontalAlignment('center');
     } else {
-      sheet.getRange(rowIndex, info.colExp + 1)
+      sheet.getRange(targetRowIndex, info.colExp + 1)
         .setNumberFormat('@')
         .setValue(formattedExp)
         .setHorizontalAlignment('center');
     }
 
-    // Set Acquisition Price (Right-aligned, currency format ₱#,##0.00)
+    // Set Acquisition Price
     if (info.colPrice !== -1) {
-      sheet.getRange(rowIndex, info.colPrice + 1)
+      sheet.getRange(targetRowIndex, info.colPrice + 1)
         .setValue(cleanPrice)
         .setNumberFormat('"₱"#,##0.00')
         .setHorizontalAlignment('right');
@@ -1188,10 +1276,12 @@ function updateMedicineBatch(payload) {
 
     return {
       success: true,
-      message: `Updated [${itemCode}] at row ${rowIndex}: Brand: ${cleanBrand || 'N/A'}, Qty: ${cleanQty.toLocaleString()}, Expiry: ${formattedExp}, Price: ₱${cleanPrice.toFixed(2)}`
+      message: `Updated [${itemCode}] at row ${targetRowIndex}: Brand: ${cleanBrand || 'N/A'}, Qty: ${cleanQty.toLocaleString()}, Expiry: ${formattedExp}, Price: ₱${cleanPrice.toFixed(2)}`
     };
   } catch (err) {
     return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -1212,36 +1302,120 @@ function initLogSheet(ss) {
     'QTY OUT',
     'PREVIOUS QTY',
     'REMAINING BALANCE',
-    'REMARKS',
-    'DISPENSED BY'
+    'REMARKS'
   ];
   
   logSheet.getRange(1, 1, 1, headers.length)
     .setValues([headers])
     .setFontWeight('bold')
     .setBackground('#1e293b')
-    .setFontColor('#ffffff');
+    .setFontColor('#ffffff')
+    .setHorizontalAlignment('center');
 
   logSheet.setFrozenRows(1);
   logSheet.setColumnWidth(1, 160); // Timestamp
   logSheet.setColumnWidth(2, 110); // Date Out
-  logSheet.setColumnWidth(3, 130); // Code
+  logSheet.setColumnWidth(3, 120); // Code
   logSheet.setColumnWidth(4, 260); // Generic
-  logSheet.setColumnWidth(5, 140); // Brand
-  logSheet.setColumnWidth(6, 90);  // UOM
-  logSheet.setColumnWidth(7, 110); // Expiry
-  logSheet.setColumnWidth(8, 120); // Unit Price (Repository)
+  logSheet.setColumnWidth(5, 130); // Brand
+  logSheet.setColumnWidth(6, 85);  // UOM
+  logSheet.setColumnWidth(7, 95);  // Expiry
+  logSheet.setColumnWidth(8, 110); // Unit Price
   logSheet.setColumnWidth(9, 90);  // Qty Out
-  logSheet.setColumnWidth(10, 100); // Prev
-  logSheet.setColumnWidth(11, 120); // Rem
+  logSheet.setColumnWidth(10, 100); // Prev Qty
+  logSheet.setColumnWidth(11, 110); // Remaining Balance
   logSheet.setColumnWidth(12, 180); // Remarks
-  logSheet.setColumnWidth(13, 150); // User
 
   return logSheet;
 }
 
 /**
- * Appends transaction record to STOCK_OUT_LOG with Date Out, Brand Name, and UOM
+ * Appends transaction record to STOCK_OUT_LOG with canonical 12 columns
+ * Automatically runs self-healing check to repair headers if outdated
+ */
+/**
+ * Robust Expiry Normalizer for Audit Logs:
+ * 1. Cross-references active inventory sheet (Stocks) by itemCode and brandName
+ * 2. Recovers original 'MMM-yy' (e.g. 'Jun-30', 'Dec-30') from Google Sheets date auto-coercion
+ *    (where Sheets coerced 'Jun-30' into June 30 of the current year 2026)
+ */
+function cleanLogExpiryValue(rawVal, itemCode, brandName, inventoryInfo) {
+  if (!rawVal) return 'NO EXPIRY';
+
+  // 1. Cross-reference with active inventory sheet (Stocks) if available
+  if (inventoryInfo && inventoryInfo.values && itemCode) {
+    const cleanCode = String(itemCode).trim().toUpperCase();
+    const cleanBrand = String(brandName || '').trim().toUpperCase();
+    for (let r = 1; r < inventoryInfo.values.length; r++) {
+      const row = inventoryInfo.values[r];
+      const c = String(row[inventoryInfo.colCode] || '').trim().toUpperCase();
+      if (c === cleanCode) {
+        const b = inventoryInfo.colBrand !== -1 ? String(row[inventoryInfo.colBrand] || '').trim().toUpperCase() : '';
+        if (!cleanBrand || b === cleanBrand || !b) {
+          const invExp = row[inventoryInfo.colExp];
+          if (invExp) {
+            const ssTz = inventoryInfo.sheet.getParent().getSpreadsheetTimeZone();
+            return normalizeExpiryString(invExp, ssTz);
+          }
+        }
+      }
+    }
+  }
+
+  // 2. If rawVal is a Date object (coerced by Google Sheets date parser)
+  if (rawVal instanceof Date) {
+    const yr = rawVal.getFullYear();
+    const day = rawVal.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const mon = months[rawVal.getMonth()];
+    // If year was defaulted to 2026 and day is 26..31, the day was originally the 2-digit year (e.g. Jun-30 -> June 2030)
+    if (yr === 2026 && day >= 26) {
+      return `${mon}-${day}`;
+    }
+    return `${mon}-${String(yr).slice(-2)}`;
+  }
+
+  // 3. If rawVal is a string
+  const s = String(rawVal).trim();
+  if (!s || s.toUpperCase() === 'NO EXPIRY' || s.toUpperCase() === 'N/A') return 'NO EXPIRY';
+
+  // Format MMM-yy (e.g. Jun-30, Feb-27)
+  const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
+  if (mShort) {
+    return mShort[1].charAt(0).toUpperCase() + mShort[1].slice(1).toLowerCase() + '-' + mShort[2];
+  }
+
+  // Long Date string like 'Tue Jun 30 2026 15:00:00 GMT+0800 (Singapore Standard Time)'
+  const mLongTs = s.match(/^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/);
+  if (mLongTs) {
+    const mon = mLongTs[1].charAt(0).toUpperCase() + mLongTs[1].slice(1).toLowerCase();
+    const day = parseInt(mLongTs[2], 10);
+    const yr = parseInt(mLongTs[3], 10);
+    if (yr === 2026 && day >= 26) {
+      return `${mon}-${day}`;
+    }
+    return `${mon}-${String(yr).slice(-2)}`;
+  }
+
+  // Fallback Date parser
+  const d = new Date(s);
+  if (!isNaN(d.getTime()) && s.length > 8) {
+    const yr = d.getFullYear();
+    const day = d.getDate();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const mon = months[d.getMonth()];
+    if (yr === 2026 && day >= 26) {
+      return `${mon}-${day}`;
+    }
+    return `${mon}-${String(yr).slice(-2)}`;
+  }
+
+  return s;
+}
+
+/**
+ * Appends transaction record to STOCK_OUT_LOG with canonical 12 columns
+ * Automatically runs self-healing check to repair headers if outdated
  */
 function logStockOutTransaction(data) {
   try {
@@ -1249,7 +1423,19 @@ function logStockOutTransaction(data) {
     let logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
     if (!logSheet) {
       logSheet = initLogSheet(ss);
+    } else {
+      // Self-healing check: Verify Row 1 has the modern 12 headers
+      const curHeaders = logSheet.getRange(1, 1, 1, Math.max(logSheet.getLastColumn(), 12)).getValues()[0];
+      const hStr = curHeaders.map(h => String(h).toUpperCase()).join('|');
+      if (!hStr.includes('DATE OUT') || !hStr.includes('UOM') || hStr.includes('DISPENSED BY') || curHeaders.length < 12) {
+        repairAndMigrateLogSheet(false); // Repair silently without blocking popup
+        logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+      }
     }
+
+    const ssTz = ss.getSpreadsheetTimeZone();
+    const cleanExpDate = cleanLogExpiryValue(data.expDate, data.itemCode, data.brandName, null);
+    const nextRow = logSheet.getLastRow() + 1;
 
     const row = [
       Utilities.formatDate(data.timestamp, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
@@ -1258,36 +1444,233 @@ function logStockOutTransaction(data) {
       data.itemDesc,
       data.brandName || '',
       data.uom || '',
-      data.expDate,
+      cleanExpDate,
       data.unitPrice || 0,
       data.qtyOut,
       data.previousQty,
       data.remainingBalance,
-      data.remarks,
-      data.user
+      data.remarks
     ];
 
-    logSheet.appendRow(row);
-    const lastRow = logSheet.getLastRow();
+    // Pre-format column 7 (Expiry Date) as Plain Text '@' to permanently lock clean string (e.g. 'Jun-30')
+    logSheet.getRange(nextRow, 7).setNumberFormat('@');
+    logSheet.getRange(nextRow, 1, 1, 12).setValues([row]);
     
     // Formatting:
-    // Col 2: Date Out
-    logSheet.getRange(lastRow, 2).setNumberFormat('@').setHorizontalAlignment('center');
-    // Col 6: UOM
-    logSheet.getRange(lastRow, 6).setHorizontalAlignment('center');
-    // Col 8: Unit Price
-    logSheet.getRange(lastRow, 8).setNumberFormat('"₱"#,##0.00');
-    // Col 9: Qty Out
-    logSheet.getRange(lastRow, 9).setNumberFormat('#,##0');
-    // Col 10-11: Prev & Remaining
-    logSheet.getRange(lastRow, 10, 1, 2).setNumberFormat('#,##0');
+    logSheet.getRange(nextRow, 1).setHorizontalAlignment('center');
+    logSheet.getRange(nextRow, 2).setNumberFormat('@').setHorizontalAlignment('center');
+    logSheet.getRange(nextRow, 3).setHorizontalAlignment('center');
+    logSheet.getRange(nextRow, 4).setHorizontalAlignment('left');
+    logSheet.getRange(nextRow, 5).setHorizontalAlignment('left');
+    logSheet.getRange(nextRow, 6).setHorizontalAlignment('center');
+    logSheet.getRange(nextRow, 7).setNumberFormat('@').setHorizontalAlignment('center');
+    logSheet.getRange(nextRow, 8).setNumberFormat('"₱"#,##0.00').setHorizontalAlignment('right');
+    logSheet.getRange(nextRow, 9, 1, 3).setNumberFormat('#,##0').setHorizontalAlignment('right');
+    logSheet.getRange(nextRow, 12).setHorizontalAlignment('left');
   } catch (err) {
     Logger.log("Error logging stock-out: " + err.message);
   }
 }
 
 /**
- * Fetches recent audit logs from STOCK_OUT_LOG
+ * Repairs, normalizes, and migrates STOCK_OUT_LOG to the canonical 12-column layout:
+ * TIMESTAMP | DATE OUT | ITEM CODE | GENERIC NAME | BRAND NAME | UOM | EXPIRY DATE | UNIT PRICE (₱) | QTY OUT | PREVIOUS QTY | REMAINING BALANCE | REMARKS
+ * Removes 'DISPENSED BY', eliminates total cost, and shifts all misplaced historical entries.
+ */
+function repairAndMigrateLogSheet(showAlert) {
+  let ui = null;
+  try {
+    ui = SpreadsheetApp.getUi();
+  } catch (e) {}
+
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+    if (!logSheet) {
+      logSheet = initLogSheet(ss);
+      if (showAlert !== false && ui) {
+        ui.alert('Stock-Out Log', 'STOCK_OUT_LOG tab was created with the canonical 12-column layout.', ui.ButtonSet.OK);
+      }
+      return { success: true, message: 'Created new log sheet.' };
+    }
+
+    const headers12 = [
+      'TIMESTAMP',
+      'DATE OUT',
+      'ITEM CODE',
+      'GENERIC NAME',
+      'BRAND NAME',
+      'UOM',
+      'EXPIRY DATE',
+      'UNIT PRICE (₱)',
+      'QTY OUT',
+      'PREVIOUS QTY',
+      'REMAINING BALANCE',
+      'REMARKS'
+    ];
+
+    const lastRow = logSheet.getLastRow();
+    const lastCol = Math.max(logSheet.getLastColumn(), 15);
+    const ssTz = ss.getSpreadsheetTimeZone();
+
+    let inventoryInfo = null;
+    try {
+      inventoryInfo = getInventorySheetInfo();
+    } catch (e) {
+      Logger.log("Notice: inventory sheet could not be pre-loaded: " + e.message);
+    }
+
+    const normalizedRows = [];
+
+    if (lastRow > 1) {
+      const dataRange = logSheet.getRange(2, 1, lastRow - 1, lastCol);
+      const rawValues = dataRange.getValues();
+
+      for (let i = 0; i < rawValues.length; i++) {
+        const r = rawValues[i];
+        const tsRaw = r[0];
+        if (!tsRaw && !r[1] && !r[2]) continue; // skip blank
+
+        let timestamp = tsRaw instanceof Date ? Utilities.formatDate(tsRaw, ssTz, 'yyyy-MM-dd HH:mm:ss') : String(tsRaw || '').trim();
+        let dateOut = '';
+        let itemCode = '';
+        let genericName = '';
+        let brandName = '';
+        let uom = '';
+        let expDate = '';
+        let unitPrice = 0;
+        let qtyOut = 0;
+        let prevQty = 0;
+        let remBal = 0;
+        let remarks = '';
+
+        const col1Str = String(r[1] || '').trim();
+        const col2Str = String(r[2] || '').trim();
+        // Check if r[1] is an Item Code (Legacy 12-column row where r[1] is 'DMR...', r[2] is description)
+        const isLegacyCol1Code = /^[A-Z]{2,}[0-9]+/.test(col1Str);
+
+        if (isLegacyCol1Code) {
+          // Format like Row 2 from screenshot:
+          dateOut = timestamp.split(' ')[0] || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd');
+          itemCode = col1Str;
+          genericName = col2Str;
+          brandName = String(r[3] || '').trim();
+          expDate = cleanLogExpiryValue(r[4], itemCode, brandName, inventoryInfo);
+          unitPrice = typeof r[5] === 'number' ? r[5] : (parseFloat(String(r[5] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          qtyOut = typeof r[6] === 'number' ? r[6] : (parseFloat(String(r[6] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          prevQty = typeof r[8] === 'number' ? r[8] : (parseFloat(String(r[8] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          remBal = typeof r[9] === 'number' ? r[9] : (parseFloat(String(r[9] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          remarks = String(r[10] || '').trim();
+          uom = inferUomFromDescription(genericName);
+        } else {
+          // Modern row format (or Row 3 from screenshot):
+          dateOut = col1Str instanceof Date ? Utilities.formatDate(col1Str, ssTz, 'yyyy-MM-dd') : col1Str;
+          itemCode = col2Str;
+          genericName = String(r[3] || '').trim();
+          brandName = String(r[4] || '').trim();
+          uom = String(r[5] || '').trim() || inferUomFromDescription(genericName);
+          expDate = cleanLogExpiryValue(r[6], itemCode, brandName, inventoryInfo);
+          unitPrice = typeof r[7] === 'number' ? r[7] : (parseFloat(String(r[7] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          qtyOut = typeof r[8] === 'number' ? r[8] : (parseFloat(String(r[8] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          prevQty = typeof r[9] === 'number' ? r[9] : (parseFloat(String(r[9] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          remBal = typeof r[10] === 'number' ? r[10] : (parseFloat(String(r[10] || '0').replace(/[^0-9.-]/g, '')) || 0);
+          remarks = String(r[11] || '').trim();
+        }
+
+        normalizedRows.push([
+          timestamp,
+          dateOut,
+          itemCode,
+          genericName,
+          brandName,
+          uom,
+          expDate,
+          unitPrice,
+          qtyOut,
+          prevQty,
+          remBal,
+          remarks
+        ]);
+      }
+    }
+
+    // Clear entire sheet and rebuild cleanly
+    logSheet.clear();
+    while (logSheet.getMaxColumns() < 12) {
+      logSheet.insertColumnAfter(logSheet.getMaxColumns());
+    }
+
+    // Set canonical headers
+    logSheet.getRange(1, 1, 1, 12)
+      .setValues([headers12])
+      .setFontWeight('bold')
+      .setBackground('#1e293b')
+      .setFontColor('#ffffff')
+      .setHorizontalAlignment('center');
+    logSheet.setFrozenRows(1);
+
+    // Set Column Widths
+    logSheet.setColumnWidth(1, 160); // Timestamp
+    logSheet.setColumnWidth(2, 110); // Date Out
+    logSheet.setColumnWidth(3, 120); // Item Code
+    logSheet.setColumnWidth(4, 260); // Generic Name
+    logSheet.setColumnWidth(5, 130); // Brand Name
+    logSheet.setColumnWidth(6, 85);  // UOM
+    logSheet.setColumnWidth(7, 95);  // Expiry Date
+    logSheet.setColumnWidth(8, 110); // Unit Price
+    logSheet.setColumnWidth(9, 90);  // Qty Out
+    logSheet.setColumnWidth(10, 100); // Prev Qty
+    logSheet.setColumnWidth(11, 110); // Remaining Balance
+    logSheet.setColumnWidth(12, 180); // Remarks
+
+    // Write back normalized data rows
+    if (normalizedRows.length > 0) {
+      // Pre-format column 7 (Expiry Date) as Plain Text '@' BEFORE writing values to prevent Google Sheets date coercion
+      logSheet.getRange(2, 7, normalizedRows.length, 1).setNumberFormat('@');
+      logSheet.getRange(2, 1, normalizedRows.length, 12).setValues(normalizedRows);
+
+      // Formatting
+      logSheet.getRange(2, 1, normalizedRows.length, 1).setHorizontalAlignment('center');
+      logSheet.getRange(2, 2, normalizedRows.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
+      logSheet.getRange(2, 3, normalizedRows.length, 1).setHorizontalAlignment('center');
+      logSheet.getRange(2, 4, normalizedRows.length, 1).setHorizontalAlignment('left');
+      logSheet.getRange(2, 5, normalizedRows.length, 1).setHorizontalAlignment('left');
+      logSheet.getRange(2, 6, normalizedRows.length, 1).setHorizontalAlignment('center');
+      logSheet.getRange(2, 7, normalizedRows.length, 1).setNumberFormat('@').setHorizontalAlignment('center');
+      logSheet.getRange(2, 8, normalizedRows.length, 1).setNumberFormat('"₱"#,##0.00').setHorizontalAlignment('right');
+      logSheet.getRange(2, 9, normalizedRows.length, 3).setNumberFormat('#,##0').setHorizontalAlignment('right');
+      logSheet.getRange(2, 12, normalizedRows.length, 1).setHorizontalAlignment('left');
+    }
+
+    // Trim any extra columns beyond Col 12 (delete legacy Column M, N, O etc.)
+    const curMaxCols = logSheet.getMaxColumns();
+    if (curMaxCols > 12) {
+      try {
+        logSheet.deleteColumns(13, curMaxCols - 12);
+      } catch (colErr) {}
+    }
+
+    const msg = `Stock-Out Log Upgraded!\n\n` +
+      `• Normalized: ${normalizedRows.length} audit records\n` +
+      `• Canonical layout: 12 Columns (A to L)\n` +
+      `• Removed 'DISPENSED BY' and legacy extra columns\n` +
+      `• All dates, codes, and balances are now properly aligned.`;
+
+    if (showAlert !== false && ui) {
+      ui.alert('Stock-Out Log Upgrade', msg, ui.ButtonSet.OK);
+    }
+
+    return { success: true, message: msg, count: normalizedRows.length };
+  } catch (err) {
+    if (showAlert !== false && ui) {
+      ui.alert('Error', 'Failed to migrate log sheet: ' + err.message, ui.ButtonSet.OK);
+    }
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fetches recent audit logs from STOCK_OUT_LOG (Canonical 12-column layout)
  */
 function getRecentLogs(limit) {
   try {
@@ -1301,63 +1684,25 @@ function getRecentLogs(limit) {
     const values = logSheet.getDataRange().getValues();
     const logs = [];
 
-    const headerRow = values[0].map(h => String(h).toUpperCase());
-    const hasUom = headerRow.includes('UOM') || headerRow.includes('UNIT');
-    const hasDateOut = headerRow.includes('DATE OUT') || headerRow.includes('DATE_OUT');
-
     // Read in reverse chronological order
     for (let i = values.length - 1; i >= 1 && logs.length < max; i--) {
       const r = values[i];
-      if (hasUom) {
-        logs.push({
-          timestamp: r[0],
-          dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
-          itemCode: r[2],
-          itemDesc: r[3],
-          brandName: r[4] || '',
-          uom: r[5] || '',
-          expDate: r[6],
-          unitPrice: r[7] || 0,
-          qtyOut: r[8],
-          previousQty: r[9],
-          remainingBalance: r[10],
-          remarks: r[11],
-          user: r[12]
-        });
-      } else if (hasDateOut) {
-        logs.push({
-          timestamp: r[0],
-          dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
-          itemCode: r[2],
-          itemDesc: r[3],
-          brandName: r[4] || '',
-          uom: '',
-          expDate: r[5],
-          unitPrice: r[6] || 0,
-          qtyOut: r[7],
-          previousQty: r[8],
-          remainingBalance: r[9],
-          remarks: r[10],
-          user: r[11]
-        });
-      } else {
-        // Fallback for older log schema
-        logs.push({
-          timestamp: r[0],
-          dateOut: '',
-          itemCode: r[1],
-          itemDesc: r[2],
-          brandName: r[3] || '',
-          uom: '',
-          expDate: r[4],
-          unitPrice: r[5] || 0,
-          qtyOut: r[6],
-          previousQty: r[8] || r[7],
-          remainingBalance: r[9] || r[8],
-          remarks: r[10] || r[9],
-          user: r[11] || r[10]
-        });
-      }
+      if (!r[0] && !r[1] && !r[2]) continue;
+
+      logs.push({
+        timestamp: r[0],
+        dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
+        itemCode: r[2],
+        itemDesc: r[3],
+        brandName: r[4] || '',
+        uom: r[5] || '',
+        expDate: cleanLogExpiryValue(r[6], r[2], r[4], null),
+        unitPrice: r[7] || 0,
+        qtyOut: r[8],
+        previousQty: r[9],
+        remainingBalance: r[10],
+        remarks: r[11] || ''
+      });
     }
 
     return { success: true, logs: logs };
@@ -1437,6 +1782,9 @@ function cleanAndConsolidateSheet() {
   } catch (e) {
     // Running in standalone web app without spreadsheet UI
   }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
 
   try {
     const info = getInventorySheetInfo();
@@ -1544,5 +1892,7 @@ function cleanAndConsolidateSheet() {
   } catch (err) {
     if (ui) ui.alert('Error', 'Failed to consolidate sheet: ' + err.message, ui.ButtonSet.OK);
     return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
   }
 }

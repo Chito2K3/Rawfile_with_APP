@@ -1144,4 +1144,312 @@
     background: var(--primary-light);
     color: var(--primary);
   }
+
+  /* ==========================================================================
+     ADVANCED BUTTON LOADING & INTERACTION SYSTEM
+     ========================================================================== */
+  .btn {
+    position: relative;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn.is-loading,
+  .btn[disabled] {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+
+  .btn.is-loading {
+    pointer-events: none;
+  }
+
+  .btn-spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 50%;
+    border-top-color: #ffffff;
+    animation: btnSpinAnim 0.65s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  .btn-outline .btn-spinner,
+  .btn-ghost .btn-spinner {
+    border: 2px solid rgba(37, 99, 235, 0.25);
+    border-top-color: #2563eb;
+  }
+
+  @keyframes btnSpinAnim {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .spin-icon-active {
+    display: inline-block;
+    animation: btnSpinAnim 0.75s linear infinite;
+  }
+
+  .btn-success-flash {
+    background-color: #16a34a !important;
+    border-color: #16a34a !important;
+    color: #ffffff !important;
+    transition: background-color 0.3s ease;
+  }
+
+  /* ==========================================================================
+     MOBILE-FIRST RESPONSIVE DESIGN & MOBILE BATCH CARDS
+     ========================================================================== */
+  .mobile-cards-view {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    body {
+      padding: 0 !important;
+      background-color: #f1f5f9;
+    }
+
+    .app-container {
+      border-radius: 0 !important;
+      border: none !important;
+      min-height: 100vh !important;
+      box-shadow: none !important;
+    }
+
+    .app-header {
+      padding: 12px 14px !important;
+    }
+
+    .header-icon {
+      font-size: 22px !important;
+      padding: 6px !important;
+    }
+
+    .header-title {
+      font-size: 15px !important;
+    }
+
+    .header-institution {
+      font-size: 9px !important;
+    }
+
+    .header-subtitle {
+      display: none !important;
+    }
+
+    /* Horizontally Scrollable KPI Ribbon */
+    .stats-banner {
+      display: flex !important;
+      overflow-x: auto !important;
+      padding: 10px 14px !important;
+      gap: 8px !important;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .stats-banner::-webkit-scrollbar {
+      display: none;
+    }
+    .stat-card {
+      min-width: 130px !important;
+      flex-shrink: 0 !important;
+      padding: 8px 10px !important;
+      border-radius: 8px !important;
+    }
+    .stat-icon {
+      font-size: 18px !important;
+    }
+    .stat-value {
+      font-size: 14px !important;
+    }
+    .stat-label {
+      font-size: 10px !important;
+    }
+
+    /* Touch Tab Bar */
+    .tab-nav {
+      overflow-x: auto !important;
+      padding: 4px 6px !important;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      border-bottom: 2px solid #e2e8f0;
+      gap: 4px !important;
+    }
+    .tab-nav::-webkit-scrollbar {
+      display: none;
+    }
+    .tab-btn {
+      white-space: nowrap !important;
+      padding: 9px 12px !important;
+      font-size: 12px !important;
+      border-radius: 6px !important;
+    }
+
+    .tab-content-area {
+      padding: 12px !important;
+    }
+
+    /* Filter & Search Bar */
+    .filter-bar {
+      flex-direction: column !important;
+      gap: 8px !important;
+      align-items: stretch !important;
+    }
+    .search-box {
+      width: 100% !important;
+    }
+    .search-input {
+      font-size: 14px !important;
+      height: 42px !important;
+    }
+    .filter-select {
+      width: 100% !important;
+      height: 42px !important;
+    }
+
+    /* Switch from Table to Mobile Batch Cards */
+    .desktop-table-view {
+      display: none !important;
+    }
+
+    .mobile-cards-view {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 12px !important;
+      margin-top: 10px !important;
+    }
+
+    .mobile-batch-card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.06);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mobile-batch-card.critical {
+      border-left: 4px solid var(--danger);
+    }
+    .mobile-batch-card.near {
+      border-left: 4px solid var(--warning);
+    }
+    .mobile-batch-card.safe {
+      border-left: 4px solid var(--success);
+    }
+    .mobile-batch-card.zero {
+      border-left: 4px solid #94a3b8;
+      background: #f8fafc;
+    }
+
+    .card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-code {
+      font-family: monospace;
+      font-weight: 700;
+      font-size: 12px;
+      color: #334155;
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--slate-900);
+      line-height: 1.4;
+    }
+
+    .card-badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .card-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: #f8fafc;
+      padding: 9px 11px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .card-meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .card-meta-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 1px;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .card-actions .btn {
+      flex: 1;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+
+    .form-grid-2 {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  /* Mobile Bottom Sheet Modals */
+  @media (max-width: 640px) {
+    .modal-backdrop {
+      align-items: flex-end !important;
+      padding: 0 !important;
+    }
+
+    .modal-card {
+      max-width: 100% !important;
+      width: 100% !important;
+      border-radius: 20px 20px 0 0 !important;
+      max-height: 90vh !important;
+      overflow-y: auto !important;
+      box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25) !important;
+      animation: slideUpMobileModal 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+      padding: 18px 16px !important;
+    }
+
+    @keyframes slideUpMobileModal {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+  }
 </style>
