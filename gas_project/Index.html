@@ -12,7 +12,9 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="header-icon">🏥</div>
+        <div class="header-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6v12M6 12h12"/></svg>
+        </div>
         <div>
           <div class="header-institution">AMANG RODRIGUEZ MEMORIAL MEDICAL CENTER</div>
           <h1 class="header-title">Pharmacy Expiry Monitoring</h1>
@@ -21,7 +23,10 @@
       </div>
       <div style="display:flex; gap:10px; align-items:center;">
         <button class="btn btn-outline btn-sm" id="btn-refresh-inventory" onclick="loadInventory()" title="Refresh from Sheet">
-          <span id="icon-refresh">🔄</span> Refresh
+          <span id="icon-refresh" style="display:inline-flex; align-items:center;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+          </span>
+          Refresh
         </button>
       </div>
     </header>
@@ -29,35 +34,45 @@
     <!-- Top KPI Stats Banner -->
     <section class="stats-banner">
       <div class="stat-card total">
-        <div class="stat-icon">📦</div>
+        <div class="stat-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+        </div>
         <div>
           <div class="stat-value" id="stat-total-items">0</div>
           <div class="stat-label">Total Batches</div>
         </div>
       </div>
       <div class="stat-card total">
-        <div class="stat-icon">📊</div>
+        <div class="stat-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+        </div>
         <div>
           <div class="stat-value" id="stat-total-qty">0 units</div>
-          <div class="stat-label">Total Units in Storage</div>
+          <div class="stat-label">Total Storage Units</div>
         </div>
       </div>
       <div class="stat-card critical">
-        <div class="stat-icon">🔴</div>
+        <div class="stat-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
         <div>
           <div class="stat-value" id="stat-2026-count">0</div>
-          <div class="stat-label">2026 Critical Risk</div>
+          <div class="stat-label" id="stat-label-critical">Critical Risk (FEFO)</div>
         </div>
       </div>
       <div class="stat-card near">
-        <div class="stat-icon">🟠</div>
+        <div class="stat-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
         <div>
           <div class="stat-value" id="stat-2027-count">0</div>
-          <div class="stat-label">2027 Near-Term</div>
+          <div class="stat-label" id="stat-label-near">Near-Term Expiry</div>
         </div>
       </div>
       <div class="stat-card zero">
-        <div class="stat-icon">⚠️</div>
+        <div class="stat-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
         <div>
           <div class="stat-value" id="stat-zero-count">0</div>
           <div class="stat-label">Out of Stock (0 Qty)</div>
@@ -68,16 +83,20 @@
     <!-- Navigation Tabs -->
     <nav class="tab-nav">
       <button class="tab-btn active" data-tab="tab-inventory">
-        📦 Inventory & Stock-Out
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-7m7 5h-7m7 5h-7M4 7h.01M4 12h.01M4 17h.01"/></svg>
+        Inventory & Stock-Out
       </button>
       <button class="tab-btn" data-tab="tab-add">
-        ➕ Add Medicine / New Batch
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-7-7h14"/></svg>
+        Add Medicine / New Batch
       </button>
       <button class="tab-btn" data-tab="tab-restock">
-        🔄 Restock 0-Qty Items
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Restock 0-Qty Items
       </button>
       <button class="tab-btn" data-tab="tab-logs">
-        📋 Stock-Out Audit Log
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Stock-Out Audit Log
       </button>
     </nav>
 
@@ -89,22 +108,25 @@
         <!-- Search and Filter Bar -->
         <div class="filter-bar">
           <div class="search-box">
-            <span class="search-icon-inside">🔍</span>
+            <span class="search-icon-inside">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
             <input type="text" id="search-input" class="search-input" placeholder="Search by Item Code, Generic Name, Brand Name, or Expiry (e.g. Feb-27)..." oninput="applyFilter()">
           </div>
 
           <select id="filter-status" class="filter-select" onchange="applyFilter()">
             <option value="ALL">All Expiry Statuses</option>
-            <option value="CRITICAL_2026">🔴 2026 Critical Expiry</option>
-            <option value="NEAR_2027">🟠 2027 Near-Term Expiry</option>
-            <option value="SAFE">🟢 2028+ Safe Stock</option>
-            <option value="NO_EXPIRY">⚪ Missing Expiry Date</option>
-            <option value="ZERO">⚠️ Out of Stock (0 Qty)</option>
-            <option value="DONATION">💜 Donated Program Items</option>
+            <option value="CRITICAL_2026">Critical Expiry (Immediate Risk)</option>
+            <option value="NEAR_2027">Near-Term Expiry</option>
+            <option value="SAFE">Safe Stock</option>
+            <option value="NO_EXPIRY">Missing Expiry Date</option>
+            <option value="ZERO">Out of Stock (0 Qty)</option>
+            <option value="DONATION">Donated Program Items</option>
           </select>
 
           <button class="btn btn-primary btn-sm" onclick="switchTab('tab-add')">
-            ➕ Add Item / Batch
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-7-7h14"/></svg>
+            Add Batch
           </button>
         </div>
 
@@ -127,7 +149,7 @@
                 <th style="width:145px;">Expiry Status</th>
                 <th style="width:115px; text-align:right;">Acq. Price</th>
                 <th style="width:110px; text-align:center;">Date Out</th>
-                <th style="width:95px; text-align:center;">Quick Action</th>
+                <th style="width:145px; text-align:center;">Actions</th>
               </tr>
             </thead>
             <tbody id="inventory-table-body">
@@ -158,17 +180,19 @@
           <!-- Master Sync Notice & Reset Bar -->
           <div class="sync-banner">
             <div style="display:flex; align-items:center; gap:8px;">
-              <span class="sync-banner-icon">⚡</span>
+              <span class="sync-banner-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              </span>
               <span class="sync-banner-text">
                 <strong>Bi-Directional Auto-Sync:</strong> Selecting or typing either <strong>DCI Code</strong> or <strong>Generic Description</strong> automatically searches, matches, and fills the corresponding field from the <strong>Medicine master list</strong>.
               </span>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <button type="button" id="btn-banner-add-catalog" class="btn btn-sm btn-primary" onclick="openAddMasterCatalogModal()" title="Register a new medicine directly into the Medicine master catalog tab">
-                ➕ Add to Master Catalog
+                + Add to Master
               </button>
               <button type="button" class="btn btn-sm btn-ghost" onclick="resetDciSelection()" title="Clear and reset both fields">
-                ↺ Reset Fields
+                Reset Fields
               </button>
             </div>
           </div>
@@ -261,7 +285,9 @@
               <label class="form-label" for="add-exp-display">Expiry Date (Month & Year) *</label>
               <div class="month-picker-input-wrap">
                 <input type="text" id="add-exp-display" class="form-input month-picker-input" placeholder="Select Month & Year..." readonly onclick="toggleMonthPicker('add')">
-                <button type="button" class="month-picker-btn" onclick="toggleMonthPicker('add')" title="Open Month & Year Picker">📅</button>
+                <button type="button" class="month-picker-btn" onclick="toggleMonthPicker('add')" title="Open Month & Year Picker">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                </button>
               </div>
               <input type="hidden" id="add-exp" value="">
               <div id="add-exp-badge" class="exp-preview-badge" style="display:none; margin-top:6px;"></div>
@@ -269,11 +295,11 @@
               <!-- Custom Month & Year Picker Card -->
               <div id="month-picker-popup-add" class="month-picker-popup" style="display:none;">
                 <div class="month-picker-header">
-                  <button type="button" class="picker-nav-btn" onclick="changePickerYear('add', -1)">◀</button>
+                  <button type="button" class="picker-nav-btn" onclick="changePickerYear('add', -1)" title="Previous Year">◀</button>
                   <div class="picker-year-select-wrap">
                     <select id="picker-year-select-add" class="picker-year-select" onchange="onPickerYearSelect('add')"></select>
                   </div>
-                  <button type="button" class="picker-nav-btn" onclick="changePickerYear('add', 1)">▶</button>
+                  <button type="button" class="picker-nav-btn" onclick="changePickerYear('add', 1)" title="Next Year">▶</button>
                 </div>
                 <div class="picker-quick-years" id="picker-quick-years-add"></div>
                 <div class="month-picker-grid" id="picker-months-grid-add"></div>
@@ -288,7 +314,7 @@
 
           <div style="margin-top:20px; display:flex; justify-content:flex-end; gap:10px;">
             <button type="button" class="btn btn-outline" onclick="switchTab('tab-inventory')">Cancel</button>
-            <button type="button" id="btn-submit-add" class="btn btn-primary" onclick="submitAddNew()">✨ Save & Insert into Sheet</button>
+            <button type="button" id="btn-submit-add" class="btn btn-primary" onclick="submitAddNew()">Save & Insert into Sheet</button>
           </div>
         </div>
       </section>
@@ -330,7 +356,10 @@
             <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Stock-Out Dispensing Log</h2>
             <p style="font-size:12px; color:var(--slate-500);">Real-time financial and batch audit record of all dispensed medicines.</p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="loadLogs()">🔄 Refresh Log</button>
+          <button class="btn btn-outline btn-sm" onclick="loadLogs()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+            Refresh Log
+          </button>
         </div>
 
         <div class="table-container">
@@ -364,7 +393,7 @@
   <div id="modal-stock-out" class="modal-backdrop" style="display:none;">
     <div class="modal-card">
       <div class="modal-header">
-        <div class="modal-title">➖ Record Stock-Out (Dispense)</div>
+        <div class="modal-title">Record Stock-Out (Dispense)</div>
         <button class="btn btn-outline btn-sm" onclick="closeModal('modal-stock-out')">✕</button>
       </div>
       <div class="modal-body">
@@ -379,7 +408,7 @@
           <div style="font-size:14px; font-weight:700; color:#0f172a; margin:4px 0;" id="so-desc"></div>
           <div style="display:flex; justify-content:space-between; font-size:12px; color:#475569; margin-top:6px; border-top:1px dashed #e2e8f0; padding-top:6px;">
             <span>Batch Expiry: <strong id="so-exp"></strong></span>
-            <span>Current Stock: <strong id="so-current-qty" style="color:#2563eb;"></strong></span>
+            <span>Current Stock: <strong id="so-current-qty" style="color:var(--primary);"></strong></span>
           </div>
         </div>
 
@@ -398,10 +427,10 @@
           <input type="text" id="so-remarks" class="form-input" placeholder="e.g. OR / ICU / Ward 3 / Outpatient">
         </div>
 
-        <div class="cost-callout" style="background:#f0fdf4; border:1px solid #bbf7d0;">
+        <div class="cost-callout" style="background:#f8fafc; border:1px solid #e2e8f0;">
           <div>
-            <div style="font-size:11px; color:#166534; font-weight:600;">NEW BALANCE IN STORAGE</div>
-            <div id="so-remaining-preview" style="font-size:15px; font-weight:800; color:#15803d;">--</div>
+            <div style="font-size:10.5px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Remaining Storage Balance</div>
+            <div id="so-remaining-preview" style="font-size:15px; font-weight:700; color:#0f172a;">--</div>
           </div>
         </div>
       </div>
@@ -416,7 +445,7 @@
   <div id="modal-edit-batch" class="modal-backdrop" style="display:none;">
     <div class="modal-card">
       <div class="modal-header">
-        <div class="modal-title">✏️ Edit / Restock Medicine Batch</div>
+        <div class="modal-title">Edit Batch Details</div>
         <button class="btn btn-outline btn-sm" onclick="closeModal('modal-edit-batch')">✕</button>
       </div>
       <div class="modal-body">
@@ -464,7 +493,9 @@
             <label class="form-label" for="edit-exp-display">Expiry Date (Month & Year)</label>
             <div class="month-picker-input-wrap">
               <input type="text" id="edit-exp-display" class="form-input month-picker-input" placeholder="Select Month & Year..." readonly onclick="toggleMonthPicker('edit')">
-              <button type="button" class="month-picker-btn" onclick="toggleMonthPicker('edit')" title="Open Month & Year Picker">📅</button>
+              <button type="button" class="month-picker-btn" onclick="toggleMonthPicker('edit')" title="Open Month & Year Picker">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+              </button>
             </div>
             <input type="hidden" id="edit-exp" value="">
             <div id="edit-exp-badge" class="exp-preview-badge" style="display:none; margin-top:6px;"></div>
@@ -472,11 +503,11 @@
             <!-- Custom Month & Year Picker Card -->
             <div id="month-picker-popup-edit" class="month-picker-popup" style="display:none;">
               <div class="month-picker-header">
-                <button type="button" class="picker-nav-btn" onclick="changePickerYear('edit', -1)">◀</button>
+                <button type="button" class="picker-nav-btn" onclick="changePickerYear('edit', -1)" title="Previous Year">◀</button>
                 <div class="picker-year-select-wrap">
                   <select id="picker-year-select-edit" class="picker-year-select" onchange="onPickerYearSelect('edit')"></select>
                 </div>
-                <button type="button" class="picker-nav-btn" onclick="changePickerYear('edit', 1)">▶</button>
+                <button type="button" class="picker-nav-btn" onclick="changePickerYear('edit', 1)" title="Next Year">▶</button>
               </div>
               <div class="picker-quick-years" id="picker-quick-years-edit"></div>
               <div class="month-picker-grid" id="picker-months-grid-edit"></div>
@@ -500,7 +531,7 @@
   <div id="modal-add-catalog" class="modal-overlay" style="display:none;">
     <div class="modal-card" style="max-width: 520px;">
       <div class="modal-header">
-        <h3 class="modal-title">➕ Register New Medicine into Master Catalog</h3>
+        <h3 class="modal-title">Register New Medicine into Master Catalog</h3>
         <button type="button" class="modal-close" onclick="closeModal('modal-add-catalog')">✕</button>
       </div>
       <div class="modal-body">

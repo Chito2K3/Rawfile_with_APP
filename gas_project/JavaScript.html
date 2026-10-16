@@ -258,13 +258,15 @@
 
       let badgeHtml = '';
       if (item.expStatus === 'CRITICAL_2026') {
-        badgeHtml = `<span class="badge badge-danger">🔴 2026 Risk (${item.expDate})</span>`;
+        badgeHtml = `<span class="badge badge-critical"><span class="status-dot dot-critical"></span>Critical (${item.expDate})</span>`;
       } else if (item.expStatus === 'NEAR_2027') {
-        badgeHtml = `<span class="badge badge-warning">🟠 2027 Near (${item.expDate})</span>`;
+        badgeHtml = `<span class="badge badge-near"><span class="status-dot dot-near"></span>Near-Term (${item.expDate})</span>`;
       } else if (item.expStatus === 'SAFE') {
-        badgeHtml = `<span class="badge badge-success">🟢 ${item.expDate}</span>`;
+        badgeHtml = `<span class="badge badge-safe"><span class="status-dot dot-safe"></span>${item.expDate}</span>`;
+      } else if (item.expStatus === 'EXPIRED') {
+        badgeHtml = `<span class="badge badge-danger"><span class="status-dot dot-critical"></span>Expired (${item.expDate})</span>`;
       } else {
-        badgeHtml = `<span class="badge badge-neutral">⚪ ${item.expDate}</span>`;
+        badgeHtml = `<span class="badge badge-neutral"><span class="status-dot dot-neutral"></span>${item.expDate}</span>`;
       }
 
       const catBadge = item.isDonation 
@@ -290,14 +292,14 @@
         ? `<span style="font-weight:600; color:#475569; font-size:12px;">${escapeHtml(item.dateOut)}</span>`
         : `<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>`;
 
-      // 1. Desktop Table Row
+      // 1. Desktop Table Row (Dispense + Edit Buttons)
       tr.innerHTML = `
         <td style="font-family:monospace; font-weight:600; color:#1e293b;">
           ${escapeHtml(item.itemCode)}
           ${item.batchId ? `<div style="font-size:10px; color:#94a3b8; font-weight:normal;">${escapeHtml(item.batchId)}</div>` : ''}
         </td>
         <td>
-          <div style="font-weight:600;">${escapeHtml(item.itemDesc)} ${catBadge}</div>
+          <div style="font-weight:600; color:#0f172a;">${escapeHtml(item.itemDesc)} ${catBadge}</div>
           <div style="font-size:11px; color:#64748b;">Row ${item.rowIndex} in Sheet</div>
         </td>
         <td>${brandBadge}</td>
@@ -306,10 +308,15 @@
         <td>${badgeHtml}</td>
         <td style="text-align:right;">${priceDisplay}</td>
         <td style="text-align:center;">${dateOutDisplay}</td>
-        <td style="text-align:center;">
-          <button class="btn btn-sm btn-danger" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''} title="Deduct / Dispense Quantity">
-            ➖ Out
-          </button>
+        <td style="text-align:center; white-space:nowrap;">
+          <div style="display:inline-flex; gap:6px; justify-content:center; align-items:center;">
+            <button class="btn btn-sm btn-danger-subtle" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''} title="Deduct / Dispense Quantity">
+              Dispense
+            </button>
+            <button class="btn btn-sm btn-outline" onclick="openEditBatchModal(${item.rowIndex})" title="Edit Batch Details">
+              Edit
+            </button>
+          </div>
         </td>
       `;
       tbody.appendChild(tr);
@@ -356,11 +363,11 @@
             </div>
           </div>
           <div class="card-actions">
-            <button class="btn btn-danger" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : ''}>
-              ➖ Deduct / Out
+            <button class="btn btn-danger-subtle" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
+              Dispense
             </button>
             <button class="btn btn-outline" onclick="openEditBatchModal(${item.rowIndex})">
-              ✏️ Edit Batch
+              Edit Batch
             </button>
           </div>
         `;
@@ -611,8 +618,8 @@
   const MONTH_NAMES_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   const pickerState = {
-    add: { year: 2028, month: 12 },
-    edit: { year: 2027, month: 10 }
+    add: { year: new Date().getFullYear() + 2, month: 12 },
+    edit: { year: new Date().getFullYear() + 1, month: 10 }
   };
 
   function initMonthPickers() {
@@ -676,8 +683,11 @@
 
   function changePickerYear(type, delta) {
     pickerState[type].year += delta;
-    if (pickerState[type].year < 2024) pickerState[type].year = 2024;
-    if (pickerState[type].year > 2036) pickerState[type].year = 2036;
+    const curSysYear = new Date().getFullYear();
+    // Allow going back up to 10 years, and completely unbounded forward navigation (future-proof past 2038)
+    if (pickerState[type].year < curSysYear - 10) {
+      pickerState[type].year = curSysYear - 10;
+    }
     renderPickerYearOptions(type);
     renderQuickYears(type);
     renderMonthGrid(type);
@@ -702,9 +712,13 @@
   function renderPickerYearOptions(type) {
     const select = document.getElementById(`picker-year-select-${type}`);
     if (!select) return;
+    const curSysYear = new Date().getFullYear();
     const curYear = pickerState[type].year;
+    // Dynamic sliding window: always encompass current year down to past 3 years, up to 25+ years into future
+    const startYear = Math.min(curSysYear - 3, curYear - 2);
+    const endYear = Math.max(curSysYear + 25, curYear + 10);
     let html = '';
-    for (let y = 2024; y <= 2036; y++) {
+    for (let y = startYear; y <= endYear; y++) {
       html += `<option value="${y}" ${y === curYear ? 'selected' : ''}>Year ${y}</option>`;
     }
     select.innerHTML = html;
@@ -714,7 +728,9 @@
     const container = document.getElementById(`picker-quick-years-${type}`);
     if (!container) return;
     const curYear = pickerState[type].year;
-    const quickYears = [2026, 2027, 2028, 2029, 2030];
+    const baseYear = new Date().getFullYear();
+    // Dynamic 6-year outlook anchored to current calendar year
+    const quickYears = [baseYear, baseYear + 1, baseYear + 2, baseYear + 3, baseYear + 4, baseYear + 5];
     container.innerHTML = quickYears.map(y => `
       <button type="button" class="picker-quick-year-btn ${y === curYear ? 'active' : ''}" onclick="setPickerYear('${type}', ${y})">
         ${y}
@@ -821,26 +837,28 @@
     const isoMonth = `${yr}-${String(mo).padStart(2, '0')}`;
     const fullDateStr = `${mShortName} ${lastDay}, ${yr}`;
 
+    const curSysYear = new Date().getFullYear();
+
     let status = 'SAFE';
     let statusClass = 'exp-preview-safe';
-    let icon = '🟢';
+    let dotClass = 'dot-safe';
     let statusLabel = 'Safe Stock';
 
-    if (yr < 2026) {
+    if (yr < curSysYear) {
       status = 'EXPIRED';
       statusClass = 'exp-preview-expired';
-      icon = '⚠️';
+      dotClass = 'dot-expired';
       statusLabel = 'Expired Batch';
-    } else if (yr === 2026) {
+    } else if (yr === curSysYear) {
       status = 'CRITICAL_2026';
       statusClass = 'exp-preview-critical';
-      icon = '🔴';
-      statusLabel = '2026 Critical Risk';
-    } else if (yr === 2027) {
+      dotClass = 'dot-critical';
+      statusLabel = `${curSysYear} Critical Risk`;
+    } else if (yr === curSysYear + 1) {
       status = 'NEAR_2027';
       statusClass = 'exp-preview-near';
-      icon = '🟠';
-      statusLabel = '2027 Near-Term';
+      dotClass = 'dot-near';
+      statusLabel = `${curSysYear + 1} Near-Term`;
     }
 
     return {
@@ -852,7 +870,7 @@
       fullDateStr,
       status,
       statusClass,
-      icon,
+      dotClass,
       statusLabel
     };
   }
@@ -875,7 +893,7 @@
     }
 
     badge.className = `exp-preview-badge ${details.statusClass}`;
-    badge.innerHTML = `${details.icon} <strong>${details.mmmYy}</strong> • Valid thru ${details.fullDateStr} (${details.statusLabel})`;
+    badge.innerHTML = `<span class="status-dot ${details.dotClass}"></span> <strong>${details.mmmYy}</strong> • Valid thru ${details.fullDateStr} (${details.statusLabel})`;
     badge.style.display = 'inline-flex';
   }
 
@@ -1139,7 +1157,7 @@
     tbody.innerHTML = '';
 
     if (zeroItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:#16a34a; font-weight:600;">🎉 No 0-quantity items! All inventory lines currently have stock.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--success); font-weight:600;">No 0-quantity items. All inventory lines currently have stock.</td></tr>`;
       return;
     }
 
@@ -1164,7 +1182,7 @@
         <td><span class="qty-zero">0 ${escapeHtml(resolvedUom.toLowerCase())}s</span></td>
         <td style="text-align:right;">
           <button class="btn btn-sm btn-primary" onclick="openEditBatchModal(${item.rowIndex})">
-            🔄 Restock & Update
+            Restock & Update
           </button>
         </td>
       `;
@@ -1706,7 +1724,7 @@
     if (!hasExactMatch && (query || '').trim().length > 0) {
       itemsHtml += `
         <div class="dropdown-add-card" onmousedown="event.preventDefault(); openAddMasterCatalogModal('${escapeJs(codeVal)}', '${escapeJs(descVal)}')">
-          <div class="dropdown-add-badge">➕</div>
+          <div class="dropdown-add-badge">+</div>
           <div class="dropdown-add-content">
             <div class="dropdown-add-title">Add New Medicine to Master Catalog</div>
             <div class="dropdown-add-subtitle">Register "${typedSafe}" into Medicine sheet</div>
@@ -1897,7 +1915,7 @@
     if (!state.masterCatalog || state.masterCatalog.length === 0) return;
 
     if (badge) {
-      badge.textContent = `📋 ${state.masterCatalog.length} in Catalog`;
+      badge.textContent = `${state.masterCatalog.length.toLocaleString()} in Catalog`;
       badge.style.display = 'inline-block';
     }
   }
