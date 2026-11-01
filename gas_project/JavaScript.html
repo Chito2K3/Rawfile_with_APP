@@ -2405,8 +2405,10 @@
     const methodSelect = document.getElementById('dci-sync-method');
     const method = methodSelect ? methodSelect.value : 'DELTA';
     const prevMap = dciSyncState.previousSnapshotItems || {};
+    const hasPrior = Object.keys(prevMap).length > 0;
 
-    const diffItems = [];
+    const allItems = [];
+    const consumedItems = [];
     const unmappedItems = [];
     let totalDeductions = 0;
 
@@ -2439,17 +2441,21 @@
         itemCode: code,
         medicine: rec.medicine,
         unit: rec.unit,
+        stockroom: rec.stockroom,
+        dispensing: rec.dispensing,
+        totalQty: rec.totalQty,
         prevStock: prev ? (method === 'DISPENSING_COL' ? prev.dispensing : prev.stockroom) : null,
-        todayStock: method === 'DISPENSING_COL' ? rec.dispensing : rec.stockroom,
         delta: delta,
-        hasPrior: !!prev,
+        hasPrior: hasPrior,
         sheetBatchesCount: matchingBatches.length,
         sheetTotalStock: totalSheetStock,
         matchingBatches: matchingBatches
       };
 
+      allItems.push(itemDiff);
+
       if (delta > 0) {
-        diffItems.push(itemDiff);
+        consumedItems.push(itemDiff);
         totalDeductions += delta;
         if (!hasStockInSheet) {
           unmappedItems.push(itemDiff);
@@ -2457,94 +2463,48 @@
       }
     });
 
-    dciSyncState.diffItems = diffItems;
-    renderDciPreviewTable(diffItems, unmappedItems, totalDeductions);
+    // Sort: If movement exists, consumed items at the top; otherwise alphabetical
+    if (hasPrior && consumedItems.length > 0) {
+      allItems.sort((a, b) => {
+        if (b.delta !== a.delta) return b.delta - a.delta;
+        return a.itemCode.localeCompare(b.itemCode);
+      });
+    } else {
+      allItems.sort((a, b) => a.itemCode.localeCompare(b.itemCode));
+    }
+
+    dciSyncState.allItems = allItems;
+    dciSyncState.diffItems = consumedItems;
+    dciSyncState.previewRenderLimit = 150; // Initial render chunk for instant responsiveness
+
+    renderDciPreviewTable(allItems, consumedItems, unmappedItems, totalDeductions, hasPrior);
   }
 
-  function renderDciPreviewTable(diffItems, unmappedItems, totalDeductions) {
+  function renderDciPreviewTable(allItems, consumedItems, unmappedItems, totalDeductions, hasPrior) {
     const previewContainer = document.getElementById('dci-preview-container');
-    const tbody = document.getElementById('dci-preview-tbody');
     const header = document.getElementById('dci-preview-header');
     const meta = document.getElementById('dci-preview-meta');
     const unmappedBox = document.getElementById('dci-unmapped-alert');
     const btnExecute = document.getElementById('btn-execute-dci-sync');
 
-    if (!previewContainer || !tbody) return;
+    if (!previewContainer) return;
     previewContainer.style.display = 'block';
-    tbody.innerHTML = '';
-
-    const hasPrior = Object.keys(dciSyncState.previousSnapshotItems || {}).length > 0;
 
     if (!hasPrior) {
-      header.textContent = `Baseline Initialization (${dciSyncState.division})`;
-      meta.textContent = `No prior baseline found. Uploading this file will establish your Day 1 baseline (${dciSyncState.parsedRecords.length.toLocaleString()} items).`;
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="8" style="text-align:center; padding:30px; color:#475569;">
-            <div style="font-size:24px; margin-bottom:8px;">📌</div>
-            <div style="font-weight:600; font-size:14px; color:#0f172a;">Ready to Save Baseline Snapshot</div>
-            <div style="font-size:12px; color:#64748b; margin-top:4px;">
-              Click below to save today's snapshot (${dciSyncState.parsedRecords.length.toLocaleString()} items). Daily consumption deltas will calculate automatically on your subsequent daily uploads.
-            </div>
-          </td>
-        </tr>
-      `;
-      if (btnExecute) btnExecute.textContent = '💾 Save Baseline Snapshot';
-      return;
+      header.textContent = `Baseline Initialization (${dciSyncState.division}): ${allItems.length.toLocaleString()} Medicines Loaded`;
+      meta.textContent = `All items from ${dciSyncState.division} CSV are displayed below. Click 'Save Baseline Snapshot' to establish your baseline for daily movement tracking.`;
+      if (btnExecute) btnExecute.textContent = `💾 Save Baseline Snapshot (${allItems.length.toLocaleString()} items)`;
+    } else if (consumedItems.length === 0) {
+      header.textContent = `Movement Summary (${dciSyncState.division}): Zero Consumption Detected`;
+      meta.textContent = `All stockroom counts are unchanged or replenished compared to prior baseline.`;
+      if (btnExecute) btnExecute.textContent = `💾 Update Baseline Snapshot`;
+    } else {
+      header.textContent = `Detected Consumption: ${consumedItems.length.toLocaleString()} Medicines (${totalDeductions.toLocaleString()} units)`;
+      meta.textContent = `Review the detected consumption below. Confirming will deduct via FEFO from 'Stocks' and record 12-column entries in STOCK_OUT_LOG.`;
+      if (btnExecute) btnExecute.textContent = `⚡ Confirm & Deduct ${totalDeductions.toLocaleString()} Units`;
     }
 
-    if (btnExecute) btnExecute.textContent = `⚡ Confirm & Deduct ${totalDeductions.toLocaleString()} Units`;
-
-    if (diffItems.length === 0) {
-      header.textContent = `Daily Movement Summary (${dciSyncState.division})`;
-      meta.textContent = `Zero consumption detected compared to previous baseline. All stockroom quantities are unchanged or replenished.`;
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="8" style="text-align:center; padding:30px; color:#64748b;">
-            ✅ Zero consumption detected between snapshots. No stock-outs needed.
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    header.textContent = `Detected Consumption: ${diffItems.length} Medicines (${totalDeductions.toLocaleString()} units)`;
-    meta.textContent = `Review the detected consumption below. Confirming will deduct via FEFO and record 12-column entries in STOCK_OUT_LOG.`;
-
-    diffItems.forEach(item => {
-      const tr = document.createElement('tr');
-      const isUnmapped = item.sheetBatchesCount === 0;
-
-      let batchInfo = '';
-      if (isUnmapped) {
-        batchInfo = `<span style="color:#b45309; font-size:11px; font-weight:600;">⚠️ Not in 'Stocks' sheet</span>`;
-      } else {
-        const pendingBatch = item.matchingBatches.find(b => b.expStatus === 'PENDING_COUNT');
-        if (pendingBatch) {
-          batchInfo = `<span class="badge badge-pending" style="font-size:10px;">Pending Count (${item.sheetTotalStock})</span>`;
-        } else {
-          batchInfo = `<span class="badge badge-safe" style="font-size:10px;">${item.sheetBatchesCount} Batch(es) FEFO</span>`;
-        }
-      }
-
-      tr.innerHTML = `
-        <td style="font-family:monospace; font-weight:600;">${escapeHtml(item.itemCode)}</td>
-        <td>
-          <div style="font-weight:600; color:#0f172a;">${escapeHtml(item.medicine)}</div>
-        </td>
-        <td style="text-align:center;"><span class="badge badge-uom">${escapeHtml(item.unit)}</span></td>
-        <td style="text-align:right; color:#64748b;">${item.prevStock !== null ? item.prevStock.toLocaleString() : '--'}</td>
-        <td style="text-align:right; font-weight:600;">${item.todayStock.toLocaleString()}</td>
-        <td style="text-align:right; font-weight:700; color:#b91c1c;">-${item.delta.toLocaleString()}</td>
-        <td>${batchInfo}</td>
-        <td style="text-align:center;">
-          <span style="font-size:11px; color:#15803d; font-weight:600;">Ready</span>
-        </td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    if (unmappedItems.length > 0 && unmappedBox) {
+    if (unmappedItems && unmappedItems.length > 0 && unmappedBox) {
       unmappedBox.innerHTML = `
         <strong>⚠️ ${unmappedItems.length} Consumed Medicine(s) Not in 'Stocks' Sheet:</strong>
         ${unmappedItems.slice(0, 5).map(u => u.itemCode).join(', ')}${unmappedItems.length > 5 ? '...' : ''}. 
@@ -2554,6 +2514,112 @@
     } else if (unmappedBox) {
       unmappedBox.style.display = 'none';
     }
+
+    filterDciPreviewTable();
+  }
+
+  function filterDciPreviewTable() {
+    const tbody = document.getElementById('dci-preview-tbody');
+    const searchInput = document.getElementById('dci-preview-search');
+    const counter = document.getElementById('dci-preview-counter');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const all = dciSyncState.allItems || [];
+
+    const filtered = all.filter(it => {
+      if (!query) return true;
+      return it.itemCode.toLowerCase().includes(query) || it.medicine.toLowerCase().includes(query);
+    });
+
+    const limit = dciSyncState.previewRenderLimit || 150;
+    const toRender = filtered.slice(0, limit);
+
+    if (counter) {
+      counter.textContent = filtered.length > limit 
+        ? `Showing top ${limit.toLocaleString()} of ${filtered.length.toLocaleString()} matching items`
+        : `Showing ${filtered.length.toLocaleString()} items`;
+    }
+
+    if (toRender.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:#64748b;">No matching medicines found for "${escapeHtml(query)}".</td></tr>`;
+      return;
+    }
+
+    toRender.forEach(item => {
+      const tr = document.createElement('tr');
+      const isConsumed = item.delta > 0;
+      if (isConsumed) {
+        tr.style.backgroundColor = '#fef2f2';
+      }
+
+      let deltaDisplay = '';
+      if (!item.hasPrior) {
+        deltaDisplay = `<span class="badge badge-neutral" style="font-size:10px;">Baseline</span>`;
+      } else if (item.delta > 0) {
+        deltaDisplay = `<span class="badge badge-critical" style="font-size:11px; font-weight:700;">-${item.delta.toLocaleString()}</span>`;
+      } else if (item.delta < 0) {
+        deltaDisplay = `<span style="color:#2563eb; font-weight:600; font-size:11px;">+${(-item.delta).toLocaleString()}</span>`;
+      } else {
+        deltaDisplay = `<span style="color:#94a3b8; font-size:12px;">0</span>`;
+      }
+
+      let sheetStatus = '';
+      if (item.sheetBatchesCount > 0) {
+        const hasPending = item.matchingBatches.some(b => b.expStatus === 'PENDING_COUNT');
+        if (hasPending) {
+          sheetStatus = `<span class="badge badge-pending" style="font-size:10px;">Pending Count (${item.sheetTotalStock.toLocaleString()})</span>`;
+        } else {
+          sheetStatus = `<span class="badge badge-safe" style="font-size:10px;">${item.sheetBatchesCount} Batch (${item.sheetTotalStock.toLocaleString()})</span>`;
+        }
+      } else {
+        sheetStatus = `<span style="color:#94a3b8; font-size:11px; font-style:italic;">Not in Sheet</span>`;
+      }
+
+      tr.innerHTML = `
+        <td style="font-family:monospace; font-weight:600; color:#1e293b;">
+          ${escapeHtml(item.itemCode)}
+        </td>
+        <td>
+          <div style="font-weight:600; color:#0f172a; font-size:12px;">${escapeHtml(item.medicine)}</div>
+        </td>
+        <td style="text-align:center;"><span class="badge badge-uom">${escapeHtml(item.unit)}</span></td>
+        <td style="text-align:right; font-weight:700; color:#b91c1c;">
+          ${item.stockroom.toLocaleString()}
+        </td>
+        <td style="text-align:right; font-weight:700; color:#15803d;">
+          ${item.dispensing.toLocaleString()}
+        </td>
+        <td style="text-align:right; font-weight:700; color:#b45309;">
+          ${item.totalQty.toLocaleString()}
+        </td>
+        <td style="text-align:right;">
+          ${deltaDisplay}
+        </td>
+        <td style="text-align:center;">
+          ${sheetStatus}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (filtered.length > limit) {
+      const moreTr = document.createElement('tr');
+      moreTr.innerHTML = `
+        <td colspan="8" style="text-align:center; padding:12px; background:#f8fafc;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="showAllDciPreviewItems()">
+            Show All ${filtered.length.toLocaleString()} Items
+          </button>
+        </td>
+      `;
+      tbody.appendChild(moreTr);
+    }
+  }
+
+  function showAllDciPreviewItems() {
+    dciSyncState.previewRenderLimit = (dciSyncState.allItems || []).length;
+    filterDciPreviewTable();
   }
 
   function clearDciPreview() {
