@@ -7,7 +7,6 @@
  */
 
 // Target or active sheet configuration
-// Target or active sheet configuration
 const CONFIG = {
   MAIN_SHEET_NAME: 'Stocks', // Primary inventory sheet name (supports 'Stocks', 'STORAGE', etc.)
   STORAGE_SHEET_ALIASES: ['Stocks', 'STOCKS', 'stocks', 'Stock', 'STORAGE', 'Storage', 'Inventory', 'INVENTORY'],
@@ -34,6 +33,15 @@ const CONFIG = {
     'Syringe',
     'Sachet'
   ]
+};
+
+// DCI Integration and Provisional Baseline configuration
+const DCI_CONFIG = {
+  REFERENCE_SPREADSHEET_ID: '1zLM0_lbs73MMEMgY-QeDOadVYMek8WJXPBxZyI5mvtM',
+  REFERENCE_SHEET_GID: '237243801',
+  BASELINE_QTY_COL_INDEX: 38, // Column AM is index 38 (0-indexed, 39th column)
+  SNAPSHOT_SHEET_NAME: 'DCI_PREVIOUS_SNAPSHOT',
+  PROVISIONAL_EXPIRY_LABEL: 'PENDING COUNT'
 };
 
 /**
@@ -65,12 +73,16 @@ function onOpen() {
     .addItem('🚀 Open Inventory Manager (Sidebar)', 'showSidebar')
     .addItem('🖥️ Open Inventory Manager (Full Dialog)', 'showDialog')
     .addSeparator()
+    .addItem('🔄 Daily DCI CSV Consumption Sync', 'showDciSyncDialog')
+    .addItem('📥 Import Baseline from Master (Col AM)', 'showImportBaselineDialog')
+    .addSeparator()
     .addItem('➖ Quick Stock-Out / Dispense', 'showStockOutDialog')
     .addItem('➕ Add Medicine or New Batch', 'showAddBatchDialog')
     .addItem('📑 Register Item in Master Formulary', 'showAddCatalogDialog')
     .addItem('🔄 Restock 0-Qty Items', 'showRestockDialog')
     .addSeparator()
     .addItem('📋 View Stock-Out Audit Log', 'openLogSheet')
+    .addItem('📊 View DCI Previous Snapshot Sheet', 'openDciSnapshotSheet')
     .addItem('🛠️ Fix & Upgrade Stock-Out Log Sheet (12 Cols)', 'repairAndMigrateLogSheet')
     .addItem('🛠️ Ensure / Upgrade Sheet Columns (Option A + UOM)', 'migrateSheetToOptionA')
     .addItem('🧹 Clean Blank Rows & Consolidate Sheet', 'cleanAndConsolidateSheet')
@@ -467,38 +479,47 @@ function getInventoryData() {
         cleanPrice = parsedPrice ? parseFloat(parsedPrice) : 0;
       }
 
-      // Parse expiration robustly (handles Date objects, timestamps, strings like 'Feb-27' or '2027-02-01')
+      // Parse expiration robustly (handles Date objects, timestamps, strings like 'Feb-27' or '2027-02-01', and 'PENDING COUNT')
       let expYear = null;
       let expLabel = 'NO EXPIRY';
+      let isPendingCount = false;
 
       if (rawExpVal instanceof Date) {
         expLabel = Utilities.formatDate(rawExpVal, ssTz, 'MMM-yy');
         expYear = parseInt(Utilities.formatDate(rawExpVal, ssTz, 'yyyy'), 10);
       } else if (rawExpVal) {
         const strExp = String(rawExpVal).trim();
-        // Check for format MMM-yy (e.g. Feb-27, May-30)
-        const matchShort = strExp.match(/^([A-Za-z]{3})-(\d{2})$/);
-        if (matchShort) {
-          expYear = 2000 + parseInt(matchShort[2], 10);
-          const m = matchShort[1].charAt(0).toUpperCase() + matchShort[1].slice(1).toLowerCase();
-          expLabel = `${m}-${matchShort[2]}`;
+        const strExpUpper = strExp.toUpperCase();
+        if (strExpUpper.includes('PENDING') || strExpUpper === 'PENDING COUNT' || strExpUpper === 'UNVERIFIED') {
+          isPendingCount = true;
+          expLabel = 'PENDING COUNT';
         } else {
-          const parsedD = new Date(strExp);
-          if (!isNaN(parsedD.getTime()) && strExp.length > 8) {
-            expLabel = Utilities.formatDate(parsedD, ssTz, 'MMM-yy');
-            expYear = parseInt(Utilities.formatDate(parsedD, ssTz, 'yyyy'), 10);
+          // Check for format MMM-yy (e.g. Feb-27, May-30)
+          const matchShort = strExp.match(/^([A-Za-z]{3})-(\d{2})$/);
+          if (matchShort) {
+            expYear = 2000 + parseInt(matchShort[2], 10);
+            const m = matchShort[1].charAt(0).toUpperCase() + matchShort[1].slice(1).toLowerCase();
+            expLabel = `${m}-${matchShort[2]}`;
           } else {
-            const matchYr = strExp.match(/20(\d{2})/);
-            if (matchYr) {
-              expYear = 2000 + parseInt(matchYr[1], 10);
+            const parsedD = new Date(strExp);
+            if (!isNaN(parsedD.getTime()) && strExp.length > 8) {
+              expLabel = Utilities.formatDate(parsedD, ssTz, 'MMM-yy');
+              expYear = parseInt(Utilities.formatDate(parsedD, ssTz, 'yyyy'), 10);
+            } else {
+              const matchYr = strExp.match(/20(\d{2})/);
+              if (matchYr) {
+                expYear = 2000 + parseInt(matchYr[1], 10);
+              }
+              expLabel = strExp || 'NO EXPIRY';
             }
-            expLabel = strExp || 'NO EXPIRY';
           }
         }
       }
 
-      let expStatus = 'SAFE'; // CRITICAL_2026, NEAR_2027, SAFE, EXPIRED, NO_EXPIRY
-      if (!expYear) {
+      let expStatus = 'SAFE'; // CRITICAL_2026, NEAR_2027, SAFE, EXPIRED, NO_EXPIRY, PENDING_COUNT
+      if (isPendingCount) {
+        expStatus = 'PENDING_COUNT';
+      } else if (!expYear) {
         expStatus = 'NO_EXPIRY';
       } else if (expYear < 2026) {
         expStatus = 'EXPIRED';
@@ -980,6 +1001,7 @@ function normalizeExpiryString(inputVal, tz) {
   }
   const str = String(inputVal).trim();
   if (!str) return 'NO EXPIRY';
+  if (str.toUpperCase().includes('PENDING')) return 'PENDING COUNT';
 
   // Format: MMM-yy (e.g. May-30, Feb-27, Dec-28)
   const match = str.match(/^([A-Za-z]{3})-(\d{2})$/);
@@ -1012,6 +1034,7 @@ function getExpiryComparableScore(val, tz) {
   }
   const s = String(val).trim();
   if (!s || s.toUpperCase() === 'NO EXPIRY' || s.toUpperCase() === 'N/A') return 999999;
+  if (s.toUpperCase().includes('PENDING')) return 999990;
 
   const monthMap = {
     jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
@@ -1895,4 +1918,586 @@ function cleanAndConsolidateSheet() {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * ============================================================================
+ * DCI AUTOMATED DAILY CONSUMPTION & PROVISIONAL BASELINE SYSTEM
+ * ============================================================================
+ */
+
+/**
+ * Fetches starting baseline stock from Column AM of the external reference Google Sheet
+ * Spreadsheet ID: 1zLM0_lbs73MMEMgY-QeDOadVYMek8WJXPBxZyI5mvtM
+ */
+function fetchBaselineFromReferenceSheet(rawItemCode) {
+  try {
+    if (!rawItemCode) throw new Error("Item Code / DCI Code is required.");
+    const targetCode = String(rawItemCode).trim().toUpperCase();
+
+    const refSs = SpreadsheetApp.openById(DCI_CONFIG.REFERENCE_SPREADSHEET_ID);
+    const sheets = refSs.getSheets();
+    let refSheet = null;
+
+    if (DCI_CONFIG.REFERENCE_SHEET_GID) {
+      for (let s of sheets) {
+        if (String(s.getSheetId()) === String(DCI_CONFIG.REFERENCE_SHEET_GID)) {
+          refSheet = s;
+          break;
+        }
+      }
+    }
+    if (!refSheet) refSheet = sheets[0];
+
+    const data = refSheet.getDataRange().getValues();
+    if (!data || data.length === 0) {
+      throw new Error("Reference sheet is empty.");
+    }
+
+    let colCode = 0;
+    let colDesc = 1;
+    let colQty = DCI_CONFIG.BASELINE_QTY_COL_INDEX; // Column AM is index 38
+
+    // Read header row
+    const headerRow = data[0];
+    for (let c = 0; c < headerRow.length; c++) {
+      const h = String(headerRow[c] || '').trim().toUpperCase();
+      if (h === 'ITEM CODE' || h === 'DCI CODE' || h === 'CODE') colCode = c;
+      if (h.includes('DESCRIPTION') || h.includes('GENERIC') || h === 'MEDICINE') colDesc = c;
+    }
+
+    let foundRow = null;
+    let foundRowIndex = -1;
+    for (let r = 1; r < data.length; r++) {
+      const rowVal = String(data[r][colCode] || '').trim().toUpperCase();
+      if (rowVal === targetCode) {
+        foundRow = data[r];
+        foundRowIndex = r + 1;
+        break;
+      }
+    }
+
+    if (!foundRow) {
+      return {
+        success: false,
+        message: `Item Code [${targetCode}] was not found in the reference sheet.`
+      };
+    }
+
+    const desc = String(foundRow[colDesc] || '').trim();
+    const rawQtyVal = foundRow.length > colQty ? foundRow[colQty] : 0;
+    let parsedQty = 0;
+    if (typeof rawQtyVal === 'number') {
+      parsedQty = rawQtyVal;
+    } else {
+      const s = String(rawQtyVal || '').replace(/[^0-9.-]/g, '');
+      parsedQty = s ? parseFloat(s) : 0;
+    }
+
+    return {
+      success: true,
+      itemCode: targetCode,
+      itemDesc: desc,
+      uom: inferUomFromDescription(desc),
+      baselineQty: parsedQty,
+      rowIndex: foundRowIndex,
+      sheetName: refSheet.getName()
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: `Could not read reference sheet: ${err.message}`
+    };
+  }
+}
+
+/**
+ * Onboards an uncounted medicine into Stocks with baseline quantity and provisional 'PENDING COUNT' status
+ */
+function onboardProvisionalItem(payload) {
+  try {
+    const { itemCode, itemDesc, baselineQty, brandName, uom, acquisitionPrice } = payload;
+    if (!itemCode || !itemDesc) {
+      throw new Error("Item Code and Description are required.");
+    }
+
+    const cleanQty = parseFloat(String(baselineQty).replace(/[^0-9.-]/g, '')) || 0;
+    const cleanPrice = parseFloat(String(acquisitionPrice || '0').replace(/[^0-9.-]/g, '')) || 0;
+
+    return addNewMedicineOrBatch({
+      itemCode: String(itemCode).trim().toUpperCase(),
+      itemDesc: String(itemDesc).trim().toUpperCase(),
+      brandName: String(brandName || 'Unverified').trim(),
+      uom: String(uom || inferUomFromDescription(itemDesc)).trim(),
+      qty: cleanQty,
+      expDate: DCI_CONFIG.PROVISIONAL_EXPIRY_LABEL,
+      acquisitionPrice: cleanPrice
+    });
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Retrieves the previously saved DCI snapshot dictionary from the snapshot tab
+ */
+function getDciPreviousSnapshot(division) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(DCI_CONFIG.SNAPSHOT_SHEET_NAME);
+    if (!sheet) {
+      return { success: true, items: {}, snapshotDate: null, count: 0 };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length <= 1) {
+      return { success: true, items: {}, snapshotDate: null, count: 0 };
+    }
+
+    // Expected headers: DIVISION | SNAPSHOT DATE | ITEM CODE | MEDICINE | UNIT | STOCKROOM | DISPENSING | TOTAL QTY | UPDATED AT
+    const targetDivision = String(division || 'STORAGE').trim().toUpperCase();
+    const items = {};
+    let latestSnapshotDate = null;
+    let count = 0;
+
+    for (let r = 1; r < data.length; r++) {
+      const row = data[r];
+      const div = String(row[0] || '').trim().toUpperCase();
+      if (div !== targetDivision) continue;
+
+      const dateStr = String(row[1] || '').trim();
+      if (!latestSnapshotDate && dateStr) latestSnapshotDate = dateStr;
+
+      const code = String(row[2] || '').trim().toUpperCase();
+      if (!code) continue;
+
+      const stockroom = parseFloat(row[5]) || 0;
+      const dispensing = parseFloat(row[6]) || 0;
+      const totalQty = parseFloat(row[7]) || 0;
+
+      items[code] = {
+        medicine: String(row[3] || '').trim(),
+        unit: String(row[4] || '').trim(),
+        stockroom: stockroom,
+        dispensing: dispensing,
+        totalQty: totalQty,
+        snapshotDate: dateStr
+      };
+      count++;
+    }
+
+    return {
+      success: true,
+      division: targetDivision,
+      snapshotDate: latestSnapshotDate,
+      count: count,
+      items: items
+    };
+  } catch (err) {
+    return { success: false, items: {}, error: err.message };
+  }
+}
+
+/**
+ * Saves current DCI snapshot records into the DCI_PREVIOUS_SNAPSHOT tab
+ */
+function saveDciSnapshot(division, records, snapshotDate) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(DCI_CONFIG.SNAPSHOT_SHEET_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(DCI_CONFIG.SNAPSHOT_SHEET_NAME);
+    const headers = [
+      'DIVISION', 'SNAPSHOT DATE', 'ITEM CODE', 'MEDICINE',
+      'UNIT', 'STOCKROOM', 'DISPENSING', 'TOTAL QTY', 'UPDATED AT'
+    ];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#e2e8f0');
+    sheet.setFrozenRows(1);
+  }
+
+  const targetDiv = String(division || 'STORAGE').trim().toUpperCase();
+  const dateStr = String(snapshotDate || Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), 'yyyy-MM-dd')).trim();
+  const nowTs = new Date();
+
+  // Read existing data and remove older records for this division to keep sheet lean
+  const existing = sheet.getDataRange().getValues();
+  const retainedRows = [];
+  if (existing.length > 1) {
+    for (let r = 1; r < existing.length; r++) {
+      const d = String(existing[r][0] || '').trim().toUpperCase();
+      if (d !== targetDiv) {
+        retainedRows.push(existing[r]);
+      }
+    }
+  }
+
+  const newRows = records.map(rec => [
+    targetDiv,
+    dateStr,
+    String(rec.itemCode || '').trim().toUpperCase(),
+    String(rec.medicine || '').trim(),
+    String(rec.unit || '').trim(),
+    parseFloat(rec.stockroom) || 0,
+    parseFloat(rec.dispensing) || 0,
+    parseFloat(rec.totalQty) || 0,
+    nowTs
+  ]);
+
+  const allRows = retainedRows.concat(newRows);
+  sheet.clearContents();
+
+  const headers = [
+    'DIVISION', 'SNAPSHOT DATE', 'ITEM CODE', 'MEDICINE',
+    'UNIT', 'STOCKROOM', 'DISPENSING', 'TOTAL QTY', 'UPDATED AT'
+  ];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#e2e8f0');
+  sheet.setFrozenRows(1);
+
+  if (allRows.length > 0) {
+    sheet.getRange(2, 1, allRows.length, headers.length).setValues(allRows);
+  }
+
+  return { success: true, count: allRows.length };
+}
+
+/**
+ * Core Automation: Processes daily DCI CSV consumption, executes FEFO stock-out deductions in Stocks,
+ * and records transactions in STOCK_OUT_LOG
+ */
+function processDciDailySync(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(45000); // 45-second atomic lock to ensure full concurrency safety
+  try {
+    const { division, snapshotDate, records, method } = payload;
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      throw new Error("No CSV records provided for DCI sync.");
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssTz = ss.getSpreadsheetTimeZone();
+    const cleanDate = String(snapshotDate || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
+    const cleanDiv = String(division || 'STORAGE').trim().toUpperCase();
+
+    // 1. Fetch previous snapshot for this division to calculate daily deltas
+    const prevSnapRes = getDciPreviousSnapshot(cleanDiv);
+    const prevItems = prevSnapRes.items || {};
+    const hasPriorSnapshot = Object.keys(prevItems).length > 0;
+
+    // 2. Fetch inventory info from 'Stocks'
+    const info = getInventorySheetInfo();
+    const sheet = info.sheet;
+    const inventoryValues = sheet.getDataRange().getValues();
+
+    // Map active batches in Stocks grouped by Item Code
+    // Array of { rowIndex, batchId, itemCode, desc, brand, uom, qty, expVal, price, sortScore, isPending }
+    const stockBatchesByCode = {};
+    for (let r = 1; r < inventoryValues.length; r++) {
+      const row = inventoryValues[r];
+      const code = String(row[info.colCode] || '').trim().toUpperCase();
+      if (!code) continue;
+
+      const rawQty = row[info.colQty];
+      const cleanQty = typeof rawQty === 'number' ? rawQty : (parseFloat(String(rawQty).replace(/[^0-9.-]/g, '')) || 0);
+      const rawPrice = info.colPrice !== -1 ? row[info.colPrice] : 0;
+      const cleanPrice = typeof rawPrice === 'number' ? rawPrice : (parseFloat(String(rawPrice).replace(/[^0-9.-]/g, '')) || 0);
+
+      const expVal = row[info.colExp];
+      const expStr = String(expVal || '').trim();
+      const isPending = expStr.toUpperCase().includes('PENDING');
+      const sortScore = getExpiryComparableScore(expVal, ssTz);
+
+      if (!stockBatchesByCode[code]) {
+        stockBatchesByCode[code] = [];
+      }
+
+      stockBatchesByCode[code].push({
+        rowIndex: r + 1,
+        batchId: info.colBatchId !== -1 ? String(row[info.colBatchId] || '').trim() : '',
+        itemCode: code,
+        desc: String(row[info.colDesc] || '').trim(),
+        brand: info.colBrand !== -1 ? String(row[info.colBrand] || '').trim() : '',
+        uom: info.colUom !== -1 ? String(row[info.colUom] || '').trim() : '',
+        qty: cleanQty,
+        rawExp: expVal,
+        price: cleanPrice,
+        sortScore: sortScore,
+        isPending: isPending
+      });
+    }
+
+    // 3. Calculate consumption deltas and prepare deductions
+    const deductionTasks = [];
+    const unmappedItems = [];
+    let totalConsumedUnits = 0;
+
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
+      const code = String(rec.itemCode || '').trim().toUpperCase();
+      if (!code) continue;
+
+      const curStockroom = parseFloat(rec.stockroom) || 0;
+      const curDispensing = parseFloat(rec.dispensing) || 0;
+      const prev = prevItems[code];
+
+      let delta = 0;
+      if (prev) {
+        if (method === 'DISPENSING_COL') {
+          // Delta based on cumulative dispensing increase
+          delta = curDispensing - prev.dispensing;
+        } else {
+          // Default: Stockroom drop = consumption
+          delta = prev.stockroom - curStockroom;
+        }
+      } else if (rec.forcedDelta && rec.forcedDelta > 0) {
+        delta = parseFloat(rec.forcedDelta) || 0;
+      }
+
+      // Only deduct positive consumption deltas
+      if (delta > 0) {
+        const availableBatches = stockBatchesByCode[code];
+        if (!availableBatches || availableBatches.length === 0) {
+          unmappedItems.push({
+            itemCode: code,
+            medicine: rec.medicine,
+            delta: delta,
+            reason: "Not found in 'Stocks' sheet"
+          });
+        } else {
+          deductionTasks.push({
+            itemCode: code,
+            medicine: rec.medicine,
+            delta: delta,
+            batches: availableBatches
+          });
+          totalConsumedUnits += delta;
+        }
+      }
+    }
+
+    // 4. Execute cascading FEFO deductions
+    const logEntries = [];
+    let executedDeductionsCount = 0;
+
+    for (let task of deductionTasks) {
+      let needed = task.delta;
+
+      // Sort batches: verified batches with earliest expiry first, pending count batches last
+      task.batches.sort((a, b) => a.sortScore - b.sortScore);
+
+      for (let b of task.batches) {
+        if (needed <= 0) break;
+        if (b.qty <= 0) continue; // Skip exhausted batches
+
+        const deductFromBatch = Math.min(b.qty, needed);
+        const newBal = b.qty - deductFromBatch;
+
+        // Apply update to sheet cell
+        sheet.getRange(b.rowIndex, info.colQty + 1)
+          .setValue(newBal)
+          .setNumberFormat('#,##0')
+          .setHorizontalAlignment('right');
+
+        if (info.colDateOut !== -1) {
+          sheet.getRange(b.rowIndex, info.colDateOut + 1)
+            .setNumberFormat('@')
+            .setValue(cleanDate)
+            .setHorizontalAlignment('center');
+        }
+
+        // Prepare audit log entry
+        const resolvedExp = normalizeExpiryString(b.rawExp, ssTz);
+        const resolvedUom = b.uom || inferUomFromDescription(b.desc);
+
+        logStockOutTransaction({
+          timestamp: new Date(),
+          dateOut: cleanDate,
+          itemCode: b.itemCode,
+          itemDesc: b.desc,
+          brandName: b.brand || (b.isPending ? 'Unverified' : 'Standard'),
+          uom: resolvedUom,
+          expDate: resolvedExp,
+          unitPrice: b.price,
+          qtyOut: deductFromBatch,
+          previousQty: b.qty,
+          remainingBalance: newBal,
+          remarks: `DCI Auto-Sync (${cleanDiv})`
+        });
+
+        // Update local object in case of subsequent loops
+        b.qty = newBal;
+        needed -= deductFromBatch;
+        executedDeductionsCount++;
+      }
+
+      if (needed > 0) {
+        // Stock in sheet was insufficient to fulfill entire DCI consumption
+        logEntries.push({
+          itemCode: task.itemCode,
+          warning: `Partial deduction: ${task.delta - needed} deducted, ${needed} unfulfilled due to zero stock.`
+        });
+      }
+    }
+
+    // 5. Save today's snapshot as the new baseline
+    saveDciSnapshot(cleanDiv, records, cleanDate);
+
+    return {
+      success: true,
+      hasPriorSnapshot: hasPriorSnapshot,
+      division: cleanDiv,
+      snapshotDate: cleanDate,
+      processedRecordsCount: records.length,
+      consumptionItemsCount: deductionTasks.length,
+      totalConsumedUnits: totalConsumedUnits,
+      executedDeductionsCount: executedDeductionsCount,
+      unmappedItemsCount: unmappedItems.length,
+      unmappedItems: unmappedItems,
+      warnings: logEntries,
+      message: hasPriorSnapshot
+        ? `Successfully synced DCI ${cleanDiv}! Deducted ${totalConsumedUnits.toLocaleString()} units across ${executedDeductionsCount} batch(es).`
+        : `Baseline DCI snapshot initialized for ${cleanDiv} (${records.length} items). Daily consumption will auto-deduct starting from the next upload!`
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Converts a provisional 'PENDING COUNT' row into one or more verified physical batches with real expiry dates
+ */
+function verifyAndSplitBatch(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const { rowIndex, batchId, itemCode, itemDesc, batches } = payload;
+    if (!batches || !Array.isArray(batches) || batches.length === 0) {
+      throw new Error("At least one verified physical batch must be provided.");
+    }
+
+    const info = getInventorySheetInfo();
+    const sheet = info.sheet;
+    const values = sheet.getDataRange().getValues();
+    const ssTz = sheet.getParent().getSpreadsheetTimeZone();
+
+    // 1. Locate the target provisional row
+    let targetRowIndex = -1;
+    if (batchId && info.colBatchId !== -1) {
+      for (let r = 1; r < values.length; r++) {
+        if (String(values[r][info.colBatchId] || '').trim() === String(batchId).trim()) {
+          targetRowIndex = r + 1;
+          break;
+        }
+      }
+    }
+    if (targetRowIndex === -1 && rowIndex && rowIndex <= values.length) {
+      const codeAtRow = String(values[rowIndex - 1][info.colCode] || '').trim().toUpperCase();
+      if (codeAtRow === String(itemCode).trim().toUpperCase()) {
+        targetRowIndex = rowIndex;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      throw new Error(`Row for Item [${itemCode}] could not be located. Please refresh the inventory.`);
+    }
+
+    // 2. Update the first batch into the existing row in place
+    const b1 = batches[0];
+    const cleanQty1 = parseFloat(String(b1.qty).replace(/[^0-9.-]/g, '')) || 0;
+    const cleanPrice1 = parseFloat(String(b1.price || '0').replace(/[^0-9.-]/g, '')) || 0;
+    const cleanBrand1 = String(b1.brandName || '').trim();
+    const cleanUom1 = String(b1.uom || inferUomFromDescription(itemDesc)).trim();
+    const expObj1 = getExpiryDateObject(b1.expDate, ssTz);
+
+    if (cleanBrand1 && info.colBrand !== -1) {
+      sheet.getRange(targetRowIndex, info.colBrand + 1).setValue(cleanBrand1);
+    }
+    if (cleanUom1 && info.colUom !== -1) {
+      sheet.getRange(targetRowIndex, info.colUom + 1).setValue(cleanUom1);
+    }
+
+    sheet.getRange(targetRowIndex, info.colQty + 1)
+      .setValue(cleanQty1)
+      .setNumberFormat('#,##0')
+      .setHorizontalAlignment('right');
+
+    if (expObj1) {
+      sheet.getRange(targetRowIndex, info.colExp + 1)
+        .setValue(expObj1)
+        .setNumberFormat('mmm-yy')
+        .setHorizontalAlignment('center');
+    } else {
+      sheet.getRange(targetRowIndex, info.colExp + 1)
+        .setNumberFormat('@')
+        .setValue(normalizeExpiryString(b1.expDate, ssTz))
+        .setHorizontalAlignment('center');
+    }
+
+    if (info.colPrice !== -1) {
+      sheet.getRange(targetRowIndex, info.colPrice + 1)
+        .setValue(cleanPrice1)
+        .setNumberFormat('"₱"#,##0.00')
+        .setHorizontalAlignment('right');
+    }
+
+    // 3. Insert any additional split batches directly below
+    for (let i = 1; i < batches.length; i++) {
+      const bExtra = batches[i];
+      addNewMedicineOrBatch({
+        itemCode: itemCode,
+        itemDesc: itemDesc,
+        brandName: bExtra.brandName,
+        uom: bExtra.uom || cleanUom1,
+        qty: bExtra.qty,
+        expDate: bExtra.expDate,
+        acquisitionPrice: bExtra.price
+      });
+    }
+
+    return {
+      success: true,
+      message: `Verified and encoded ${batches.length} batch(es) for [${itemCode}] ${itemDesc}!`
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Menu Dialog: Shows Daily DCI Sync Dialog
+ */
+function showDciSyncDialog() {
+  const html = HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setWidth(950)
+    .setHeight(650)
+    .setTitle('🔄 Daily DCI Consumption Sync - ARMMC');
+  SpreadsheetApp.getUi().showModalDialog(html, 'Daily DCI Consumption Sync');
+}
+
+/**
+ * Menu Dialog: Shows Import Baseline Dialog
+ */
+function showImportBaselineDialog() {
+  showAddBatchDialog();
+}
+
+/**
+ * Menu Action: Opens the DCI Previous Snapshot Sheet
+ */
+function openDciSnapshotSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(DCI_CONFIG.SNAPSHOT_SHEET_NAME);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Notice', 'No DCI Snapshot sheet found yet. It will be created on your first daily sync.', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+  ss.setActiveSheet(sheet);
 }
