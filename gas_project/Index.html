@@ -4,6 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <title>Pharmacy Expiry Monitoring - Amang Rodriguez Memorial Medical Center</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <?!= include('Styles'); ?>
 </head>
 <body>
@@ -95,12 +96,13 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-7m7 5h-7m7 5h-7M4 7h.01M4 12h.01M4 17h.01"/></svg>
         Inventory & Stock-Out
       </button>
+      <button class="tab-btn" data-tab="tab-file-injection">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        File Injection (FEFO)
+      </button>
       <button class="tab-btn" data-tab="tab-dci-sync">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
         Daily DCI Sync
-      </button>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-7m7 5h-7m7 5h-7M4 7h.01M4 12h.01M4 17h.01"/></svg>
-        Inventory & Stock-Out
       </button>
       <button class="tab-btn" data-tab="tab-add">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-7-7h14"/></svg>
@@ -140,6 +142,20 @@
             <option value="ZERO">Out of Stock (0 Qty)</option>
             <option value="DONATION">Donated Program Items</option>
           </select>
+
+          <!-- View Mode Toggle: Consolidated vs Detailed Batches -->
+          <div class="view-mode-toggle" style="display:inline-flex; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9; padding:2px;">
+            <button type="button" id="btn-view-consolidated" class="btn btn-sm" style="font-size:11.5px; padding:4px 9px; border-radius:4px; font-weight:600; background:#2563eb; color:#ffffff; border:none;" onclick="setViewMode('CONSOLIDATED')" title="Consolidate duplicate batches with same code, brand, and expiry into 1 unified total">
+              📦 Consolidated
+            </button>
+            <button type="button" id="btn-view-detailed" class="btn btn-sm" style="font-size:11.5px; padding:4px 9px; border-radius:4px; font-weight:600; background:transparent; color:#64748b; border:none;" onclick="setViewMode('DETAILED')" title="Show every individual physical delivery batch row">
+              📋 Detailed
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-outline btn-sm" onclick="triggerSheetConsolidation()" title="Permanently merge and consolidate identical batch rows in the active Google Sheet">
+            🧹 Merge Sheet
+          </button>
 
           <button class="btn btn-outline btn-sm" onclick="switchTab('tab-dci-sync')" title="Upload Daily DCI CSV to sync consumption">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
@@ -183,6 +199,111 @@
         <!-- Mobile Touch Batch Cards (Screens <= 768px) -->
         <div id="inventory-cards-container" class="mobile-cards-view">
           <!-- Dynamically populated for mobile phones -->
+        </div>
+      </section>
+
+      <!-- TAB: FILE INJECTION & CASCADING FEFO DEDUCTIONS -->
+      <section id="tab-file-injection" class="tab-pane">
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <div>
+              <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0; display:flex; align-items:center; gap:8px;">
+                <span>⚡ Daily File Injection & Cascading FEFO Deductions</span>
+              </h2>
+              <p style="font-size:12px; color:#64748b; margin:4px 0 0 0;">
+                Inject cleaned daily HIS files (<code style="background:#f1f5f9; padding:2px 4px; border-radius:4px; font-weight:600;">CONSUMPTION_COMBINED_CLEANED</code> or <code style="background:#f1f5f9; padding:2px 4px; border-radius:4px; font-weight:600;">ISSUANCE_STORAGE_CLEANED</code>) to automatically calculate and deduct stock from earliest-expiring batches.
+              </p>
+            </div>
+            <div style="font-size:12px; color:#475569; font-weight:600;">
+              Source Folder: <span style="font-family:monospace; color:#2563eb; background:#eff6ff; padding:2px 6px; border-radius:4px;">DAILY_FINAL_RESULTS</span>
+            </div>
+          </div>
+
+          <!-- Drag and Drop Zone -->
+          <div id="injection-dropzone" class="injection-dropzone" onclick="document.getElementById('injection-file-input').click()">
+            <input type="file" id="injection-file-input" accept=".csv, .xlsx, .xls" multiple style="display:none;" onchange="handleInjectionFileSelected(event)">
+            <div style="font-size:32px; margin-bottom:8px;">📁</div>
+            <div style="font-weight:700; color:#1e293b; font-size:14px;" id="injection-dropzone-label">
+              Drag & drop your 3 cleaned HIS files here, or click to browse (Multi-select enabled)
+            </div>
+            <div style="font-size:12px; color:#64748b; margin-top:4px;">
+              Select all 3 files (Consumption, Storage Issuance, Dispensing Issuance) • Supports <strong>.csv</strong> & <strong>.xlsx</strong>
+            </div>
+          </div>
+
+          <!-- Configuration & File Status Bar (Shown after file loaded) -->
+          <div id="injection-config-bar" style="display:none; margin-top:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; display:block;">Loaded Files & Mode</span>
+                <span id="injection-file-summary" style="font-weight:700; color:#0f172a; font-size:13px;">--</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label for="injection-tx-date" style="font-size:12px; font-weight:600; color:#475569;">Transaction Date:</label>
+                <input type="date" id="injection-tx-date" class="form-input" style="width:140px; padding:4px 8px; font-size:12px;">
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="clearInjectionFile()">✕ Clear</button>
+                <button type="button" id="btn-execute-injection" class="btn btn-primary" onclick="executeInjectionFefoSync()">
+                  ⚡ Confirm & Apply FEFO Deductions
+                </button>
+              </div>
+            </div>
+
+            <!-- Stats Ribbon -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
+              <div>
+                <span style="font-size:11px; color:#64748b;">Total Unique Items</span>
+                <div id="stat-inj-total-items" style="font-size:16px; font-weight:700; color:#1e293b;">0</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#64748b;">Matched in Sheet</span>
+                <div id="stat-inj-matched" style="font-size:16px; font-weight:700; color:#15803d;">0</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#64748b;">Total Units to Deduct</span>
+                <div id="stat-inj-deduct-units" style="font-size:16px; font-weight:700; color:#dc2626;">0</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#64748b;">Batches Impacted</span>
+                <div id="stat-inj-batches-impacted" style="font-size:16px; font-weight:700; color:#2563eb;">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Impact Preview Table -->
+        <div id="injection-preview-card" class="card" style="display:none; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px; flex-wrap:wrap;">
+            <div class="search-box" style="flex:1; min-width:240px; margin:0;">
+              <span class="search-icon-inside">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input type="text" id="injection-preview-search" class="search-input" placeholder="Search preview items by code or description..." oninput="filterInjectionPreviewTable()">
+            </div>
+            <div style="font-size:12px; color:#64748b; font-weight:600;" id="injection-preview-counter">
+              Showing 0 items
+            </div>
+          </div>
+
+          <div class="table-container" style="max-height:480px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:110px;">Item Code</th>
+                  <th>Medicine Description</th>
+                  <th style="width:180px;">Source Breakdown</th>
+                  <th style="width:110px; text-align:right;">Total Injected</th>
+                  <th style="width:100px; text-align:right;">Current Stock</th>
+                  <th>Cascading FEFO Deduction Plan (Per Batch)</th>
+                  <th style="width:110px; text-align:center;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="injection-preview-tbody">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -506,15 +627,77 @@
 
       <!-- TAB 4: AUDIT LOG -->
       <section id="tab-logs" class="tab-pane">
-        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <div>
-            <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Stock-Out Dispensing Log</h2>
-            <p style="font-size:12px; color:var(--slate-500);">Real-time financial and batch audit record of all dispensed medicines.</p>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h2 style="font-size:16px; font-weight:700; color:var(--slate-900); margin:0;">Stock-Out & File Injection Audit Trail</h2>
+              <span id="logs-count-badge" class="badge badge-neutral" style="font-size:11px;">Showing 0 records</span>
+            </div>
+            <p style="font-size:12px; color:var(--slate-500); margin:2px 0 0 0;">Complete chronological transaction ledger of daily file injections, FEFO deductions, and stock-outs.</p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="loadLogs()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-            Refresh Log
-          </button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-outline btn-sm" onclick="promptTrackMedicineAudit()" title="Search medicine ledger">
+              🔍 Track Medicine
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="loadLogs()" title="Reload latest logs from sheet">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+              Refresh Log
+            </button>
+          </div>
+        </div>
+
+        <!-- Audit Metrics Strip -->
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom:16px;">
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">Total Transactions</div>
+            <div id="stat-log-total" class="stat-value" style="font-size:20px; color:#1e293b;">0</div>
+            <div class="stat-sub">Lifetime audit entries</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">Total Units Deducted</div>
+            <div id="stat-log-units" class="stat-value" style="font-size:20px; color:#dc2626;">0</div>
+            <div class="stat-sub">Across all batches</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">File Injections</div>
+            <div id="stat-log-injections" class="stat-value" style="font-size:20px; color:#2563eb;">0</div>
+            <div class="stat-sub">Cleaned daily records</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">Shortages / Exhausted</div>
+            <div id="stat-log-shortages" class="stat-value" style="font-size:20px; color:#d97706;">0</div>
+            <div class="stat-sub">Unfulfilled warnings</div>
+          </div>
+        </div>
+
+        <!-- Live Search & Filtering Toolbar -->
+        <div style="background:#ffffff; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <div style="flex:1; min-width:240px; position:relative;">
+              <input type="text" id="logs-search-input" class="form-control" placeholder="🔍 Search audit logs by Item Code, Medicine Name, Brand, Remarks, or Date..." oninput="filterLogsTable()" style="padding-left:12px;">
+            </div>
+            <div style="width:200px;">
+              <select id="logs-filter-action" class="form-control" onchange="filterLogsTable()">
+                <option value="ALL">All Transactions</option>
+                <option value="INJECTION">⚡ File Injections Only</option>
+                <option value="MANUAL">📤 Manual Stock-Outs Only</option>
+                <option value="SHORTAGE">⚠️ Shortages & Out-of-Stock</option>
+              </select>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="clearLogsFilter()" style="padding:7px 12px;">
+              ✕ Clear Filter
+            </button>
+          </div>
+
+          <!-- Quick Filter Chips -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+            <span style="font-size:11px; color:#64748b; font-weight:600; margin-right:4px;">Quick Filters:</span>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px;" onclick="quickFilterLogs('')">All</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#93c5fd; color:#1d4ed8; background:#eff6ff;" onclick="quickFilterLogs('TELMISARTAN')">💊 Telmisartan 40mg</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#cbd5e1;" onclick="quickFilterLogs('SODIUM BICARBONATE')">🧪 Sodium Bicarb</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#cbd5e1;" onclick="setLogsActionFilter('INJECTION')">⚡ File Injections</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#fecdd3; color:#be123c; background:#fff1f2;" onclick="setLogsActionFilter('SHORTAGE')">⚠️ Shortages</button>
+          </div>
         </div>
 
         <div class="table-container">
@@ -525,13 +708,14 @@
                 <th style="width:100px; text-align:center;">Date Out</th>
                 <th style="width:110px;">Item Code</th>
                 <th>Generic Name</th>
-                <th style="width:120px;">Brand Name</th>
-                <th style="width:85px; text-align:center;">UOM</th>
+                <th style="width:110px;">Brand Name</th>
+                <th style="width:80px; text-align:center;">UOM</th>
                 <th style="width:95px;">Batch Expiry</th>
-                <th style="width:105px; text-align:right;">Unit Price</th>
-                <th style="width:85px; text-align:right;">Qty Out</th>
+                <th style="width:95px; text-align:right;">Unit Price</th>
+                <th style="width:95px; text-align:right;">Qty Out</th>
                 <th style="width:95px; text-align:right;">Remaining</th>
                 <th>Remarks</th>
+                <th style="width:80px; text-align:center;">Ledger</th>
               </tr>
             </thead>
             <tbody id="logs-table-body">
@@ -779,6 +963,113 @@
         <button type="button" class="btn btn-outline" onclick="closeModal('modal-verify-batch')">Cancel</button>
         <button type="button" id="btn-save-verify-batch" class="btn btn-primary" onclick="submitVerifyBatch()">
           ✓ Save Verified Batches (Activate FEFO)
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: PER-MEDICINE AUDIT LEDGER & LIFETIME MOVEMENT -->
+  <div id="modal-medicine-audit" class="modal-backdrop" style="display:none;">
+    <div class="modal-card" style="max-width:820px; max-height:90vh; display:flex; flex-direction:column;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">📜</span>
+          <div class="modal-title" style="margin:0;">Medicine Audit Ledger</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-medicine-audit')">✕</button>
+      </div>
+
+      <div class="modal-body" style="overflow-y:auto; flex:1; padding:16px;">
+        <!-- Drug Header & Active Stock Card -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span id="med-audit-code" style="font-family:monospace; font-weight:700; font-size:15px; color:#1e293b; background:#e2e8f0; padding:2px 8px; border-radius:4px;">DMC001032</span>
+                <span id="med-audit-uom" class="badge badge-uom">Tablet</span>
+              </div>
+              <div id="med-audit-desc" style="font-size:14px; font-weight:700; color:#0f172a; margin-top:4px;">(C) TELMISARTAN 40MG TABLET</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px; color:#64748b; font-weight:600; text-transform:uppercase;">Current Storage Stock</div>
+              <div id="med-audit-stock" style="font-size:18px; font-weight:800; color:#2563eb;">0 units</div>
+            </div>
+          </div>
+
+          <!-- Mini KPI row -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:12px; border-top:1px dashed #cbd5e1; padding-top:10px;">
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">Total Dispensed</div>
+              <div id="med-audit-total-disp" style="font-size:14px; font-weight:700; color:#dc2626;">0 units</div>
+            </div>
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">File Injections</div>
+              <div id="med-audit-injections" style="font-size:14px; font-weight:700; color:#2563eb;">0</div>
+            </div>
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">Total Transactions</div>
+              <div id="med-audit-tx-count" style="font-size:14px; font-weight:700; color:#1e293b;">0</div>
+            </div>
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">Shortages Flagged</div>
+              <div id="med-audit-shortages" style="font-size:14px; font-weight:700; color:#d97706;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: Active Sheet Batches -->
+        <div style="margin-bottom:16px;">
+          <h4 style="font-size:12px; font-weight:700; text-transform:uppercase; color:#475569; margin:0 0 8px 0; letter-spacing:0.5px;">Active Batches in Inventory Sheet</h4>
+          <div class="table-container" style="max-height:160px; overflow-y:auto;">
+            <table style="font-size:12px;">
+              <thead>
+                <tr>
+                  <th style="width:70px; text-align:center;">Row</th>
+                  <th>Brand Name</th>
+                  <th style="width:70px; text-align:center;">UOM</th>
+                  <th style="width:90px; text-align:right;">Current Qty</th>
+                  <th style="width:90px; text-align:center;">Expiry Date</th>
+                  <th style="width:90px; text-align:center;">Date Out</th>
+                </tr>
+              </thead>
+              <tbody id="med-audit-batches-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 2: Complete Movement & Audit Log -->
+        <div>
+          <h4 style="font-size:12px; font-weight:700; text-transform:uppercase; color:#475569; margin:0 0 8px 0; letter-spacing:0.5px;">Chronological Movement & Stock-Out Ledger</h4>
+          <div class="table-container" style="max-height:260px; overflow-y:auto;">
+            <table style="font-size:11.5px;">
+              <thead>
+                <tr>
+                  <th style="width:130px;">Timestamp</th>
+                  <th style="width:85px; text-align:center;">Date Out</th>
+                  <th style="width:90px;">Brand</th>
+                  <th style="width:85px; text-align:center;">Expiry</th>
+                  <th style="width:80px; text-align:right;">Qty Out</th>
+                  <th style="width:80px; text-align:right;">Remaining</th>
+                  <th>Remarks / File Source</th>
+                </tr>
+              </thead>
+              <tbody id="med-audit-ledger-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" id="btn-med-audit-filter-main" onclick="filterMainFromModal()">
+          🔍 Open in Main Audit Log
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="closeModal('modal-medicine-audit')">
+          Close Ledger
         </button>
       </div>
     </div>

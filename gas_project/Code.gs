@@ -8,8 +8,9 @@
 
 // Target or active sheet configuration
 const CONFIG = {
-  MAIN_SHEET_NAME: 'Stocks', // Primary inventory sheet name (supports 'Stocks', 'STORAGE', etc.)
-  STORAGE_SHEET_ALIASES: ['Stocks', 'STOCKS', 'stocks', 'Stock', 'STORAGE', 'Storage', 'Inventory', 'INVENTORY'],
+  TARGET_SHEET_GID: '374732397', // Target active inventory sheet GID (from user sheet URL)
+  MAIN_SHEET_NAME: 'STORAGE', // Primary inventory sheet name (supports 'STORAGE', 'Stocks', etc.)
+  STORAGE_SHEET_ALIASES: ['STORAGE', 'Storage', 'Stocks', 'STOCKS', 'stocks', 'Stock', 'Inventory', 'INVENTORY', 'Sheet1'],
   MASTER_DCI_SHEET_NAME: 'Medicine', // Master catalog tab with Col A: DCI Code, Col B: Generic Description (supports 'Medicine', 'Sheet1', etc.)
   LOG_SHEET_NAME: 'STOCK_OUT_LOG',
   COLUMN_KEYS: {
@@ -65,6 +66,23 @@ function inferUomFromDescription(desc) {
 }
 
 /**
+ * Normalizes medicine descriptions (removes prefixes like (C), (DON), (EP) and whitespace)
+ */
+function cleanGenericDesc(d) {
+  return String(d || '').trim().toUpperCase()
+    .replace(/^\([A-Z0-9\s-]+\)\s*/, '')
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Extracts numeric code digits from code string (e.g. DMC001032 -> 001032)
+ */
+function extractNumericPart(code) {
+  const match = String(code || '').match(/\d+/);
+  return match ? match[0] : '';
+}
+
+/**
  * Automatically creates custom menu on spreadsheet open
  */
 function onOpen() {
@@ -73,6 +91,7 @@ function onOpen() {
     .addItem('🚀 Open Inventory Manager (Sidebar)', 'showSidebar')
     .addItem('🖥️ Open Inventory Manager (Full Dialog)', 'showDialog')
     .addSeparator()
+    .addItem('⚡ File Injection & FEFO Deduction', 'showFileInjectionDialog')
     .addItem('🔄 Daily DCI CSV Consumption Sync', 'showDciSyncDialog')
     .addItem('📥 Import Baseline from Master (Col AM)', 'showImportBaselineDialog')
     .addSeparator()
@@ -82,6 +101,8 @@ function onOpen() {
     .addItem('🔄 Restock 0-Qty Items', 'showRestockDialog')
     .addSeparator()
     .addItem('📋 View Stock-Out Audit Log', 'openLogSheet')
+    .addItem('🔍 Track Medicine Audit Trail (Ledger)', 'showMedicineAuditTrailDialog')
+    .addItem('🧹 Consolidate Identical Batches in Sheet', 'consolidateIdenticalSheetRows')
     .addItem('📊 View DCI Previous Snapshot Sheet', 'openDciSnapshotSheet')
     .addItem('🛠️ Fix & Upgrade Stock-Out Log Sheet (12 Cols)', 'repairAndMigrateLogSheet')
     .addItem('🛠️ Ensure / Upgrade Sheet Columns (Option A + UOM)', 'migrateSheetToOptionA')
@@ -158,12 +179,24 @@ function openLogSheet() {
  * Option A Standard with UOM:
  * ITEM CODE | ITEM DESCRIPTION | BRAND NAME | UOM | QTY STORAGE | EXP DATE | ACQUISITION PRICE | DATE OUT
  */
-function getInventorySheetInfo() {
+function getInventorySheetInfo(targetGid) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = null;
 
-  // 1. Try CONFIG.MAIN_SHEET_NAME if defined
-  if (CONFIG.MAIN_SHEET_NAME) {
+  // 0. Try target GID (guarantees targeting the exact sheet tab the user is viewing)
+  const desiredGid = targetGid || (CONFIG && CONFIG.TARGET_SHEET_GID);
+  if (desiredGid) {
+    const allSheets = ss.getSheets();
+    for (let s of allSheets) {
+      if (String(s.getSheetId()) === String(desiredGid)) {
+        sheet = s;
+        break;
+      }
+    }
+  }
+
+  // 1. Try CONFIG.MAIN_SHEET_NAME if defined (fallback if GID was not specified)
+  if (!sheet && CONFIG.MAIN_SHEET_NAME) {
     sheet = ss.getSheetByName(CONFIG.MAIN_SHEET_NAME);
   }
   
@@ -927,6 +960,8 @@ function addNewMedicineOrBatch(payload) {
   }
 }
 
+
+
 /**
  * Converts any expiry value (Date object, 'YYYY-MM', 'YYYY-MM-DD', 'MMM-yy') into a JavaScript Date object.
  * By pharmaceutical convention, expiration is anchored to the last day of the given month.
@@ -1088,17 +1123,97 @@ function recordStockOut(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000); // 30-second atomic lock to prevent race conditions among mobile users
   try {
-    const { batchId, rowIndex, itemCode, qtyOut, dateOut, remarks } = payload;
+    const { batchId, rowIndex, itemCode, qtyOut, dateOut, remarks, isConsolidated, rowIndices } = payload || {};
     const deductQty = parseFloat(qtyOut);
 
     if (isNaN(deductQty) || deductQty <= 0) {
       throw new Error("Quantity out must be a positive number.");
     }
 
-    const info = getInventorySheetInfo();
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const info = getInventorySheetInfo(targetGid);
     const sheet = info.sheet;
     const values = sheet.getDataRange().getValues();
+    const ssTz = sheet.getParent().getSpreadsheetTimeZone();
+    const cleanDateOut = String(dateOut || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
 
+    // CASE 1: Consolidated Multi-Batch Stock-Out (Cascades across physical sub-batches in row order)
+    if (isConsolidated && Array.isArray(rowIndices) && rowIndices.length > 1) {
+      const subBatches = [];
+      for (let rIdx of rowIndices) {
+        if (rIdx <= values.length) {
+          const rData = values[rIdx - 1];
+          const rawQ = rData[info.colQty];
+          const q = typeof rawQ === 'number' ? rawQ : (parseFloat(String(rawQ).replace(/[^0-9.-]/g, '')) || 0);
+          const rawP = info.colPrice !== -1 ? rData[info.colPrice] : 0;
+          const p = typeof rawP === 'number' ? rawP : (parseFloat(String(rawP).replace(/[^0-9.-]/g, '')) || 0);
+
+          subBatches.push({
+            rowIndex: rIdx,
+            itemCode: String(rData[info.colCode] || '').trim(),
+            desc: String(rData[info.colDesc] || '').trim(),
+            brand: info.colBrand !== -1 ? String(rData[info.colBrand] || '').trim() : '',
+            uom: info.colUom !== -1 ? String(rData[info.colUom] || '').trim() : '',
+            expDate: normalizeExpiryString(rData[info.colExp], ssTz),
+            price: p,
+            qty: q
+          });
+        }
+      }
+
+      const totalAvail = subBatches.reduce((sum, b) => sum + b.qty, 0);
+      if (deductQty > totalAvail) {
+        throw new Error(`Cannot deduct ${deductQty.toLocaleString()} units! Consolidated total stock only has ${totalAvail.toLocaleString()} units.`);
+      }
+
+      let needed = deductQty;
+      let totalDeducted = 0;
+      for (let b of subBatches) {
+        if (needed <= 0) break;
+        if (b.qty <= 0) continue;
+
+        const deductFromBatch = Math.min(b.qty, needed);
+        const newBal = b.qty - deductFromBatch;
+
+        sheet.getRange(b.rowIndex, info.colQty + 1)
+          .setValue(newBal)
+          .setNumberFormat('#,##0')
+          .setHorizontalAlignment('right');
+
+        if (info.colDateOut !== -1) {
+          sheet.getRange(b.rowIndex, info.colDateOut + 1)
+            .setNumberFormat('@')
+            .setValue(cleanDateOut)
+            .setHorizontalAlignment('center');
+        }
+
+        logStockOutTransaction({
+          timestamp: new Date(),
+          dateOut: cleanDateOut,
+          itemCode: b.itemCode,
+          itemDesc: b.desc,
+          brandName: b.brand,
+          uom: b.uom || inferUomFromDescription(b.desc),
+          expDate: b.expDate,
+          unitPrice: b.price,
+          qtyOut: deductFromBatch,
+          previousQty: b.qty,
+          remainingBalance: newBal,
+          remarks: (remarks || 'Stock-Out Dispense') + ' [Consolidated Batch: Row ' + b.rowIndex + ']'
+        });
+
+        needed -= deductFromBatch;
+        totalDeducted += deductFromBatch;
+      }
+
+      return {
+        success: true,
+        message: `Successfully dispensed ${totalDeducted.toLocaleString()} units across ${subBatches.length} consolidated batches!`,
+        newBalance: totalAvail - totalDeducted
+      };
+    }
+
+    // CASE 2: Single Batch Stock-Out
     // AppSheet-style UID Resolution: Locate row by BATCH_ID first, preventing index shift collisions
     let targetRowIndex = -1;
 
@@ -1140,7 +1255,6 @@ function recordStockOut(payload) {
     const brandName = info.colBrand !== -1 ? String(targetRowData[info.colBrand] || '').trim() : '';
     const uom = info.colUom !== -1 ? String(targetRowData[info.colUom] || '').trim() : '';
     const rawExp = targetRowData[info.colExp];
-    const ssTz = sheet.getParent().getSpreadsheetTimeZone();
     const expDate = normalizeExpiryString(rawExp, ssTz);
     
     // Read batch unit price
@@ -1155,7 +1269,6 @@ function recordStockOut(payload) {
     }
 
     const newQty = currentQty - deductQty;
-    const cleanDateOut = String(dateOut || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
     const resolvedUom = uom || inferUomFromDescription(desc);
 
     // Update inventory sheet quantity
@@ -1208,6 +1321,8 @@ function recordStockOut(payload) {
     lock.releaseLock();
   }
 }
+
+
 
 /**
  * Updates an existing row (useful for restocking 0-qty lines with new brand, uom, expiry, price, and qty)
@@ -1307,6 +1422,8 @@ function updateMedicineBatch(payload) {
     lock.releaseLock();
   }
 }
+
+
 
 /**
  * Initializes and formats the STOCK_OUT_LOG sheet with Brand, UOM, and Date Out columns
@@ -1490,6 +1607,13 @@ function logStockOutTransaction(data) {
     logSheet.getRange(nextRow, 8).setNumberFormat('"₱"#,##0.00').setHorizontalAlignment('right');
     logSheet.getRange(nextRow, 9, 1, 3).setNumberFormat('#,##0').setHorizontalAlignment('right');
     logSheet.getRange(nextRow, 12).setHorizontalAlignment('left');
+
+    // Auto-enable Google Sheets native Filter for instant medicine filtering directly in spreadsheet
+    try {
+      if (!logSheet.getFilter() && nextRow >= 2) {
+        logSheet.getRange(1, 1, nextRow, 12).createFilter();
+      }
+    } catch (filterErr) {}
   } catch (err) {
     Logger.log("Error logging stock-out: " + err.message);
   }
@@ -1703,34 +1827,215 @@ function getRecentLogs(limit) {
       return { success: true, logs: [] };
     }
 
-    const max = limit || 50;
+    const tz = Session.getScriptTimeZone();
+    const max = limit || 500;
     const values = logSheet.getDataRange().getValues();
     const logs = [];
 
     // Read in reverse chronological order
     for (let i = values.length - 1; i >= 1 && logs.length < max; i--) {
       const r = values[i];
-      if (!r[0] && !r[1] && !r[2]) continue;
+      if (!r || (!r[0] && !r[1] && !r[2])) continue;
+
+      // Robust primitive serialization for Google RPC
+      let tsStr = '';
+      if (r[0] instanceof Date) {
+        tsStr = Utilities.formatDate(r[0], tz, 'yyyy-MM-dd HH:mm:ss');
+      } else {
+        tsStr = String(r[0] || '').trim();
+      }
+
+      let dateOutStr = '';
+      if (r[1] instanceof Date) {
+        dateOutStr = Utilities.formatDate(r[1], tz, 'yyyy-MM-dd');
+      } else {
+        dateOutStr = String(r[1] || '').trim();
+      }
+
+      const cleanExp = cleanLogExpiryValue(r[6], r[2], r[4], null);
 
       logs.push({
-        timestamp: r[0],
-        dateOut: r[1] ? (r[1] instanceof Date ? Utilities.formatDate(r[1], Session.getScriptTimeZone(), 'yyyy-MM-dd') : String(r[1])) : '',
-        itemCode: r[2],
-        itemDesc: r[3],
-        brandName: r[4] || '',
-        uom: r[5] || '',
-        expDate: cleanLogExpiryValue(r[6], r[2], r[4], null),
-        unitPrice: r[7] || 0,
-        qtyOut: r[8],
-        previousQty: r[9],
-        remainingBalance: r[10],
-        remarks: r[11] || ''
+        timestamp: tsStr,
+        dateOut: dateOutStr,
+        itemCode: String(r[2] || ''),
+        itemDesc: String(r[3] || ''),
+        brandName: String(r[4] || ''),
+        uom: String(r[5] || ''),
+        expDate: String(cleanExp || 'NO EXPIRY'),
+        unitPrice: typeof r[7] === 'number' ? r[7] : (parseFloat(String(r[7]).replace(/[^0-9.-]/g, '')) || 0),
+        qtyOut: typeof r[8] === 'number' ? r[8] : (parseFloat(String(r[8]).replace(/[^0-9.-]/g, '')) || 0),
+        previousQty: typeof r[9] === 'number' ? r[9] : (parseFloat(String(r[9]).replace(/[^0-9.-]/g, '')) || 0),
+        remainingBalance: typeof r[10] === 'number' ? r[10] : (parseFloat(String(r[10]).replace(/[^0-9.-]/g, '')) || 0),
+        remarks: String(r[11] || '')
       });
     }
 
     return { success: true, logs: logs };
   } catch (err) {
-    return { success: false, error: err.message };
+    Logger.log("getRecentLogs error: " + err.message);
+    return { success: false, error: err.message, logs: [] };
+  }
+}
+
+/**
+ * Deep Per-Medicine Audit Ledger Tracker:
+ * Aggregates all current inventory batches AND complete historical transaction log
+ * for a specific medicine (queried by Item Code, numeric ID, or Generic Description).
+ */
+function getMedicineAuditTrail(query) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const tz = Session.getScriptTimeZone();
+    const ssTz = ss.getSpreadsheetTimeZone();
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const invInfo = getInventorySheetInfo(targetGid);
+    const logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+
+    const qClean = String(query || '').trim().toUpperCase();
+    if (!qClean) {
+      return { success: false, error: 'Query parameter is required' };
+    }
+    const qNum = extractNumericPart(qClean);
+    const qNorm = cleanGenericDesc(qClean);
+
+    // 1. Gather all active batches for this medicine in current active sheet
+    const activeBatches = [];
+    let canonicalCode = qClean;
+    let canonicalDesc = '';
+    let canonicalUom = '';
+    let totalCurrentStock = 0;
+
+    if (invInfo && invInfo.values) {
+      for (let r = 1; r < invInfo.values.length; r++) {
+        const row = invInfo.values[r];
+        const code = String(row[invInfo.colCode] || '').trim().toUpperCase();
+        const desc = String(row[invInfo.colDesc] || '').trim();
+        const normDesc = cleanGenericDesc(desc);
+        const num = extractNumericPart(code);
+
+        let match = false;
+        if (code && code === qClean) match = true;
+        else if (qNum && num === qNum && (!qNorm || normDesc.includes(qNorm) || qNorm.includes(normDesc))) match = true;
+        else if (qNorm && (normDesc.includes(qNorm) || qNorm.includes(normDesc))) match = true;
+
+        if (match) {
+          if (!canonicalCode || canonicalCode.length < code.length) canonicalCode = code;
+          if (!canonicalDesc) canonicalDesc = desc;
+          const uomVal = invInfo.colUom !== -1 ? String(row[invInfo.colUom] || '').trim() : '';
+          if (!canonicalUom && uomVal) canonicalUom = uomVal;
+
+          const qty = parseFloat(String(row[invInfo.colQty] || '0').replace(/[^0-9.-]/g, '')) || 0;
+          totalCurrentStock += qty;
+          const brand = invInfo.colBrand !== -1 ? String(row[invInfo.colBrand] || '').trim() : '';
+          const exp = normalizeExpiryString(row[invInfo.colExp], ssTz);
+          const dateOut = invInfo.colDateOut !== -1 ? String(row[invInfo.colDateOut] || '').trim() : '';
+          const price = invInfo.colPrice !== -1 ? (parseFloat(String(row[invInfo.colPrice] || '0').replace(/[^0-9.-]/g, '')) || 0) : 0;
+
+          activeBatches.push({
+            rowIndex: r + 1,
+            itemCode: code,
+            brand: brand || 'Standard',
+            uom: uomVal || inferUomFromDescription(desc),
+            qty: qty,
+            expDate: exp,
+            dateOut: dateOut,
+            unitPrice: price
+          });
+        }
+      }
+    }
+
+    // 2. Fetch all matching historical transactions from STOCK_OUT_LOG
+    const logs = [];
+    let totalDispensedUnits = 0;
+    let fileInjectionsCount = 0;
+    let manualStockOutCount = 0;
+    let shortageWarningsCount = 0;
+
+    if (logSheet && logSheet.getLastRow() > 1) {
+      const logVals = logSheet.getDataRange().getValues();
+      for (let i = logVals.length - 1; i >= 1; i--) {
+        const r = logVals[i];
+        if (!r || (!r[0] && !r[1] && !r[2])) continue;
+
+        const logCode = String(r[2] || '').trim().toUpperCase();
+        const logDesc = String(r[3] || '').trim();
+        const logNorm = cleanGenericDesc(logDesc);
+        const logNum = extractNumericPart(logCode);
+
+        let match = false;
+        if (logCode && (logCode === qClean || logCode === canonicalCode)) match = true;
+        else if (qNum && logNum === qNum && (!qNorm || logNorm.includes(qNorm) || qNorm.includes(logNorm))) match = true;
+        else if (qNorm && (logNorm.includes(qNorm) || qNorm.includes(logNorm))) match = true;
+
+        if (match) {
+          if (!canonicalDesc) canonicalDesc = logDesc;
+          if (!canonicalUom && r[5]) canonicalUom = String(r[5]).trim();
+
+          const qtyOut = typeof r[8] === 'number' ? r[8] : (parseFloat(String(r[8]).replace(/[^0-9.-]/g, '')) || 0);
+          const rem = typeof r[10] === 'number' ? r[10] : (parseFloat(String(r[10]).replace(/[^0-9.-]/g, '')) || 0);
+          const prev = typeof r[9] === 'number' ? r[9] : (parseFloat(String(r[9]).replace(/[^0-9.-]/g, '')) || 0);
+          const remarks = String(r[11] || '');
+
+          totalDispensedUnits += qtyOut;
+          if (remarks.includes('File Injection')) fileInjectionsCount++;
+          else manualStockOutCount++;
+
+          if (remarks.includes('SHORTAGE') || remarks.includes('OUT OF STOCK') || qtyOut === 0) {
+            shortageWarningsCount++;
+          }
+
+          let tsStr = '';
+          if (r[0] instanceof Date) tsStr = Utilities.formatDate(r[0], tz, 'yyyy-MM-dd HH:mm:ss');
+          else tsStr = String(r[0] || '').trim();
+
+          let dateOutStr = '';
+          if (r[1] instanceof Date) dateOutStr = Utilities.formatDate(r[1], tz, 'yyyy-MM-dd');
+          else dateOutStr = String(r[1] || '').trim();
+
+          const cleanExp = cleanLogExpiryValue(r[6], r[2], r[4], null);
+
+          logs.push({
+            timestamp: tsStr,
+            dateOut: dateOutStr,
+            itemCode: logCode,
+            itemDesc: logDesc,
+            brandName: String(r[4] || ''),
+            uom: String(r[5] || canonicalUom || inferUomFromDescription(logDesc)),
+            expDate: String(cleanExp || 'NO EXPIRY'),
+            unitPrice: typeof r[7] === 'number' ? r[7] : (parseFloat(String(r[7]).replace(/[^0-9.-]/g, '')) || 0),
+            qtyOut: qtyOut,
+            previousQty: prev,
+            remainingBalance: rem,
+            remarks: remarks
+          });
+        }
+      }
+    }
+
+    if (!canonicalUom && canonicalDesc) {
+      canonicalUom = inferUomFromDescription(canonicalDesc);
+    }
+
+    return {
+      success: true,
+      itemCode: canonicalCode || qClean,
+      itemDesc: canonicalDesc || qClean,
+      uom: canonicalUom || 'Unit',
+      currentTotalStock: totalCurrentStock,
+      activeBatches: activeBatches,
+      logs: logs,
+      metrics: {
+        totalDispensedUnits: totalDispensedUnits,
+        transactionsCount: logs.length,
+        fileInjectionsCount: fileInjectionsCount,
+        manualStockOutCount: manualStockOutCount,
+        shortageWarningsCount: shortageWarningsCount
+      }
+    };
+  } catch (err) {
+    Logger.log("getMedicineAuditTrail error: " + err.message);
+    return { success: false, error: err.message, activeBatches: [], logs: [] };
   }
 }
 
@@ -1914,6 +2219,126 @@ function cleanAndConsolidateSheet() {
     };
   } catch (err) {
     if (ui) ui.alert('Error', 'Failed to consolidate sheet: ' + err.message, ui.ButtonSet.OK);
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+
+/**
+ * One-Click Utility: Physically merges and consolidates identical batch rows in the active Google Sheet
+ * Combines rows that share the exact same Item Code, Normalized Generic Description, Brand, and Expiry Date.
+ * Sums their quantities into the earliest row, and removes redundant duplicate rows.
+ */
+function consolidateIdenticalSheetRows() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  let ui = null;
+  try { ui = SpreadsheetApp.getUi(); } catch (e) {}
+
+  try {
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const info = getInventorySheetInfo(targetGid);
+    const sheet = info.sheet;
+    const values = sheet.getDataRange().getValues();
+    const ssTz = sheet.getParent().getSpreadsheetTimeZone();
+
+    if (values.length <= 2) {
+      if (ui) ui.alert('Consolidation', 'No rows available to consolidate.', ui.ButtonSet.OK);
+      return { success: true, count: 0, message: 'No rows available.' };
+    }
+
+    // Group rows by unique key: Code + cleanDesc + Brand + Expiry
+    const groups = new Map();
+    for (let r = 1; r < values.length; r++) {
+      const row = values[r];
+      const code = String(row[info.colCode] || '').trim().toUpperCase();
+      if (!code) continue;
+
+      const desc = String(row[info.colDesc] || '').trim();
+      const normDesc = cleanGenericDesc(desc);
+      const brand = info.colBrand !== -1 ? String(row[info.colBrand] || '').trim().toUpperCase() : '';
+      const exp = normalizeExpiryString(row[info.colExp], ssTz).toUpperCase();
+
+      const key = `${code}|${normDesc}|${brand}|${exp}`;
+
+      const rawQ = row[info.colQty];
+      const qty = typeof rawQ === 'number' ? rawQ : (parseFloat(String(rawQ).replace(/[^0-9.-]/g, '')) || 0);
+      const rawDateOut = info.colDateOut !== -1 ? String(row[info.colDateOut] || '').trim() : '';
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          key: key,
+          primaryRowIndex: r + 1, // 1-based index in sheet
+          itemCode: code,
+          desc: desc,
+          brand: brand,
+          expDate: exp,
+          totalQty: qty,
+          latestDateOut: rawDateOut,
+          duplicateRowIndices: []
+        });
+      } else {
+        const grp = groups.get(key);
+        grp.totalQty += qty;
+        if (rawDateOut && (!grp.latestDateOut || rawDateOut > grp.latestDateOut)) {
+          grp.latestDateOut = rawDateOut;
+        }
+        grp.duplicateRowIndices.push(r + 1);
+      }
+    }
+
+    // Identify duplicate rows to remove and primary rows to update
+    let mergedGroupsCount = 0;
+    let totalRowsEliminated = 0;
+    const rowsToDelete = [];
+
+    groups.forEach(grp => {
+      if (grp.duplicateRowIndices.length > 0) {
+        mergedGroupsCount++;
+        totalRowsEliminated += grp.duplicateRowIndices.length;
+
+        // Update primary row with combined quantity & latest date out
+        sheet.getRange(grp.primaryRowIndex, info.colQty + 1)
+          .setValue(grp.totalQty)
+          .setNumberFormat('#,##0')
+          .setHorizontalAlignment('right');
+
+        if (info.colDateOut !== -1 && grp.latestDateOut) {
+          sheet.getRange(grp.primaryRowIndex, info.colDateOut + 1)
+            .setNumberFormat('@')
+            .setValue(grp.latestDateOut)
+            .setHorizontalAlignment('center');
+        }
+
+        // Add duplicate row indices to deletion list
+        grp.duplicateRowIndices.forEach(idx => rowsToDelete.push(idx));
+      }
+    });
+
+    if (totalRowsEliminated === 0) {
+      const msg = 'Sheet is already 100% consolidated! No duplicate identical batches were found.';
+      if (ui) ui.alert('Batch Consolidation', msg, ui.ButtonSet.OK);
+      return { success: true, count: 0, message: msg };
+    }
+
+    // Delete duplicate rows from bottom to top so row indices don't shift
+    rowsToDelete.sort((a, b) => b - a);
+    for (let rIdx of rowsToDelete) {
+      sheet.deleteRow(rIdx);
+    }
+
+    const resultMsg = `Consolidation Complete!\n\n` +
+      `• Successfully merged ${mergedGroupsCount} identical medicine group(s).\n` +
+      `• Combined and removed ${totalRowsEliminated} redundant duplicate row(s).\n` +
+      `• Active Sheet tab [${sheet.getName()}] is now cleanly organized!`;
+
+    if (ui) ui.alert('Batch Consolidation Complete', resultMsg, ui.ButtonSet.OK);
+    return { success: true, mergedGroupsCount: mergedGroupsCount, rowsEliminated: totalRowsEliminated, message: resultMsg };
+  } catch (err) {
+    if (ui) ui.alert('Error', 'Failed to consolidate sheet rows: ' + err.message, ui.ButtonSet.OK);
     return { success: false, error: err.message };
   } finally {
     lock.releaseLock();
@@ -2368,6 +2793,8 @@ function processDciDailySync(payload) {
   }
 }
 
+
+
 /**
  * Converts a provisional 'PENDING COUNT' row into one or more verified physical batches with real expiry dates
  */
@@ -2470,6 +2897,8 @@ function verifyAndSplitBatch(payload) {
   }
 }
 
+
+
 /**
  * Menu Dialog: Shows Daily DCI Sync Dialog
  */
@@ -2500,4 +2929,284 @@ function openDciSnapshotSheet() {
     return;
   }
   ss.setActiveSheet(sheet);
+}
+
+
+/**
+ * ============================================================================
+ * DAILY FILE INJECTION & AUTOMATED CASCADING FEFO DEDUCTION ENGINE
+ * ============================================================================
+ * Ingests cleaned daily HIS files (CONSUMPTION_COMBINED_CLEANED,
+ * ISSUANCE_STORAGE_CLEANED, or ISSUANCE_DISPENSING_CLEANED) and automatically
+ * executes cascading FEFO deductions against active batches in the 'Stocks' sheet.
+ */
+function executeFileInjectionDeduction(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(45000); // 45-second atomic lock to guarantee concurrency safety
+  try {
+    const { sourceFileName, fileType, transactionDate, records } = payload || {};
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      throw new Error("No deduction records provided in file injection payload.");
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssTz = ss.getSpreadsheetTimeZone();
+    const cleanDate = String(transactionDate || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
+    const cleanSource = String(sourceFileName || 'Cleaned HIS File').trim();
+
+    // 1. Fetch active inventory from sheet
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const info = getInventorySheetInfo(targetGid);
+    const sheet = info.sheet;
+    const values = sheet.getDataRange().getValues();
+
+    // Map active batches in sheet
+    const batchList = [];
+    for (let r = 1; r < values.length; r++) {
+      const row = values[r];
+      const code = String(row[info.colCode] || '').trim().toUpperCase();
+      if (!code) continue;
+
+      const rawQty = row[info.colQty];
+      const cleanQty = typeof rawQty === 'number' ? rawQty : (parseFloat(String(rawQty).replace(/[^0-9.-]/g, '')) || 0);
+      const rawPrice = info.colPrice !== -1 ? row[info.colPrice] : 0;
+      const cleanPrice = typeof rawPrice === 'number' ? rawPrice : (parseFloat(String(rawPrice).replace(/[^0-9.-]/g, '')) || 0);
+      const expVal = row[info.colExp];
+      const sortScore = getExpiryComparableScore(expVal, ssTz);
+
+      batchList.push({
+        rowIndex: r + 1,
+        batchId: info.colBatchId !== -1 ? String(row[info.colBatchId] || '').trim() : '',
+        itemCode: code,
+        desc: String(row[info.colDesc] || '').trim(),
+        cleanDesc: cleanGenericDesc(row[info.colDesc]),
+        numericCode: extractNumericPart(code),
+        brand: info.colBrand !== -1 ? String(row[info.colBrand] || '').trim() : '',
+        uom: info.colUom !== -1 ? String(row[info.colUom] || '').trim() : '',
+        qty: cleanQty,
+        rawExp: expVal,
+        price: cleanPrice,
+        sortScore: sortScore
+      });
+    }
+
+    let totalDeductedUnits = 0;
+    let executedBatchesCount = 0;
+    let matchedMedicinesCount = 0;
+    const unmatchedMedicines = [];
+    const shortageWarnings = [];
+
+    // 2. Process each injected record
+    for (let i = 0; i < records.length; i++) {
+      const rec = records[i];
+      const rawCode = String(rec.itemCode || '').trim().toUpperCase();
+      const rawDesc = String(rec.medicine || rec.desc || '').trim();
+      const normDesc = cleanGenericDesc(rawDesc);
+      const numCode = extractNumericPart(rawCode);
+      const toDeduct = parseFloat(rec.quantityToDeduct || rec.delta || rec.qty) || 0;
+
+      if (toDeduct <= 0) continue; // Only process positive deductions
+
+      // 3-tier matching:
+      // Tier 1: exact code match
+      // Tier 2: numeric code part (e.g. 001032)
+      // Tier 3: clean generic description match
+      let matchingBatches = batchList.filter(b => b.itemCode === rawCode);
+      if (matchingBatches.length === 0 && numCode) {
+        matchingBatches = batchList.filter(b => {
+          if (b.numericCode !== numCode) return false;
+          // Guard against numeric collision across distinct medicines (e.g. Tamoxifen 000010 vs D5NSS 000010)
+          if (!normDesc || !b.cleanDesc) return true;
+          return b.cleanDesc === normDesc || b.cleanDesc.includes(normDesc) || normDesc.includes(b.cleanDesc);
+        });
+      }
+      if (matchingBatches.length === 0 && normDesc) {
+        matchingBatches = batchList.filter(b => b.cleanDesc === normDesc || b.cleanDesc.includes(normDesc) || normDesc.includes(b.cleanDesc));
+      }
+
+      if (matchingBatches.length === 0) {
+        unmatchedMedicines.push({
+          itemCode: rawCode,
+          medicine: rawDesc,
+          quantityToDeduct: toDeduct,
+          reason: "Not found in active inventory sheet"
+        });
+
+        // CRITICAL AUDIT: Log unmatched item into STOCK_OUT_LOG so auditors have a complete trail
+        let sourceDetail = (rec.fileType || fileType || 'HIS Cleaned');
+        if (rec.consumptionQty || rec.storageQty || rec.dispensingQty) {
+          const breakdown = [];
+          if (rec.consumptionQty) breakdown.push('Cons: ' + rec.consumptionQty);
+          if (rec.storageQty) breakdown.push('Storage: ' + rec.storageQty);
+          if (rec.dispensingQty) breakdown.push('Disp: ' + rec.dispensingQty);
+          sourceDetail += ' [' + breakdown.join(', ') + ']';
+        }
+
+        logStockOutTransaction({
+          timestamp: new Date(),
+          dateOut: cleanDate,
+          itemCode: rawCode,
+          itemDesc: rawDesc,
+          brandName: '--',
+          uom: inferUomFromDescription(rawDesc),
+          expDate: 'UNMATCHED',
+          unitPrice: 0,
+          qtyOut: 0,
+          previousQty: 0,
+          remainingBalance: 0,
+          remarks: 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') ⚠️ UNMATCHED: Demanded ' + toDeduct.toLocaleString() + ' units - not found in sheet'
+        });
+        continue;
+      }
+
+      matchedMedicinesCount++;
+
+      // Sort matching batches in ascending FEFO order (earliest expiry first), with row index as FIFO tie-breaker
+      matchingBatches.sort((a, b) => (a.sortScore - b.sortScore) || (a.rowIndex - b.rowIndex));
+
+      let needed = toDeduct;
+      for (let b of matchingBatches) {
+        if (needed <= 0) break;
+        if (b.qty <= 0) continue; // Batch already exhausted
+
+        const deductFromBatch = Math.min(b.qty, needed);
+        const newBal = b.qty - deductFromBatch;
+
+        // Apply update to sheet cell
+        sheet.getRange(b.rowIndex, info.colQty + 1)
+          .setValue(newBal)
+          .setNumberFormat('#,##0')
+          .setHorizontalAlignment('right');
+
+        if (info.colDateOut !== -1) {
+          sheet.getRange(b.rowIndex, info.colDateOut + 1)
+            .setNumberFormat('@')
+            .setValue(cleanDate)
+            .setHorizontalAlignment('center');
+        }
+
+        // Log transaction in STOCK_OUT_LOG
+        const resolvedExp = normalizeExpiryString(b.rawExp, ssTz);
+        const resolvedUom = b.uom || inferUomFromDescription(b.desc);
+
+        let sourceDetail = (rec.fileType || fileType || 'HIS Cleaned');
+        if (rec.consumptionQty || rec.storageQty || rec.dispensingQty) {
+          const breakdown = [];
+          if (rec.consumptionQty) breakdown.push('Cons: ' + rec.consumptionQty);
+          if (rec.storageQty) breakdown.push('Storage: ' + rec.storageQty);
+          if (rec.dispensingQty) breakdown.push('Disp: ' + rec.dispensingQty);
+          sourceDetail += ' [' + breakdown.join(', ') + ']';
+        }
+
+        logStockOutTransaction({
+          timestamp: new Date(),
+          dateOut: cleanDate,
+          itemCode: b.itemCode,
+          itemDesc: b.desc,
+          brandName: b.brand || 'Standard',
+          uom: resolvedUom,
+          expDate: resolvedExp,
+          unitPrice: b.price,
+          qtyOut: deductFromBatch,
+          previousQty: b.qty,
+          remainingBalance: newBal,
+          remarks: 'File Injection: ' + cleanSource + ' (' + sourceDetail + ')'
+        });
+
+        // Update in-memory batch qty for any subsequent items in file
+        b.qty = newBal;
+        needed -= deductFromBatch;
+        totalDeductedUnits += deductFromBatch;
+        executedBatchesCount++;
+      }
+
+      if (needed > 0) {
+        shortageWarnings.push({
+          itemCode: rawCode,
+          medicine: rawDesc,
+          requested: toDeduct,
+          unfulfilledShortage: needed
+        });
+
+        // CRITICAL AUDIT: Log shortage into STOCK_OUT_LOG so auditors and pharmacists see why stock is 0 or short
+        const repBatch = matchingBatches.find(b => b) || null;
+        const resolvedExp = repBatch ? normalizeExpiryString(repBatch.rawExp, ssTz) : 'OUT OF STOCK';
+        const resolvedUom = repBatch ? (repBatch.uom || inferUomFromDescription(repBatch.desc)) : inferUomFromDescription(rawDesc);
+        const resolvedBrand = repBatch ? (repBatch.brand || 'Standard') : '--';
+        const resolvedPrice = repBatch ? repBatch.price : 0;
+
+        let sourceDetail = (rec.fileType || fileType || 'HIS Cleaned');
+        if (rec.consumptionQty || rec.storageQty || rec.dispensingQty) {
+          const breakdown = [];
+          if (rec.consumptionQty) breakdown.push('Cons: ' + rec.consumptionQty);
+          if (rec.storageQty) breakdown.push('Storage: ' + rec.storageQty);
+          if (rec.dispensingQty) breakdown.push('Disp: ' + rec.dispensingQty);
+          sourceDetail += ' [' + breakdown.join(', ') + ']';
+        }
+
+        const fulfilled = toDeduct - needed;
+        const shortageRemark = (fulfilled > 0)
+          ? 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') ⚠️ PARTIAL SHORTAGE (Deducted ' + fulfilled.toLocaleString() + ', Unfulfilled: ' + needed.toLocaleString() + ' units - stock exhausted)'
+          : 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') ⚠️ OUT OF STOCK / SHORTAGE (Demanded ' + toDeduct.toLocaleString() + ' units, 0 available in sheet)';
+
+        logStockOutTransaction({
+          timestamp: new Date(),
+          dateOut: cleanDate,
+          itemCode: repBatch ? repBatch.itemCode : rawCode,
+          itemDesc: repBatch ? repBatch.desc : rawDesc,
+          brandName: resolvedBrand,
+          uom: resolvedUom,
+          expDate: resolvedExp,
+          unitPrice: resolvedPrice,
+          qtyOut: 0,
+          previousQty: 0,
+          remainingBalance: 0,
+          remarks: shortageRemark
+        });
+      }
+    }
+
+    return {
+      success: true,
+      totalDeductedUnits: totalDeductedUnits,
+      executedBatchesCount: executedBatchesCount,
+      matchedMedicinesCount: matchedMedicinesCount,
+      unmatchedMedicinesCount: unmatchedMedicines.length,
+      unmatchedMedicines: unmatchedMedicines,
+      shortageWarnings: shortageWarnings,
+      sheetName: sheet.getName(),
+      sheetGid: sheet.getSheetId(),
+      message: 'File Injection Successful on tab [' + sheet.getName() + '] (gid: ' + sheet.getSheetId() + ')! Deducted ' + totalDeductedUnits.toLocaleString() + ' unit(s) across ' + executedBatchesCount + ' batch(es) via FEFO.'
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+
+/**
+ * Menu Dialog: Shows File Injection Dialog
+ */
+function showFileInjectionDialog() {
+  const html = HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setWidth(1000)
+    .setHeight(700)
+    .setTitle('⚡ File Injection & Cascading FEFO Deduction - ARMMC');
+  SpreadsheetApp.getUi().showModalDialog(html, 'File Injection & FEFO Deduction');
+}
+
+/**
+ * Menu Dialog: Shows Medicine Audit Trail & Ledger Dialog
+ */
+function showMedicineAuditTrailDialog() {
+  const html = HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setWidth(1050)
+    .setHeight(720)
+    .setTitle('📜 Medicine Audit Ledger & Transaction Tracker - ARMMC');
+  SpreadsheetApp.getUi().showModalDialog(html, '📜 Medicine Audit Ledger - ARMMC');
 }

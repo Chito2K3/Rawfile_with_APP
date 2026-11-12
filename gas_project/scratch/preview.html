@@ -4,6 +4,7 @@
   <base target="_top">
   <meta charset="UTF-8">
   <title>Pharmacy Expiry Monitoring - Amang Rodriguez Memorial Medical Center</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
   :root {
     /* Minimalist Monochrome Clinical Theme Palette */
@@ -530,6 +531,12 @@
 
   .exp-preview-near {
     background: #fffbeb;
+    color: #b45309;
+    border: 1px solid #fde68a;
+  }
+
+  .exp-preview-pending {
+    background: #fef3c7;
     color: #b45309;
     border: 1px solid #fde68a;
   }
@@ -1725,6 +1732,132 @@
       grid-template-columns: 1fr 1fr;
     }
   }
+
+  /* File Injection & Cascading FEFO Styles */
+  .injection-dropzone {
+    border: 2px dashed #93c5fd;
+    background: #f0f7ff;
+    border-radius: 10px;
+    padding: 30px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .injection-dropzone:hover, .injection-dropzone.dragover {
+    border-color: #2563eb;
+    background: #e0f2fe;
+    transform: translateY(-1px);
+  }
+  .fefo-plan-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    margin: 2px 4px 2px 0;
+    line-height: 1.3;
+    font-weight: 500;
+  }
+  .fefo-plan-chip.zeroed {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #b91c1c;
+    font-weight: 600;
+  }
+  .fefo-plan-chip.partial {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #b45309;
+    font-weight: 600;
+  }
+  .fefo-plan-chip.untouched {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #64748b;
+  }
+  .source-breakdown-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    line-height: 1.2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .source-badge-cons {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+  }
+  .source-badge-storage {
+    background: #fdf4ff;
+    color: #86198f;
+    border: 1px solid #f5d0fe;
+  }
+  .source-badge-disp {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+  }
+
+  /* Consolidated Batch Accordion Styles */
+  .sub-batches-accordion-row {
+    background: #f8fafc !important;
+    transition: all 0.2s ease;
+  }
+  .sub-batch-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .sub-batch-table th {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 7px 10px;
+    border-bottom: 1px solid #cbd5e1;
+  }
+  .sub-batch-table td {
+    padding: 7px 10px;
+    font-size: 11.5px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+  }
+  .sub-batch-table tr:last-child td {
+    border-bottom: none;
+  }
+  .badge-consolidated {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    font-weight: 600;
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .badge-consolidated:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+  }
 </style>
 </head>
 <body>
@@ -1816,12 +1949,13 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-7m7 5h-7m7 5h-7M4 7h.01M4 12h.01M4 17h.01"/></svg>
         Inventory & Stock-Out
       </button>
+      <button class="tab-btn" data-tab="tab-file-injection">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        File Injection (FEFO)
+      </button>
       <button class="tab-btn" data-tab="tab-dci-sync">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
         Daily DCI Sync
-      </button>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-7m7 5h-7m7 5h-7M4 7h.01M4 12h.01M4 17h.01"/></svg>
-        Inventory & Stock-Out
       </button>
       <button class="tab-btn" data-tab="tab-add">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m-7-7h14"/></svg>
@@ -1861,6 +1995,20 @@
             <option value="ZERO">Out of Stock (0 Qty)</option>
             <option value="DONATION">Donated Program Items</option>
           </select>
+
+          <!-- View Mode Toggle: Consolidated vs Detailed Batches -->
+          <div class="view-mode-toggle" style="display:inline-flex; border:1px solid #cbd5e1; border-radius:6px; overflow:hidden; background:#f1f5f9; padding:2px;">
+            <button type="button" id="btn-view-consolidated" class="btn btn-sm" style="font-size:11.5px; padding:4px 9px; border-radius:4px; font-weight:600; background:#2563eb; color:#ffffff; border:none;" onclick="setViewMode('CONSOLIDATED')" title="Consolidate duplicate batches with same code, brand, and expiry into 1 unified total">
+              📦 Consolidated
+            </button>
+            <button type="button" id="btn-view-detailed" class="btn btn-sm" style="font-size:11.5px; padding:4px 9px; border-radius:4px; font-weight:600; background:transparent; color:#64748b; border:none;" onclick="setViewMode('DETAILED')" title="Show every individual physical delivery batch row">
+              📋 Detailed
+            </button>
+          </div>
+
+          <button type="button" class="btn btn-outline btn-sm" onclick="triggerSheetConsolidation()" title="Permanently merge and consolidate identical batch rows in the active Google Sheet">
+            🧹 Merge Sheet
+          </button>
 
           <button class="btn btn-outline btn-sm" onclick="switchTab('tab-dci-sync')" title="Upload Daily DCI CSV to sync consumption">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
@@ -1904,6 +2052,111 @@
         <!-- Mobile Touch Batch Cards (Screens <= 768px) -->
         <div id="inventory-cards-container" class="mobile-cards-view">
           <!-- Dynamically populated for mobile phones -->
+        </div>
+      </section>
+
+      <!-- TAB: FILE INJECTION & CASCADING FEFO DEDUCTIONS -->
+      <section id="tab-file-injection" class="tab-pane">
+        <div class="card" style="margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <div>
+              <h2 style="font-size:16px; font-weight:700; color:#0f172a; margin:0; display:flex; align-items:center; gap:8px;">
+                <span>⚡ Daily File Injection & Cascading FEFO Deductions</span>
+              </h2>
+              <p style="font-size:12px; color:#64748b; margin:4px 0 0 0;">
+                Inject cleaned daily HIS files (<code style="background:#f1f5f9; padding:2px 4px; border-radius:4px; font-weight:600;">CONSUMPTION_COMBINED_CLEANED</code> or <code style="background:#f1f5f9; padding:2px 4px; border-radius:4px; font-weight:600;">ISSUANCE_STORAGE_CLEANED</code>) to automatically calculate and deduct stock from earliest-expiring batches.
+              </p>
+            </div>
+            <div style="font-size:12px; color:#475569; font-weight:600;">
+              Source Folder: <span style="font-family:monospace; color:#2563eb; background:#eff6ff; padding:2px 6px; border-radius:4px;">DAILY_FINAL_RESULTS</span>
+            </div>
+          </div>
+
+          <!-- Drag and Drop Zone -->
+          <div id="injection-dropzone" class="injection-dropzone" onclick="document.getElementById('injection-file-input').click()">
+            <input type="file" id="injection-file-input" accept=".csv, .xlsx, .xls" multiple style="display:none;" onchange="handleInjectionFileSelected(event)">
+            <div style="font-size:32px; margin-bottom:8px;">📁</div>
+            <div style="font-weight:700; color:#1e293b; font-size:14px;" id="injection-dropzone-label">
+              Drag & drop your 3 cleaned HIS files here, or click to browse (Multi-select enabled)
+            </div>
+            <div style="font-size:12px; color:#64748b; margin-top:4px;">
+              Select all 3 files (Consumption, Storage Issuance, Dispensing Issuance) • Supports <strong>.csv</strong> & <strong>.xlsx</strong>
+            </div>
+          </div>
+
+          <!-- Configuration & File Status Bar (Shown after file loaded) -->
+          <div id="injection-config-bar" style="display:none; margin-top:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; display:block;">Loaded Files & Mode</span>
+                <span id="injection-file-summary" style="font-weight:700; color:#0f172a; font-size:13px;">--</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label for="injection-tx-date" style="font-size:12px; font-weight:600; color:#475569;">Transaction Date:</label>
+                <input type="date" id="injection-tx-date" class="form-input" style="width:140px; padding:4px 8px; font-size:12px;">
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <button type="button" class="btn btn-outline btn-sm" onclick="clearInjectionFile()">✕ Clear</button>
+                <button type="button" id="btn-execute-injection" class="btn btn-primary" onclick="executeInjectionFefoSync()">
+                  ⚡ Confirm & Apply FEFO Deductions
+                </button>
+              </div>
+            </div>
+
+            <!-- Stats Ribbon -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
+              <div>
+                <span style="font-size:11px; color:#64748b;">Total Unique Items</span>
+                <div id="stat-inj-total-items" style="font-size:16px; font-weight:700; color:#1e293b;">0</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#64748b;">Matched in Sheet</span>
+                <div id="stat-inj-matched" style="font-size:16px; font-weight:700; color:#15803d;">0</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#64748b;">Total Units to Deduct</span>
+                <div id="stat-inj-deduct-units" style="font-size:16px; font-weight:700; color:#dc2626;">0</div>
+              </div>
+              <div>
+                <span style="font-size:11px; color:#64748b;">Batches Impacted</span>
+                <div id="stat-inj-batches-impacted" style="font-size:16px; font-weight:700; color:#2563eb;">0</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Impact Preview Table -->
+        <div id="injection-preview-card" class="card" style="display:none; padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; gap:10px; flex-wrap:wrap;">
+            <div class="search-box" style="flex:1; min-width:240px; margin:0;">
+              <span class="search-icon-inside">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input type="text" id="injection-preview-search" class="search-input" placeholder="Search preview items by code or description..." oninput="filterInjectionPreviewTable()">
+            </div>
+            <div style="font-size:12px; color:#64748b; font-weight:600;" id="injection-preview-counter">
+              Showing 0 items
+            </div>
+          </div>
+
+          <div class="table-container" style="max-height:480px; overflow-y:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:110px;">Item Code</th>
+                  <th>Medicine Description</th>
+                  <th style="width:180px;">Source Breakdown</th>
+                  <th style="width:110px; text-align:right;">Total Injected</th>
+                  <th style="width:100px; text-align:right;">Current Stock</th>
+                  <th>Cascading FEFO Deduction Plan (Per Batch)</th>
+                  <th style="width:110px; text-align:center;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="injection-preview-tbody">
+                <!-- Dynamically rendered -->
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -2227,15 +2480,77 @@
 
       <!-- TAB 4: AUDIT LOG -->
       <section id="tab-logs" class="tab-pane">
-        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
           <div>
-            <h2 style="font-size:16px; font-weight:700; color:var(--slate-900);">Stock-Out Dispensing Log</h2>
-            <p style="font-size:12px; color:var(--slate-500);">Real-time financial and batch audit record of all dispensed medicines.</p>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <h2 style="font-size:16px; font-weight:700; color:var(--slate-900); margin:0;">Stock-Out & File Injection Audit Trail</h2>
+              <span id="logs-count-badge" class="badge badge-neutral" style="font-size:11px;">Showing 0 records</span>
+            </div>
+            <p style="font-size:12px; color:var(--slate-500); margin:2px 0 0 0;">Complete chronological transaction ledger of daily file injections, FEFO deductions, and stock-outs.</p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="loadLogs()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
-            Refresh Log
-          </button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-outline btn-sm" onclick="promptTrackMedicineAudit()" title="Search medicine ledger">
+              🔍 Track Medicine
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="loadLogs()" title="Reload latest logs from sheet">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+              Refresh Log
+            </button>
+          </div>
+        </div>
+
+        <!-- Audit Metrics Strip -->
+        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom:16px;">
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">Total Transactions</div>
+            <div id="stat-log-total" class="stat-value" style="font-size:20px; color:#1e293b;">0</div>
+            <div class="stat-sub">Lifetime audit entries</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">Total Units Deducted</div>
+            <div id="stat-log-units" class="stat-value" style="font-size:20px; color:#dc2626;">0</div>
+            <div class="stat-sub">Across all batches</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">File Injections</div>
+            <div id="stat-log-injections" class="stat-value" style="font-size:20px; color:#2563eb;">0</div>
+            <div class="stat-sub">Cleaned daily records</div>
+          </div>
+          <div class="stat-card" style="padding:12px 14px;">
+            <div class="stat-label">Shortages / Exhausted</div>
+            <div id="stat-log-shortages" class="stat-value" style="font-size:20px; color:#d97706;">0</div>
+            <div class="stat-sub">Unfulfilled warnings</div>
+          </div>
+        </div>
+
+        <!-- Live Search & Filtering Toolbar -->
+        <div style="background:#ffffff; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:16px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <div style="flex:1; min-width:240px; position:relative;">
+              <input type="text" id="logs-search-input" class="form-control" placeholder="🔍 Search audit logs by Item Code, Medicine Name, Brand, Remarks, or Date..." oninput="filterLogsTable()" style="padding-left:12px;">
+            </div>
+            <div style="width:200px;">
+              <select id="logs-filter-action" class="form-control" onchange="filterLogsTable()">
+                <option value="ALL">All Transactions</option>
+                <option value="INJECTION">⚡ File Injections Only</option>
+                <option value="MANUAL">📤 Manual Stock-Outs Only</option>
+                <option value="SHORTAGE">⚠️ Shortages & Out-of-Stock</option>
+              </select>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="clearLogsFilter()" style="padding:7px 12px;">
+              ✕ Clear Filter
+            </button>
+          </div>
+
+          <!-- Quick Filter Chips -->
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+            <span style="font-size:11px; color:#64748b; font-weight:600; margin-right:4px;">Quick Filters:</span>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px;" onclick="quickFilterLogs('')">All</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#93c5fd; color:#1d4ed8; background:#eff6ff;" onclick="quickFilterLogs('TELMISARTAN')">💊 Telmisartan 40mg</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#cbd5e1;" onclick="quickFilterLogs('SODIUM BICARBONATE')">🧪 Sodium Bicarb</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#cbd5e1;" onclick="setLogsActionFilter('INJECTION')">⚡ File Injections</button>
+            <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:2px 8px; border-color:#fecdd3; color:#be123c; background:#fff1f2;" onclick="setLogsActionFilter('SHORTAGE')">⚠️ Shortages</button>
+          </div>
         </div>
 
         <div class="table-container">
@@ -2246,13 +2561,14 @@
                 <th style="width:100px; text-align:center;">Date Out</th>
                 <th style="width:110px;">Item Code</th>
                 <th>Generic Name</th>
-                <th style="width:120px;">Brand Name</th>
-                <th style="width:85px; text-align:center;">UOM</th>
+                <th style="width:110px;">Brand Name</th>
+                <th style="width:80px; text-align:center;">UOM</th>
                 <th style="width:95px;">Batch Expiry</th>
-                <th style="width:105px; text-align:right;">Unit Price</th>
-                <th style="width:85px; text-align:right;">Qty Out</th>
+                <th style="width:95px; text-align:right;">Unit Price</th>
+                <th style="width:95px; text-align:right;">Qty Out</th>
                 <th style="width:95px; text-align:right;">Remaining</th>
                 <th>Remarks</th>
+                <th style="width:80px; text-align:center;">Ledger</th>
               </tr>
             </thead>
             <tbody id="logs-table-body">
@@ -2505,6 +2821,113 @@
     </div>
   </div>
 
+
+  <!-- MODAL: PER-MEDICINE AUDIT LEDGER & LIFETIME MOVEMENT -->
+  <div id="modal-medicine-audit" class="modal-backdrop" style="display:none;">
+    <div class="modal-card" style="max-width:820px; max-height:90vh; display:flex; flex-direction:column;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">📜</span>
+          <div class="modal-title" style="margin:0;">Medicine Audit Ledger</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-medicine-audit')">✕</button>
+      </div>
+
+      <div class="modal-body" style="overflow-y:auto; flex:1; padding:16px;">
+        <!-- Drug Header & Active Stock Card -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span id="med-audit-code" style="font-family:monospace; font-weight:700; font-size:15px; color:#1e293b; background:#e2e8f0; padding:2px 8px; border-radius:4px;">DMC001032</span>
+                <span id="med-audit-uom" class="badge badge-uom">Tablet</span>
+              </div>
+              <div id="med-audit-desc" style="font-size:14px; font-weight:700; color:#0f172a; margin-top:4px;">(C) TELMISARTAN 40MG TABLET</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:11px; color:#64748b; font-weight:600; text-transform:uppercase;">Current Storage Stock</div>
+              <div id="med-audit-stock" style="font-size:18px; font-weight:800; color:#2563eb;">0 units</div>
+            </div>
+          </div>
+
+          <!-- Mini KPI row -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-top:12px; border-top:1px dashed #cbd5e1; padding-top:10px;">
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">Total Dispensed</div>
+              <div id="med-audit-total-disp" style="font-size:14px; font-weight:700; color:#dc2626;">0 units</div>
+            </div>
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">File Injections</div>
+              <div id="med-audit-injections" style="font-size:14px; font-weight:700; color:#2563eb;">0</div>
+            </div>
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">Total Transactions</div>
+              <div id="med-audit-tx-count" style="font-size:14px; font-weight:700; color:#1e293b;">0</div>
+            </div>
+            <div>
+              <div style="font-size:10px; color:#64748b; text-transform:uppercase; font-weight:600;">Shortages Flagged</div>
+              <div id="med-audit-shortages" style="font-size:14px; font-weight:700; color:#d97706;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: Active Sheet Batches -->
+        <div style="margin-bottom:16px;">
+          <h4 style="font-size:12px; font-weight:700; text-transform:uppercase; color:#475569; margin:0 0 8px 0; letter-spacing:0.5px;">Active Batches in Inventory Sheet</h4>
+          <div class="table-container" style="max-height:160px; overflow-y:auto;">
+            <table style="font-size:12px;">
+              <thead>
+                <tr>
+                  <th style="width:70px; text-align:center;">Row</th>
+                  <th>Brand Name</th>
+                  <th style="width:70px; text-align:center;">UOM</th>
+                  <th style="width:90px; text-align:right;">Current Qty</th>
+                  <th style="width:90px; text-align:center;">Expiry Date</th>
+                  <th style="width:90px; text-align:center;">Date Out</th>
+                </tr>
+              </thead>
+              <tbody id="med-audit-batches-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Section 2: Complete Movement & Audit Log -->
+        <div>
+          <h4 style="font-size:12px; font-weight:700; text-transform:uppercase; color:#475569; margin:0 0 8px 0; letter-spacing:0.5px;">Chronological Movement & Stock-Out Ledger</h4>
+          <div class="table-container" style="max-height:260px; overflow-y:auto;">
+            <table style="font-size:11.5px;">
+              <thead>
+                <tr>
+                  <th style="width:130px;">Timestamp</th>
+                  <th style="width:85px; text-align:center;">Date Out</th>
+                  <th style="width:90px;">Brand</th>
+                  <th style="width:85px; text-align:center;">Expiry</th>
+                  <th style="width:80px; text-align:right;">Qty Out</th>
+                  <th style="width:80px; text-align:right;">Remaining</th>
+                  <th>Remarks / File Source</th>
+                </tr>
+              </thead>
+              <tbody id="med-audit-ledger-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline btn-sm" id="btn-med-audit-filter-main" onclick="filterMainFromModal()">
+          🔍 Open in Main Audit Log
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="closeModal('modal-medicine-audit')">
+          Close Ledger
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
@@ -2513,6 +2936,10 @@
   const state = {
     items: [],
     filteredItems: [],
+    rawItems: [],
+    consolidatedItems: [],
+    viewMode: 'CONSOLIDATED',
+    expandedGroups: new Set(),
     masterCatalog: [], // Master DCI catalog from Sheet1
     logs: [],
     selectedRow: null,
@@ -2528,6 +2955,7 @@
     setupComboboxEvents();
     loadInventory();
     initMonthPickers();
+    initFileInjection();
     const addUomEl = document.getElementById('add-uom');
     if (addUomEl) {
       addUomEl.addEventListener('change', () => {
@@ -2675,6 +3103,129 @@
     }
   }
 
+  
+  // --- SMART BATCH CONSOLIDATION ENGINE ---
+  function buildConsolidatedInventory(rawItems) {
+    if (!rawItems || !Array.isArray(rawItems)) return [];
+    const groups = new Map();
+
+    rawItems.forEach(item => {
+      const code = String(item.itemCode || '').trim().toUpperCase();
+      const normDesc = (typeof cleanGenericDesc === 'function' ? cleanGenericDesc(item.itemDesc) : String(item.itemDesc || '').trim().toUpperCase());
+      const brand = String(item.brandName || '').trim().toUpperCase();
+      const exp = String(item.expDate || '').trim().toUpperCase();
+      const key = `${code}|${normDesc}|${brand}|${exp}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          groupKey: key,
+          isConsolidated: true,
+          rowIndex: item.rowIndex,
+          itemCode: item.itemCode,
+          batchId: item.batchId,
+          itemDesc: item.itemDesc,
+          brandName: item.brandName,
+          uom: item.uom,
+          qty: 0,
+          expDate: item.expDate,
+          expYear: item.expYear,
+          expStatus: item.expStatus,
+          acquisitionPrice: item.acquisitionPrice,
+          dateOut: item.dateOut,
+          isDonation: item.isDonation,
+          isZeroStock: false,
+          subBatches: [],
+          rowIndices: []
+        });
+      }
+
+      const grp = groups.get(key);
+      grp.qty += (item.qty || 0);
+      grp.subBatches.push(item);
+      grp.rowIndices.push(item.rowIndex);
+
+      if (item.dateOut && (!grp.dateOut || item.dateOut > grp.dateOut)) {
+        grp.dateOut = item.dateOut;
+      }
+      if ((item.acquisitionPrice || 0) > 0 && (!grp.acquisitionPrice || grp.acquisitionPrice === 0)) {
+        grp.acquisitionPrice = item.acquisitionPrice;
+      }
+    });
+
+    const result = [];
+    groups.forEach(grp => {
+      grp.isZeroStock = (grp.qty <= 0);
+      result.push(grp);
+    });
+
+    return result;
+  }
+
+  function setViewMode(mode) {
+    state.viewMode = mode;
+    const btnCons = document.getElementById('btn-view-consolidated');
+    const btnDet = document.getElementById('btn-view-detailed');
+    if (btnCons && btnDet) {
+      if (mode === 'CONSOLIDATED') {
+        btnCons.style.background = '#2563eb';
+        btnCons.style.color = '#ffffff';
+        btnDet.style.background = 'transparent';
+        btnDet.style.color = '#64748b';
+      } else {
+        btnDet.style.background = '#2563eb';
+        btnDet.style.color = '#ffffff';
+        btnCons.style.background = 'transparent';
+        btnCons.style.color = '#64748b';
+      }
+    }
+    applyFilter();
+  }
+
+  function toggleGroupExpansion(groupKey) {
+    if (state.expandedGroups.has(groupKey)) {
+      state.expandedGroups.delete(groupKey);
+    } else {
+      state.expandedGroups.add(groupKey);
+    }
+    renderInventoryTable();
+  }
+
+  function triggerSheetConsolidation() {
+    const confirmMsg = "Are you sure you want to permanently merge and consolidate identical batch rows in the active Google Sheet?\n\n" +
+      "• Rows with the same Item Code, Description, Brand, and Expiry will be combined into a single row.\n" +
+      "• Example: Telmisartan 40mg (Rows 5, 72, 83, 175) will be combined into 1 clean row of 20,000 units.\n" +
+      "• Redundant duplicate rows will be safely removed.\n\n" +
+      "Proceed with sheet consolidation?";
+
+    if (!confirm(confirmMsg)) return;
+
+    setLoading(true);
+    showToast("Consolidating identical rows in Google Sheet...", "info");
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          setLoading(false);
+          if (res.success) {
+            showToast(res.message || "Sheet consolidated successfully!", "success");
+            loadInventory();
+          } else {
+            showToast(res.error || "Failed to consolidate sheet", "error");
+          }
+        })
+        .withFailureHandler(err => {
+          setLoading(false);
+          showToast("Error consolidating sheet: " + (err.message || String(err)), "error");
+        })
+        .consolidateIdenticalSheetRows();
+    } else {
+      setTimeout(() => {
+        setLoading(false);
+        showToast("[Preview Mock] Successfully consolidated sheet rows!", "success");
+      }, 600);
+    }
+  }
+
   function onInventoryLoaded(response) {
     setLoading(false);
     if (!response.success) {
@@ -2682,7 +3233,9 @@
       return;
     }
 
-    state.items = response.items || [];
+    state.rawItems = response.items || [];
+    state.consolidatedItems = buildConsolidatedInventory(state.rawItems);
+    state.items = state.viewMode === 'CONSOLIDATED' ? state.consolidatedItems : state.rawItems;
     if (response.catalog && Array.isArray(response.catalog) && response.catalog.length > 0) {
       state.masterCatalog = response.catalog;
     } else if (!state.masterCatalog || state.masterCatalog.length === 0) {
@@ -2716,7 +3269,11 @@
     const zeroStock = state.items.filter(i => i.isZeroStock).length;
     const pendingCount = state.items.filter(i => i.expStatus === 'PENDING_COUNT').length;
 
-    document.getElementById('stat-total-items').textContent = totalItems.toLocaleString();
+    if (state.viewMode === 'CONSOLIDATED' && state.rawItems.length > 0 && state.consolidatedItems.length !== state.rawItems.length) {
+      document.getElementById('stat-total-items').textContent = state.consolidatedItems.length.toLocaleString();
+    } else {
+      document.getElementById('stat-total-items').textContent = totalItems.toLocaleString();
+    }
     document.getElementById('stat-total-qty').textContent = totalUnits.toLocaleString() + ' units';
     document.getElementById('stat-2026-count').textContent = critical2026;
     document.getElementById('stat-2027-count').textContent = near2027;
@@ -2740,7 +3297,9 @@
     const query = (document.getElementById('search-input').value || '').toLowerCase().trim();
     const statusFilter = document.getElementById('filter-status').value;
 
-    state.filteredItems = state.items.filter(item => {
+    const sourceList = state.viewMode === 'CONSOLIDATED' ? (state.consolidatedItems || []) : (state.rawItems || []);
+
+    state.filteredItems = sourceList.filter(item => {
       const matchQuery = !query || 
         item.itemCode.toLowerCase().includes(query) || 
         item.itemDesc.toLowerCase().includes(query) ||
@@ -2771,9 +3330,9 @@
     if (cardsContainer) cardsContainer.innerHTML = '';
 
     if (state.filteredItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>`;
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:#64748b;">No matching medicines found.</td></tr>';
       if (cardsContainer) {
-        cardsContainer.innerHTML = `<div style="text-align:center; padding:36px 16px; color:#64748b; background:#ffffff; border-radius:12px; border:1px dashed #cbd5e1;">🔍 No matching medicines found.</div>`;
+        cardsContainer.innerHTML = '<div style="text-align:center; padding:36px 16px; color:#64748b; background:#ffffff; border-radius:12px; border:1px dashed #cbd5e1;">🔍 No matching medicines found.</div>';
       }
       return;
     }
@@ -2792,43 +3351,55 @@
       } else if (item.expStatus === 'EXPIRED') {
         badgeHtml = `<span class="badge badge-danger"><span class="status-dot dot-critical"></span>Expired (${item.expDate})</span>`;
       } else if (item.expStatus === 'PENDING_COUNT') {
-        badgeHtml = `<span class="badge badge-pending"><span class="status-dot dot-pending"></span>Pending Count</span>`;
+        badgeHtml = '<span class="badge badge-pending"><span class="status-dot dot-pending"></span>Pending Count</span>';
       } else {
         badgeHtml = `<span class="badge badge-neutral"><span class="status-dot dot-neutral"></span>${item.expDate}</span>`;
       }
 
       const catBadge = item.isDonation 
-        ? `<span class="badge badge-donation" style="margin-left:4px;">Donation</span>` 
+        ? '<span class="badge badge-donation" style="margin-left:4px;">Donation</span>' 
         : '';
 
       const brandBadge = item.brandName 
         ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>`
-        : `<span style="color:#94a3b8; font-style:italic;">--</span>`;
+        : '<span style="color:#94a3b8; font-style:italic;">--</span>';
 
       const resolvedUom = item.uom || detectUomFromText(item.itemDesc);
       const uomDisplay = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
 
       const qtyDisplay = item.isZeroStock 
-        ? `<span class="qty-zero">0 (Out of Stock)</span>` 
-        : `<span class="qty-display">${item.qty.toLocaleString()}</span>`;
+        ? '<span class="qty-zero">0 (Out of Stock)</span>' 
+        : `<span style="font-weight:700; color:#0f172a; font-size:13.5px;">${item.qty.toLocaleString()}</span>`;
 
-      const priceDisplay = (typeof item.acquisitionPrice === 'number' && item.acquisitionPrice > 0)
-        ? `<span class="price-display">₱${item.acquisitionPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`
-        : `<span style="color:#94a3b8;">₱0.00</span>`;
+      const priceDisplay = (item.acquisitionPrice && item.acquisitionPrice > 0)
+        ? `₱${Number(item.acquisitionPrice).toFixed(2)}`
+        : '<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>';
 
       const dateOutDisplay = item.dateOut 
         ? `<span style="font-weight:600; color:#475569; font-size:12px;">${escapeHtml(item.dateOut)}</span>`
-        : `<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>`;
+        : '<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>';
 
-      // 1. Desktop Table Row (Dispense + Edit Buttons)
+      const hasMultipleBatches = item.isConsolidated && item.subBatches && item.subBatches.length > 1;
+      const isExpanded = hasMultipleBatches && state.expandedGroups && state.expandedGroups.has(item.groupKey);
+
+      // 1. Desktop Table Row
       tr.innerHTML = `
         <td style="font-family:monospace; font-weight:600; color:#1e293b;">
           ${escapeHtml(item.itemCode)}
           ${item.batchId ? `<div style="font-size:10px; color:#94a3b8; font-weight:normal;">${escapeHtml(item.batchId)}</div>` : ''}
         </td>
         <td>
-          <div style="font-weight:600; color:#0f172a;">${escapeHtml(item.itemDesc)} ${catBadge}</div>
-          <div style="font-size:11px; color:#64748b;">Row ${item.rowIndex} in Sheet</div>
+          <div style="font-weight:600; color:#0f172a; font-size:13px; display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
+            <span>${escapeHtml(item.itemDesc)} ${catBadge}</span>
+            ${hasMultipleBatches ? `
+              <span class="badge badge-consolidated" onclick="toggleGroupExpansion('${escapeHtml(item.groupKey)}')" title="Click to view all ${item.subBatches.length} delivery batches">
+                📦 ${item.subBatches.length} Batches (${item.rowIndices.map(r => 'R' + r).join(', ')}) ${isExpanded ? '▲' : '▼'}
+              </span>
+            ` : ''}
+          </div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px;">
+            ${hasMultipleBatches ? `Unified across ${item.subBatches.length} sheet rows` : `Row ${item.rowIndex} in Sheet`}
+          </div>
         </td>
         <td>${brandBadge}</td>
         <td style="text-align:center;">${uomDisplay}</td>
@@ -2846,6 +3417,9 @@
             <button class="btn btn-sm btn-danger-subtle" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''} title="Deduct / Dispense Quantity">
               Dispense
             </button>
+            <button class="btn btn-sm btn-outline" onclick="openMedicineAuditModal('${escapeHtml(item.itemCode)}', '${escapeHtml(item.itemDesc)}')" title="View complete audit trail & injection history">
+              📜 Audit
+            </button>
             <button class="btn btn-sm btn-outline" onclick="openEditBatchModal(${item.rowIndex})" title="Edit Batch Details">
               Edit
             </button>
@@ -2853,6 +3427,58 @@
         </td>
       `;
       tbody.appendChild(tr);
+
+      // Render Sub-Batches Accordion Drawer if expanded
+      if (hasMultipleBatches && isExpanded) {
+        const subTr = document.createElement('tr');
+        subTr.className = 'sub-batches-accordion-row';
+        
+        let subTableRows = '';
+        item.subBatches.forEach(sb => {
+          subTableRows += `
+            <tr>
+              <td style="text-align:center; font-family:monospace; font-weight:700; color:#475569;">Row ${sb.rowIndex}</td>
+              <td><span class="badge badge-brand">${escapeHtml(sb.brandName || 'Standard')}</span></td>
+              <td style="text-align:center;"><span class="badge badge-uom">${escapeHtml(sb.uom || item.uom)}</span></td>
+              <td style="text-align:right; font-weight:700; color:#0f172a;">${Number(sb.qty || 0).toLocaleString()}</td>
+              <td style="text-align:center;"><span class="badge badge-neutral">${escapeHtml(sb.expDate)}</span></td>
+              <td style="text-align:center; font-size:11px; color:#64748b;">${escapeHtml(sb.dateOut || '--')}</td>
+              <td style="text-align:center; white-space:nowrap;">
+                <button class="btn btn-sm btn-danger-subtle" style="font-size:10.5px; padding:2px 6px;" onclick="openStockOutModal(${sb.rowIndex})" title="Dispense strictly from Row ${sb.rowIndex}">Dispense Row</button>
+                <button class="btn btn-sm btn-outline" style="font-size:10.5px; padding:2px 6px;" onclick="openEditBatchModal(${sb.rowIndex})" title="Edit Row ${sb.rowIndex}">Edit Row</button>
+              </td>
+            </tr>
+          `;
+        });
+
+        subTr.innerHTML = `
+          <td colspan="9" style="padding:10px 16px; background:#f8fafc; border-left:3px solid #2563eb;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+              <span style="font-size:11.5px; font-weight:700; color:#334155; text-transform:uppercase; letter-spacing:0.5px;">
+                📦 Physical Delivery Batches (Total: ${item.qty.toLocaleString()} ${escapeHtml(item.uom || 'units')})
+              </span>
+              <span style="font-size:11px; color:#64748b;">FIFO order: Dispensing will consume from Row ${item.rowIndices[0]} first</span>
+            </div>
+            <table class="sub-batch-table">
+              <thead>
+                <tr>
+                  <th style="width:80px; text-align:center;">Sheet Row</th>
+                  <th>Brand Name</th>
+                  <th style="width:80px; text-align:center;">UOM</th>
+                  <th style="width:110px; text-align:right;">Physical Qty</th>
+                  <th style="width:95px; text-align:center;">Expiry Date</th>
+                  <th style="width:105px; text-align:center;">Date Out</th>
+                  <th style="width:160px; text-align:center;">Row Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${subTableRows}
+              </tbody>
+            </table>
+          </td>
+        `;
+        tbody.appendChild(subTr);
+      }
 
       // 2. Mobile Touch Batch Card (Phones)
       if (cardsContainer) {
@@ -2876,6 +3502,11 @@
             ${brandBadge}
             ${uomDisplay}
             ${catBadge}
+            ${hasMultipleBatches ? `
+              <span class="badge badge-consolidated" onclick="toggleGroupExpansion('${escapeHtml(item.groupKey)}')">
+                📦 ${item.subBatches.length} Batches ${isExpanded ? '▲' : '▼'}
+              </span>
+            ` : ''}
           </div>
           <div class="card-meta-grid">
             <div class="card-meta-item">
@@ -2904,6 +3535,9 @@
             <button class="btn btn-danger-subtle" onclick="openStockOutModal(${item.rowIndex})" ${item.isZeroStock ? 'disabled style="opacity:0.4;cursor:not-allowed;"' : ''}>
               Dispense
             </button>
+            <button class="btn btn-outline" onclick="openMedicineAuditModal('${escapeHtml(item.itemCode)}', '${escapeHtml(item.itemDesc)}')">
+              📜 Audit
+            </button>
             <button class="btn btn-outline" onclick="openEditBatchModal(${item.rowIndex})">
               Edit Batch
             </button>
@@ -2916,7 +3550,13 @@
 
   // --- STOCK OUT MODAL ACTIONS (BRAND & DATE OUT DEDUCTION) ---
   function openStockOutModal(rowIndex) {
-    const item = state.items.find(i => i.rowIndex === rowIndex);
+    let item = null;
+    if (state.viewMode === 'CONSOLIDATED') {
+      item = (state.consolidatedItems || []).find(i => i.rowIndex === rowIndex || (i.rowIndices && i.rowIndices.includes(rowIndex)));
+      if (!item) item = (state.items || []).find(i => i.rowIndex === rowIndex);
+    } else {
+      item = (state.items || []).find(i => i.rowIndex === rowIndex);
+    }
     if (!item) return;
 
     state.selectedRow = item;
@@ -2994,7 +3634,9 @@
       itemCode: state.selectedRow.itemCode,
       qtyOut: qtyOut,
       dateOut: dateOut,
-      remarks: remarks || 'Stock-Out Dispense'
+      remarks: remarks || 'Stock-Out Dispense',
+      isConsolidated: !!(state.selectedRow.isConsolidated && state.selectedRow.rowIndices && state.selectedRow.rowIndices.length > 1),
+      rowIndices: state.selectedRow.rowIndices || [state.selectedRow.rowIndex]
     };
 
     setBtnLoading('btn-confirm-stock-out', true, 'Recording Stock-Out...');
@@ -3157,7 +3799,8 @@
 
   const pickerState = {
     add: { year: new Date().getFullYear() + 2, month: 12 },
-    edit: { year: new Date().getFullYear() + 1, month: 10 }
+    edit: { year: new Date().getFullYear() + 1, month: 10 },
+    dynamic: { year: new Date().getFullYear() + 1, month: 10, targetInput: null }
   };
 
   function initMonthPickers() {
@@ -3188,6 +3831,13 @@
           popupEdit.style.display = 'none';
         }
       }
+
+      const popupDyn = document.getElementById('month-picker-popup-dynamic');
+      if (popupDyn && popupDyn.style.display !== 'none') {
+        if (!popupDyn.contains(e.target) && e.target !== pickerState.dynamic?.targetInput) {
+          popupDyn.style.display = 'none';
+        }
+      }
     });
   }
 
@@ -3215,8 +3865,10 @@
   function closeAllMonthPickers() {
     const pAdd = document.getElementById('month-picker-popup-add');
     const pEdit = document.getElementById('month-picker-popup-edit');
+    const pDyn = document.getElementById('month-picker-popup-dynamic');
     if (pAdd) pAdd.style.display = 'none';
     if (pEdit) pEdit.style.display = 'none';
+    if (pDyn) pDyn.style.display = 'none';
   }
 
   function changePickerYear(type, delta) {
@@ -3280,7 +3932,13 @@
     const container = document.getElementById(`picker-months-grid-${type}`);
     if (!container) return;
     const curYear = pickerState[type].year;
-    const currentSelectedVal = document.getElementById(`${type}-exp`).value;
+    let currentSelectedVal = '';
+    if (type === 'dynamic') {
+      currentSelectedVal = pickerState.dynamic.targetInput ? pickerState.dynamic.targetInput.value : '';
+    } else {
+      const expEl = document.getElementById(`${type}-exp`);
+      currentSelectedVal = expEl ? expEl.value : '';
+    }
     const currentDetails = getExpiryDateDetails(currentSelectedVal);
 
     container.innerHTML = MONTH_NAMES_SHORT.map((mName, idx) => {
@@ -3300,6 +3958,14 @@
     const mShort = MONTH_NAMES_SHORT[monthNum - 1];
     const mmmYy = `${mShort}-${String(yr).slice(-2)}`;
 
+    if (type === 'dynamic') {
+      if (pickerState.dynamic.targetInput) {
+        pickerState.dynamic.targetInput.value = mmmYy;
+      }
+      closeAllMonthPickers();
+      return;
+    }
+
     const expHidden = document.getElementById(`${type}-exp`);
     const expDisplay = document.getElementById(`${type}-exp-display`);
     if (expHidden) expHidden.value = mmmYy;
@@ -3307,6 +3973,58 @@
 
     closeAllMonthPickers();
     onExpiryChange(type);
+  }
+
+  function openDynamicMonthPicker(inputEl) {
+    if (!inputEl) return;
+    let popup = document.getElementById('month-picker-popup-dynamic');
+    if (!popup) {
+      popup = document.createElement('div');
+      popup.id = 'month-picker-popup-dynamic';
+      popup.className = 'month-picker-popup';
+      popup.style.cssText = 'display:none; position:absolute; bottom:calc(100% + 6px); left:0; width:295px; z-index:1060;';
+      popup.innerHTML = `
+        <div class="month-picker-header">
+          <button type="button" class="picker-nav-btn" onclick="changePickerYear('dynamic', -1)" title="Previous Year">‹</button>
+          <div class="picker-year-select-wrap">
+            <select id="picker-year-select-dynamic" class="picker-year-select" onchange="onPickerYearSelect('dynamic')"></select>
+          </div>
+          <button type="button" class="picker-nav-btn" onclick="changePickerYear('dynamic', 1)" title="Next Year">›</button>
+        </div>
+        <div class="picker-quick-years" id="picker-quick-years-dynamic"></div>
+        <div class="month-picker-grid" id="picker-months-grid-dynamic"></div>
+      `;
+    }
+
+    const parent = inputEl.parentElement || document.body;
+    if (popup.parentElement !== parent) {
+      parent.appendChild(popup);
+    }
+
+    const isVisible = popup.style.display !== 'none' && pickerState.dynamic.targetInput === inputEl;
+    closeAllMonthPickers();
+    if (isVisible) return;
+
+    pickerState.dynamic.targetInput = inputEl;
+    const currentVal = inputEl.value;
+    if (currentVal) {
+      const details = getExpiryDateDetails(currentVal);
+      if (details) {
+        pickerState.dynamic.year = details.year;
+        pickerState.dynamic.month = details.month;
+      } else {
+        pickerState.dynamic.year = new Date().getFullYear() + 1;
+        pickerState.dynamic.month = 10;
+      }
+    } else {
+      pickerState.dynamic.year = new Date().getFullYear() + 1;
+      pickerState.dynamic.month = 10;
+    }
+
+    renderPickerYearOptions('dynamic');
+    renderQuickYears('dynamic');
+    renderMonthGrid('dynamic');
+    popup.style.display = 'block';
   }
 
   function formatIsoMonthToMmmYy(val) {
@@ -3728,43 +4446,176 @@
     });
   }
 
-  // --- STOCK OUT AUDIT LOGS ---
+  // --- STOCK OUT AUDIT LOGS & PER-MEDICINE TRACKING ---
   function loadLogs() {
     const tbody = document.getElementById('logs-table-body');
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:20px;">Loading audit logs...</td></tr>`;
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:24px; color:#64748b;"><div class="spinner" style="margin:0 auto 8px auto; width:22px; height:22px; border-width:2.5px;"></div>Loading real-time audit ledger...</td></tr>';
+    }
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
       google.script.run
         .withSuccessHandler(res => {
-          if (res.success) {
-            renderLogsTable(res.logs || []);
+          if (res && res.success) {
+            state.logs = res.logs || [];
+            updateAuditMetrics();
+            filterLogsTable();
           } else {
-            tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#dc2626;">${res.error}</td></tr>`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:#dc2626; padding:20px;">${escapeHtml(res ? res.error : 'Failed to load logs')}</td></tr>`;
           }
         })
         .withFailureHandler(err => {
-          tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+          if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:#dc2626; padding:20px;">Error loading logs: ${escapeHtml(err.message || String(err))}</td></tr>`;
         })
-        .getRecentLogs(50);
+        .getRecentLogs(500);
     } else {
-      // Mock Logs
-      renderLogsTable([
+      // Mock Logs for Offline / Preview
+      state.logs = [
         { 
-          timestamp: '2026-10-14 14:30:00', 
-          dateOut: '2026-10-14',
-          itemCode: 'DMR000451', 
-          itemDesc: 'FLUCONAZOLE 200MG CAPSULE', 
-          brandName: 'Diflucan', 
-          uom: 'Capsule',
-          expDate: 'Jun-28', 
-          unitPrice: 125.00, 
-          qtyOut: 20, 
-          previousQty: 200, 
-          remainingBalance: 180, 
-          remarks: 'ICU Dispense', 
-          user: 'pharmacist@armmc.gov.ph' 
+          timestamp: '2026-11-13 03:08:35', 
+          dateOut: '2026-11-12',
+          itemCode: 'DMC001032', 
+          itemDesc: '(C) TELMISARTAN 40MG TABLET', 
+          brandName: 'Telgio', 
+          uom: 'Tablet',
+          expDate: 'Mar-29', 
+          unitPrice: 4.73, 
+          qtyOut: 2000, 
+          previousQty: 2000, 
+          remainingBalance: 0, 
+          remarks: 'File Injection: CONSUMPTION_COMBINED_CLEANED_2026-11-12.xlsx (Cons: 8279)' 
+        },
+        { 
+          timestamp: '2026-11-13 03:08:35', 
+          dateOut: '2026-11-12',
+          itemCode: 'DMC001032', 
+          itemDesc: '(C) TELMISARTAN 40MG TABLET', 
+          brandName: 'Telgio', 
+          uom: 'Tablet',
+          expDate: 'Mar-29', 
+          unitPrice: 4.73, 
+          qtyOut: 0, 
+          previousQty: 0, 
+          remainingBalance: 0, 
+          remarks: 'File Injection: CONSUMPTION_COMBINED_CLEANED_2026-11-12.xlsx ⚠️ PARTIAL SHORTAGE (Deducted 2,000, Unfulfilled: 6,279 units - stock exhausted)' 
+        },
+        { 
+          timestamp: '2026-11-13 03:08:35', 
+          dateOut: '2026-11-12',
+          itemCode: 'DMC000997', 
+          itemDesc: '(C) SODIUM BICARBONATE 1MEQ/ML 50ML AMPULE/VIAL (IV INFUSION)', 
+          brandName: 'Royaleriate', 
+          uom: 'Vial',
+          expDate: 'Aug-28', 
+          unitPrice: 270.00, 
+          qtyOut: 2, 
+          previousQty: 446, 
+          remainingBalance: 444, 
+          remarks: 'File Injection: ISSUANCE_STORAGE_CLEANED_2026-11-12.xlsx' 
+        },
+        { 
+          timestamp: '2026-11-13 03:08:35', 
+          dateOut: '2026-11-12',
+          itemCode: 'DMR000996', 
+          itemDesc: 'SODIUM BICARBONATE 1MEQ/ML 20ML AMPULE/VIAL (IV INFUSION)', 
+          brandName: 'SOLUNATE', 
+          uom: 'Vial',
+          expDate: 'Jun-29', 
+          unitPrice: 41.23, 
+          qtyOut: 316, 
+          previousQty: 2664, 
+          remainingBalance: 2348, 
+          remarks: 'File Injection: ISSUANCE_STORAGE_CLEANED_2026-11-12.xlsx' 
         }
-      ]);
+      ];
+      updateAuditMetrics();
+      filterLogsTable();
+    }
+  }
+
+  function updateAuditMetrics() {
+    const logs = state.logs || [];
+    const totalTransactions = logs.length;
+    const totalDeductedUnits = logs.reduce((sum, l) => sum + (Number(l.qtyOut) || 0), 0);
+    const fileInjections = logs.filter(l => (l.remarks || '').includes('File Injection')).length;
+    const shortages = logs.filter(l => (l.remarks || '').includes('SHORTAGE') || (l.remarks || '').includes('OUT OF STOCK') || Number(l.qtyOut) === 0).length;
+
+    const elTotal = document.getElementById('stat-log-total');
+    const elUnits = document.getElementById('stat-log-units');
+    const elInj = document.getElementById('stat-log-injections');
+    const elShort = document.getElementById('stat-log-shortages');
+
+    if (elTotal) elTotal.textContent = totalTransactions.toLocaleString();
+    if (elUnits) elUnits.textContent = totalDeductedUnits.toLocaleString() + ' units';
+    if (elInj) elInj.textContent = fileInjections.toLocaleString();
+    if (elShort) elShort.textContent = shortages.toLocaleString();
+  }
+
+  function filterLogsTable() {
+    const query = (document.getElementById('logs-search-input')?.value || '').toLowerCase().trim();
+    const actionFilter = document.getElementById('logs-filter-action')?.value || 'ALL';
+
+    const logs = state.logs || [];
+    state.filteredLogs = logs.filter(log => {
+      const matchText = !query ||
+        (log.itemCode || '').toLowerCase().includes(query) ||
+        (log.itemDesc || '').toLowerCase().includes(query) ||
+        (log.brandName || '').toLowerCase().includes(query) ||
+        (log.uom || '').toLowerCase().includes(query) ||
+        (log.expDate || '').toLowerCase().includes(query) ||
+        (log.dateOut || '').toLowerCase().includes(query) ||
+        (log.timestamp || '').toLowerCase().includes(query) ||
+        (log.remarks || '').toLowerCase().includes(query);
+
+      let matchAction = true;
+      const isInj = (log.remarks || '').includes('File Injection');
+      const isShort = (log.remarks || '').includes('SHORTAGE') || (log.remarks || '').includes('OUT OF STOCK') || Number(log.qtyOut) === 0;
+
+      if (actionFilter === 'INJECTION') {
+        matchAction = isInj;
+      } else if (actionFilter === 'MANUAL') {
+        matchAction = !isInj && !isShort;
+      } else if (actionFilter === 'SHORTAGE') {
+        matchAction = isShort;
+      }
+
+      return matchText && matchAction;
+    });
+
+    const badge = document.getElementById('logs-count-badge');
+    if (badge) {
+      badge.textContent = `Showing ${state.filteredLogs.length.toLocaleString()} of ${logs.length.toLocaleString()} records`;
+    }
+
+    renderLogsTable(state.filteredLogs);
+  }
+
+  function clearLogsFilter() {
+    const input = document.getElementById('logs-search-input');
+    const select = document.getElementById('logs-filter-action');
+    if (input) input.value = '';
+    if (select) select.value = 'ALL';
+    filterLogsTable();
+  }
+
+  function quickFilterLogs(term) {
+    const input = document.getElementById('logs-search-input');
+    const select = document.getElementById('logs-filter-action');
+    if (input) input.value = term;
+    if (select) select.value = 'ALL';
+    filterLogsTable();
+  }
+
+  function setLogsActionFilter(action) {
+    const select = document.getElementById('logs-filter-action');
+    if (select) select.value = action;
+    filterLogsTable();
+  }
+
+  function promptTrackMedicineAudit() {
+    const q = prompt('Enter Item Code or Medicine Generic Name to trace (e.g. DMC001032 or TELMISARTAN):');
+    if (q && q.trim()) {
+      openMedicineAuditModal(q.trim(), q.trim());
     }
   }
 
@@ -3773,13 +4624,11 @@
     const s = String(val).trim();
     if (!s || s.toUpperCase() === 'NO EXPIRY' || s.toUpperCase() === 'N/A') return 'NO EXPIRY';
 
-    // Already clean short format (e.g. Jun-30, Feb-27)
     const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
     if (mShort) {
       return mShort[1].charAt(0).toUpperCase() + mShort[1].slice(1).toLowerCase() + '-' + mShort[2];
     }
 
-    // Long timestamp string coerced by Sheets: 'Tue Jun 30 2026 15:00:00 GMT+0800 (Singapore Standard Time)'
     const mLong = s.match(/^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{4})/);
     if (mLong) {
       const mon = mLong[1].charAt(0).toUpperCase() + mLong[1].slice(1).toLowerCase();
@@ -3791,7 +4640,6 @@
       return `${mon}-${String(yr).slice(-2)}`;
     }
 
-    // Fallback Date parser for ISO or other date strings
     const d = new Date(s);
     if (!isNaN(d.getTime()) && s.length > 8) {
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -3809,15 +4657,21 @@
 
   function renderLogsTable(logs) {
     const tbody = document.getElementById('logs-table-body');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (logs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:30px; color:#64748b;">No stock-out transactions recorded yet.</td></tr>`;
+    if (!logs || logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:32px; color:#64748b;">No matching audit transactions found.</td></tr>';
       return;
     }
 
     logs.forEach(log => {
       const tr = document.createElement('tr');
+      const isShortage = (log.remarks || '').includes('SHORTAGE') || (log.remarks || '').includes('OUT OF STOCK') || Number(log.qtyOut) === 0;
+      if (isShortage) {
+        tr.style.backgroundColor = '#fffbfb';
+      }
+
       const brandStr = log.brandName 
         ? `<span class="badge badge-brand">${escapeHtml(log.brandName)}</span>` 
         : '<span style="color:#94a3b8;">--</span>';
@@ -3835,21 +4689,227 @@
 
       const cleanExp = formatExpiryForDisplay(log.expDate);
 
+      let qtyOutHtml = '';
+      if (Number(log.qtyOut) > 0) {
+        qtyOutHtml = `<span style="font-weight:700; color:#dc2626;">-${Number(log.qtyOut).toLocaleString()}</span>`;
+      } else {
+        qtyOutHtml = '<span class="badge badge-warning" style="font-size:10px; font-weight:700;">0 (Shortage)</span>';
+      }
+
+      let remarksHtml = escapeHtml(log.remarks || '');
+      if (remarksHtml.includes('File Injection')) {
+        remarksHtml = `<span class="badge badge-brand" style="font-size:10px; margin-right:4px; background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe;">⚡ INJECTION</span>${remarksHtml}`;
+      }
+      if (isShortage) {
+        remarksHtml = `<span class="badge badge-critical" style="font-size:10px; margin-right:4px;">⚠️ WARNING</span>${remarksHtml}`;
+      }
+
       tr.innerHTML = `
-        <td style="font-size:11px; color:#64748b; white-space:nowrap;">${log.timestamp}</td>
+        <td style="font-size:11px; color:#64748b; white-space:nowrap; font-family:monospace;">${escapeHtml(log.timestamp || '')}</td>
         <td style="text-align:center;">${dateOutStr}</td>
-        <td style="font-family:monospace; font-weight:600;">${escapeHtml(log.itemCode)}</td>
-        <td>${escapeHtml(log.itemDesc)}</td>
+        <td style="font-family:monospace; font-weight:700;">
+          <a href="javascript:void(0)" onclick="quickFilterLogs('${escapeHtml(log.itemCode)}')" style="color:#2563eb; text-decoration:none;" title="Filter by this code">${escapeHtml(log.itemCode)}</a>
+        </td>
+        <td>
+          <a href="javascript:void(0)" onclick="openMedicineAuditModal('${escapeHtml(log.itemCode)}', '${escapeHtml(log.itemDesc)}')" style="color:#0f172a; text-decoration:none; font-weight:600;" title="View lifetime ledger">${escapeHtml(log.itemDesc)}</a>
+        </td>
         <td>${brandStr}</td>
         <td style="text-align:center;">${uomBadge}</td>
         <td><span class="badge badge-neutral">${escapeHtml(cleanExp)}</span></td>
         <td style="text-align:right; font-family:monospace;">${unitPriceFormatted}</td>
-        <td style="text-align:right; font-weight:700; color:#dc2626;">-${Number(log.qtyOut).toLocaleString()}</td>
-        <td style="text-align:right; font-family:monospace;">${Number(log.remainingBalance).toLocaleString()}</td>
-        <td style="font-size:12px; color:#475569;">${escapeHtml(log.remarks || '')}</td>
+        <td style="text-align:right;">${qtyOutHtml}</td>
+        <td style="text-align:right; font-family:monospace; font-weight:600;">${Number(log.remainingBalance || 0).toLocaleString()}</td>
+        <td style="font-size:11.5px; color:#475569; max-width:280px; word-break:break-word;">${remarksHtml}</td>
+        <td style="text-align:center;">
+          <button class="btn btn-outline btn-sm" style="font-size:10.5px; padding:3px 7px;" onclick="openMedicineAuditModal('${escapeHtml(log.itemCode)}', '${escapeHtml(log.itemDesc)}')" title="View complete audit trail & active batches">
+            📜 Trace
+          </button>
+        </td>
       `;
       tbody.appendChild(tr);
     });
+  }
+
+  // --- DEDICATED PER-MEDICINE AUDIT LEDGER MODAL ---
+  function openMedicineAuditModal(itemCode, itemDesc) {
+    state.currentAuditMed = itemCode || itemDesc;
+    const modal = document.getElementById('modal-medicine-audit');
+    if (!modal) return;
+    modal.style.display = 'flex';
+
+    const codeEl = document.getElementById('med-audit-code');
+    const descEl = document.getElementById('med-audit-desc');
+    const uomEl = document.getElementById('med-audit-uom');
+    const stockEl = document.getElementById('med-audit-stock');
+    const batchesBody = document.getElementById('med-audit-batches-body');
+    const ledgerBody = document.getElementById('med-audit-ledger-body');
+
+    if (codeEl) codeEl.textContent = itemCode || 'MEDICINE';
+    if (descEl) descEl.textContent = itemDesc || 'Loading medicine records...';
+    if (stockEl) stockEl.textContent = 'Calculating...';
+    if (batchesBody) batchesBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:16px; color:#64748b;">Loading sheet batches...</td></tr>';
+    if (ledgerBody) ledgerBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#64748b;">Loading chronological ledger...</td></tr>';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res && res.success) {
+            renderMedicineAuditModalData(res);
+          } else {
+            if (stockEl) stockEl.textContent = 'Error loading';
+            if (batchesBody) batchesBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#dc2626; padding:16px;">Failed to load batches</td></tr>';
+            if (ledgerBody) ledgerBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#dc2626; padding:16px;">Error: ${escapeHtml(res ? res.error : 'Failed to load ledger')}</td></tr>`;
+          }
+        })
+        .withFailureHandler(err => {
+          if (stockEl) stockEl.textContent = 'Error loading';
+          if (batchesBody) batchesBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#dc2626; padding:16px;">Failed to load batches</td></tr>';
+          if (ledgerBody) ledgerBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#dc2626; padding:16px;">Error: ${escapeHtml(err.message || String(err))}</td></tr>`;
+        })
+        .getMedicineAuditTrail(itemCode || itemDesc);
+    } else {
+      // Offline / Preview Mock
+      setTimeout(() => {
+        const query = (itemCode || itemDesc || '').toUpperCase();
+        const activeBatches = (state.items || []).filter(i => 
+          i.itemCode.toUpperCase().includes(query) || i.itemDesc.toUpperCase().includes(query)
+        ).map(i => ({
+          rowIndex: i.rowIndex,
+          itemCode: i.itemCode,
+          brand: i.brandName || 'Standard',
+          uom: i.uom || 'Unit',
+          qty: i.qty,
+          expDate: i.expDate,
+          dateOut: i.dateOut
+        }));
+
+        const logs = (state.logs || []).filter(l => 
+          (l.itemCode || '').toUpperCase().includes(query) || (l.itemDesc || '').toUpperCase().includes(query)
+        );
+
+        const currentStock = activeBatches.reduce((sum, b) => sum + (b.qty || 0), 0);
+        const totalDisp = logs.reduce((sum, l) => sum + (Number(l.qtyOut) || 0), 0);
+
+        renderMedicineAuditModalData({
+          success: true,
+          itemCode: itemCode || 'DMC001032',
+          itemDesc: itemDesc || '(C) TELMISARTAN 40MG TABLET',
+          uom: 'Tablet',
+          currentTotalStock: currentStock,
+          activeBatches: activeBatches,
+          logs: logs,
+          metrics: {
+            totalDispensedUnits: totalDisp,
+            transactionsCount: logs.length,
+            fileInjectionsCount: logs.filter(l => (l.remarks || '').includes('File Injection')).length,
+            shortagesCount: logs.filter(l => (l.remarks || '').includes('SHORTAGE') || Number(l.qtyOut) === 0).length
+          }
+        });
+      }, 300);
+    }
+  }
+
+  function renderMedicineAuditModalData(data) {
+    const codeEl = document.getElementById('med-audit-code');
+    const descEl = document.getElementById('med-audit-desc');
+    const uomEl = document.getElementById('med-audit-uom');
+    const stockEl = document.getElementById('med-audit-stock');
+    const totalDispEl = document.getElementById('med-audit-total-disp');
+    const injEl = document.getElementById('med-audit-injections');
+    const txCountEl = document.getElementById('med-audit-tx-count');
+    const shortagesEl = document.getElementById('med-audit-shortages');
+    const batchesBody = document.getElementById('med-audit-batches-body');
+    const ledgerBody = document.getElementById('med-audit-ledger-body');
+
+    if (codeEl) codeEl.textContent = data.itemCode;
+    if (descEl) descEl.textContent = data.itemDesc;
+    if (uomEl) uomEl.textContent = data.uom || 'Unit';
+
+    const stock = Number(data.currentTotalStock || 0);
+    if (stockEl) {
+      stockEl.textContent = stock <= 0 ? '0 (Out of Stock)' : `${stock.toLocaleString()} ${data.uom || 'units'}`;
+      stockEl.style.color = stock <= 0 ? '#dc2626' : '#2563eb';
+    }
+
+    if (totalDispEl) totalDispEl.textContent = `${Number(data.metrics?.totalDispensedUnits || 0).toLocaleString()} ${data.uom || 'units'}`;
+    if (injEl) injEl.textContent = Number(data.metrics?.fileInjectionsCount || 0).toLocaleString();
+    if (txCountEl) txCountEl.textContent = Number(data.metrics?.transactionsCount || 0).toLocaleString();
+    if (shortagesEl) shortagesEl.textContent = Number(data.metrics?.shortagesCount || 0).toLocaleString();
+
+    // 1. Render Active Sheet Batches
+    if (batchesBody) {
+      batchesBody.innerHTML = '';
+      if (!data.activeBatches || data.activeBatches.length === 0) {
+        batchesBody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:14px; color:#94a3b8;">No active batches recorded in inventory sheet.</td></tr>';
+      } else {
+        data.activeBatches.forEach(b => {
+          const tr = document.createElement('tr');
+          const isZero = Number(b.qty) <= 0;
+          const qtyText = isZero 
+            ? '<span class="qty-zero">0 (Out of Stock)</span>' 
+            : `<strong>${Number(b.qty).toLocaleString()}</strong>`;
+
+          tr.innerHTML = `
+            <td style="text-align:center; font-family:monospace; color:#64748b;">Row ${b.rowIndex}</td>
+            <td><span class="badge badge-brand">${escapeHtml(b.brand || 'Standard')}</span></td>
+            <td style="text-align:center;"><span class="badge badge-uom">${escapeHtml(b.uom)}</span></td>
+            <td style="text-align:right;">${qtyText}</td>
+            <td style="text-align:center;"><span class="badge badge-neutral">${escapeHtml(formatExpiryForDisplay(b.expDate))}</span></td>
+            <td style="text-align:center; font-size:11px; color:#64748b;">${escapeHtml(b.dateOut || '--')}</td>
+          `;
+          batchesBody.appendChild(tr);
+        });
+      }
+    }
+
+    // 2. Render Chronological Movement Ledger
+    if (ledgerBody) {
+      ledgerBody.innerHTML = '';
+      if (!data.logs || data.logs.length === 0) {
+        ledgerBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8;">No stock-out or injection transactions recorded yet for this medicine.</td></tr>';
+      } else {
+        data.logs.forEach(l => {
+          const tr = document.createElement('tr');
+          const isShort = (l.remarks || '').includes('SHORTAGE') || (l.remarks || '').includes('OUT OF STOCK') || Number(l.qtyOut) === 0;
+          if (isShort) tr.style.backgroundColor = '#fffbfb';
+
+          let qtyHtml = '';
+          if (Number(l.qtyOut) > 0) {
+            qtyHtml = `<span style="font-weight:700; color:#dc2626;">-${Number(l.qtyOut).toLocaleString()}</span>`;
+          } else {
+            qtyHtml = '<span class="badge badge-warning" style="font-size:10px;">0 (Shortage)</span>';
+          }
+
+          let remText = escapeHtml(l.remarks || '');
+          if (remText.includes('File Injection')) {
+            remText = `<span class="badge badge-brand" style="font-size:10px; margin-right:4px; background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe;">⚡ INJECTION</span>${remText}`;
+          }
+          if (isShort) {
+            remText = `<span class="badge badge-critical" style="font-size:10px; margin-right:4px;">⚠️ SHORTAGE</span>${remText}`;
+          }
+
+          tr.innerHTML = `
+            <td style="font-size:11px; font-family:monospace; color:#64748b; white-space:nowrap;">${escapeHtml(l.timestamp || '')}</td>
+            <td style="text-align:center; font-weight:600; font-size:11.5px;">${escapeHtml(l.dateOut || '--')}</td>
+            <td><span class="badge badge-brand">${escapeHtml(l.brandName || '--')}</span></td>
+            <td style="text-align:center;"><span class="badge badge-neutral">${escapeHtml(formatExpiryForDisplay(l.expDate))}</span></td>
+            <td style="text-align:right;">${qtyHtml}</td>
+            <td style="text-align:right; font-family:monospace; font-weight:600;">${Number(l.remainingBalance || 0).toLocaleString()}</td>
+            <td style="font-size:11px; color:#334155;">${remText}</td>
+          `;
+          ledgerBody.appendChild(tr);
+        });
+      }
+    }
+  }
+
+  function filterMainFromModal() {
+    const med = state.currentAuditMed;
+    closeModal('modal-medicine-audit');
+    switchTab('tab-logs');
+    if (med) {
+      quickFilterLogs(med);
+    }
   }
 
   // Helpers
@@ -4661,13 +5721,21 @@
     const qtyInput = document.getElementById('add-qty');
     const brandInput = document.getElementById('add-brand');
     const uomSelect = document.getElementById('add-uom');
-    const expInput = document.getElementById('add-exp-date');
+    const expHidden = document.getElementById('add-exp');
+    const expDisplay = document.getElementById('add-exp-display');
+    const expBadge = document.getElementById('add-exp-badge');
 
     if (descInput && data.itemDesc) descInput.value = data.itemDesc;
     if (qtyInput) qtyInput.value = data.baselineQty || 0;
     if (brandInput && !brandInput.value) brandInput.value = 'Unverified';
     if (uomSelect && data.uom) uomSelect.value = data.uom;
-    if (expInput) expInput.value = 'PENDING COUNT';
+    if (expHidden) expHidden.value = 'PENDING COUNT';
+    if (expDisplay) expDisplay.value = 'PENDING COUNT';
+    if (expBadge) {
+      expBadge.className = 'exp-preview-badge exp-preview-pending';
+      expBadge.innerHTML = '<span class="status-dot dot-pending"></span> <strong>PENDING COUNT</strong> • Provisional Baseline Stock';
+      expBadge.style.display = 'inline-flex';
+    }
 
     showToast(`Loaded ${data.itemCode}: Baseline stock ${Number(data.baselineQty || 0).toLocaleString()} units. Expiry set to PENDING COUNT.`, 'success');
   }
@@ -5419,6 +6487,645 @@
   window.addEventListener('DOMContentLoaded', () => {
     initDciSyncTab();
   });
+
+  // ============================================================================
+  // DAILY FILE INJECTION & AUTOMATED CASCADING FEFO DEDUCTION ENGINE
+  // ============================================================================
+  const injectionState = {
+    sourceFileName: '',
+    fileType: '',
+    transactionDate: '',
+    parsedRecords: [],
+    previewItems: [],
+    previewRenderLimit: 150
+  };
+
+  function initFileInjection() {
+    const txInput = document.getElementById('injection-tx-date');
+    if (txInput && !txInput.value) {
+      const today = new Date().toISOString().split('T')[0];
+      txInput.value = today;
+      injectionState.transactionDate = today;
+    }
+
+    const dropzone = document.getElementById('injection-dropzone');
+    if (!dropzone) return;
+
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      });
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleInjectionFiles(Array.from(e.dataTransfer.files));
+      }
+    });
+  }
+
+  function handleInjectionFileSelected(event) {
+    if (event.target && event.target.files && event.target.files.length > 0) {
+      handleInjectionFiles(Array.from(event.target.files));
+    }
+  }
+
+  function handleInjectionFiles(fileList) {
+    if (!fileList || fileList.length === 0) return;
+    const dropLabel = document.getElementById('injection-dropzone-label');
+    if (dropLabel) {
+      dropLabel.textContent = fileList.length === 1 
+        ? `Processing ${fileList[0].name}...`
+        : `Processing ${fileList.length} files (${fileList.map(f => f.name).join(', ')})...`;
+    }
+
+    // Helper to read single file (CSV or XLSX)
+    function readFileAsync(file) {
+      return new Promise((resolve, reject) => {
+        const fname = file.name;
+        const isExcel = /\.xlsx?$/i.test(fname);
+        if (isExcel) {
+          if (typeof XLSX === 'undefined') {
+            reject(new Error(`SheetJS library not loaded. Please upload .csv or wait a moment.`));
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            try {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: 'array' });
+              const sheetName = workbook.SheetNames[0];
+              const firstSheet = workbook.Sheets[sheetName];
+              const csvText = XLSX.utils.sheet_to_csv(firstSheet);
+              resolve({ fileName: fname, csvText: csvText });
+            } catch (err) {
+              reject(new Error(`Excel parse error in ${fname}: ${err.message}`));
+            }
+          };
+          reader.onerror = () => reject(new Error(`Failed to read ${fname}`));
+          reader.readAsArrayBuffer(file);
+        } else {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            resolve({ fileName: fname, csvText: e.target.result });
+          };
+          reader.onerror = () => reject(new Error(`Failed to read ${fname}`));
+          reader.readAsText(file);
+        }
+      });
+    }
+
+    Promise.all(fileList.map(readFileAsync))
+      .then(results => {
+        processMultipleInjectionFiles(results);
+      })
+      .catch(err => {
+        showToast(err.message || 'Error reading files.', 'error');
+        if (dropLabel) dropLabel.textContent = 'Drag & drop your 3 cleaned HIS files here, or click to browse (Multi-select enabled)';
+      });
+  }
+
+  function parseCsvRow(line) {
+    const row = [];
+    let inQuote = false;
+    let cell = '';
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (ch === '"') {
+        if (inQuote && c + 1 < line.length && line[c + 1] === '"') {
+          cell += '"';
+          c++;
+        } else {
+          inQuote = !inQuote;
+        }
+      } else if (ch === ',' && !inQuote) {
+        row.push(cell.trim());
+        cell = '';
+      } else {
+        cell += ch;
+      }
+    }
+    row.push(cell.trim());
+    return row;
+  }
+
+  function parseSingleInjectionFile(csvText, fileName) {
+    if (!csvText) return null;
+    const lines = csvText.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return null;
+
+    // Find header row
+    let headerRow = null;
+    let headerIdx = -1;
+    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+      const r = parseCsvRow(lines[i]);
+      const upper = r.map(c => c.toUpperCase());
+      if (upper.some(c => c.includes('ITEM CODE') || c.includes('CODE') || c.includes('DESCRIPTION'))) {
+        headerRow = upper;
+        headerIdx = i;
+        break;
+      }
+    }
+
+    if (!headerRow) return null;
+
+    const codeCol = headerRow.findIndex(h => h.includes('ITEM CODE') || h === 'CODE');
+    const descCol = headerRow.findIndex(h => h.includes('DESCRIPTION') || h.includes('MEDICINE'));
+
+    let deductCol = -1;
+    let fileType = 'HIS_CLEANED';
+    let typeLabel = 'Generic HIS Cleaned';
+
+    const fnameUpper = (fileName || '').toUpperCase();
+    const hasRendered = headerRow.some(h => h.includes('RENDERED'));
+    const hasTotalQty = headerRow.findIndex(h => h === 'TOTAL QUANTITY' || h.includes('TOTAL QTY'));
+    const hasTotalIssuance = headerRow.findIndex(h => h.includes('TOTAL ISSUANCE'));
+
+    if (hasRendered || fnameUpper.includes('CONSUMPTION') || hasTotalQty !== -1) {
+      fileType = 'CONSUMPTION';
+      typeLabel = 'Patient Consumption';
+      deductCol = hasTotalQty !== -1 ? hasTotalQty : headerRow.findIndex(h => h.includes('TOTAL'));
+    } else if (fnameUpper.includes('STORAGE') || (hasTotalIssuance !== -1 && fnameUpper.includes('ISSUANCE') && !fnameUpper.includes('DISPENSING'))) {
+      fileType = 'STORAGE_ISSUANCE';
+      typeLabel = 'Storage Issuance';
+      deductCol = hasTotalIssuance !== -1 ? hasTotalIssuance : headerRow.length - 1;
+    } else if (fnameUpper.includes('DISPENSING') || hasTotalIssuance !== -1) {
+      fileType = 'DISPENSING_ISSUANCE';
+      typeLabel = 'Dispensing Issuance';
+      deductCol = hasTotalIssuance;
+    } else {
+      deductCol = headerRow.findIndex(h => h.includes('QTY') || h.includes('QUANTITY') || h.includes('ISSUANCE'));
+      typeLabel = 'Generic Cleaned File';
+    }
+
+    if (deductCol === -1) {
+      deductCol = headerRow.length - 1;
+    }
+
+    const records = [];
+    for (let i = headerIdx + 1; i < lines.length; i++) {
+      const row = parseCsvRow(lines[i]);
+      const code = (row[codeCol] || '').trim();
+      if (!code || code.toUpperCase() === 'ITEM CODE') continue;
+
+      const desc = descCol !== -1 ? (row[descCol] || '').trim() : '';
+      const rawDeductVal = row[deductCol] || '0';
+      const cleanDeductVal = parseFloat(String(rawDeductVal).replace(/[^0-9.-]/g, '')) || 0;
+
+      if (cleanDeductVal > 0) {
+        records.push({
+          itemCode: code.toUpperCase(),
+          medicine: desc,
+          qty: cleanDeductVal
+        });
+      }
+    }
+
+    return {
+      fileName: fileName,
+      fileType: fileType,
+      typeLabel: typeLabel,
+      records: records
+    };
+  }
+
+  function cleanGenericDescText(d) {
+    return String(d || '').trim().toUpperCase()
+      .replace(/^\([A-Z0-9\s-]+\)\s*/, '')
+      .replace(/\s+/g, ' ');
+  }
+
+  function extractNumPart(code) {
+    const match = String(code || '').match(/\d+/);
+    return match ? match[0] : '';
+  }
+
+  function processMultipleInjectionFiles(fileResults) {
+    if (!fileResults || fileResults.length === 0) {
+      showToast('No files were loaded.', 'warning');
+      return;
+    }
+
+    const parsedFiles = fileResults.map(f => parseSingleInjectionFile(f.csvText, f.fileName)).filter(Boolean);
+
+    if (parsedFiles.length === 0) {
+      showToast('Could not find recognizable headers (Item Code, Description) in the uploaded file(s).', 'error');
+      return;
+    }
+
+    // Aggregate by medicine (itemCode primary, normalized description secondary)
+    const aggregateMap = {};
+    parsedFiles.forEach(pf => {
+      pf.records.forEach(r => {
+        const codeKey = (r.itemCode || '').toUpperCase().trim();
+        const normDesc = cleanGenericDescText(r.medicine);
+        const key = codeKey || normDesc;
+        if (!key) return;
+
+        if (!aggregateMap[key]) {
+          aggregateMap[key] = {
+            itemCode: codeKey,
+            medicine: r.medicine,
+            normDesc: normDesc,
+            consumptionQty: 0,
+            storageQty: 0,
+            dispensingQty: 0,
+            totalDeductQty: 0,
+            sources: []
+          };
+        }
+
+        if (pf.fileType === 'CONSUMPTION') {
+          aggregateMap[key].consumptionQty += r.qty;
+        } else if (pf.fileType === 'STORAGE_ISSUANCE') {
+          aggregateMap[key].storageQty += r.qty;
+        } else if (pf.fileType === 'DISPENSING_ISSUANCE') {
+          aggregateMap[key].dispensingQty += r.qty;
+        } else {
+          aggregateMap[key].consumptionQty += r.qty;
+        }
+        aggregateMap[key].totalDeductQty += r.qty;
+
+        if (!aggregateMap[key].sources.includes(pf.typeLabel)) {
+          aggregateMap[key].sources.push(pf.typeLabel);
+        }
+        if (!aggregateMap[key].medicine && r.medicine) {
+          aggregateMap[key].medicine = r.medicine;
+        }
+        if (!aggregateMap[key].itemCode && codeKey) {
+          aggregateMap[key].itemCode = codeKey;
+        }
+      });
+    });
+
+    const aggregatedRecords = Object.values(aggregateMap).filter(a => a.totalDeductQty > 0);
+
+    if (aggregatedRecords.length === 0) {
+      showToast('No positive deduction quantities found across the selected file(s).', 'warning');
+      return;
+    }
+
+    const fileNamesList = parsedFiles.map(pf => pf.fileName);
+    const filesSummary = parsedFiles.length === 1
+      ? `${parsedFiles[0].typeLabel} • ${parsedFiles[0].fileName}`
+      : `Combined ${parsedFiles.length} Files (${parsedFiles.map(pf => pf.typeLabel).join(' + ')}) • ${fileNamesList.join(', ')}`;
+
+    injectionState.sourceFileName = fileNamesList.join(', ');
+    injectionState.fileType = parsedFiles.length > 1 ? 'MULTI_FILE_COMBINED' : parsedFiles[0].fileType;
+    injectionState.parsedRecords = aggregatedRecords.map(a => ({
+      itemCode: a.itemCode,
+      medicine: a.medicine,
+      quantityToDeduct: a.totalDeductQty,
+      consumptionQty: a.consumptionQty,
+      storageQty: a.storageQty,
+      dispensingQty: a.dispensingQty,
+      sources: a.sources,
+      fileType: parsedFiles.length > 1 ? 'COMBINED' : parsedFiles[0].fileType
+    }));
+
+    simulateFefoAllocation(aggregatedRecords, filesSummary, fileNamesList);
+  }
+
+  function simulateFefoAllocation(aggregatedRecords, filesSummary, fileNamesList) {
+    const sheetItems = state.items || [];
+    const previewList = [];
+    let totalDeductUnits = 0;
+    let matchedCount = 0;
+    let batchesImpactedCount = 0;
+
+    // Deep clone of sheet items for in-memory simulation
+    const simulatedInventory = sheetItems.map(it => ({
+      ...it,
+      simQty: it.qty,
+      normDesc: cleanGenericDescText(it.itemDesc),
+      numCode: extractNumPart(it.itemCode)
+    }));
+
+    aggregatedRecords.forEach(rec => {
+      const rawCode = rec.itemCode;
+      const rawDesc = rec.medicine;
+      const normDesc = rec.normDesc || cleanGenericDescText(rawDesc);
+      const numCode = extractNumPart(rawCode);
+      const neededQty = rec.totalDeductQty || rec.quantityToDeduct || 0;
+
+      totalDeductUnits += neededQty;
+
+      // 3-tier matching
+      let matchingBatches = simulatedInventory.filter(b => b.itemCode === rawCode);
+      if (matchingBatches.length === 0 && numCode) {
+        matchingBatches = simulatedInventory.filter(b => {
+          if (b.numCode !== numCode) return false;
+          // Guard against numeric collision across distinct medicines (e.g. Tamoxifen 000010 vs D5NSS 000010)
+          if (!normDesc || !b.normDesc) return true;
+          return b.normDesc === normDesc || b.normDesc.includes(normDesc) || normDesc.includes(b.normDesc);
+        });
+      }
+      if (matchingBatches.length === 0 && normDesc) {
+        matchingBatches = simulatedInventory.filter(b => b.normDesc === normDesc || b.normDesc.includes(normDesc) || normDesc.includes(b.normDesc));
+      }
+
+      if (matchingBatches.length === 0) {
+        previewList.push({
+          itemCode: rawCode,
+          medicine: rawDesc,
+          consumptionQty: rec.consumptionQty || 0,
+          storageQty: rec.storageQty || 0,
+          dispensingQty: rec.dispensingQty || 0,
+          totalDeductQty: neededQty,
+          sheetTotalStock: 0,
+          planChips: [],
+          status: 'UNMAPPED',
+          planSummary: '<span style="color:#b45309; font-weight:600; font-size:11px;">⚠️ Not found in active sheet</span>'
+        });
+        return;
+      }
+
+      matchedCount++;
+
+      // Sort matching batches in FEFO order (earliest expiry first), with sheet row index as FIFO tie-breaker
+      matchingBatches.sort((a, b) => {
+        const scoreA = getMockExpiryComparableScore(a.expDate);
+        const scoreB = getMockExpiryComparableScore(b.expDate);
+        return (scoreA - scoreB) || (a.rowIndex - b.rowIndex);
+      });
+
+      const totalSheetStockBefore = matchingBatches.reduce((acc, b) => acc + b.simQty, 0);
+
+      let needed = neededQty;
+      const planChips = [];
+
+      for (let b of matchingBatches) {
+        if (needed <= 0) {
+          planChips.push({
+            exp: b.expDate || 'No Exp',
+            brand: b.brandName,
+            deduct: 0,
+            remaining: b.simQty,
+            state: 'untouched'
+          });
+          continue;
+        }
+
+        if (b.simQty <= 0) continue;
+
+        const deduct = Math.min(b.simQty, needed);
+        const rem = b.simQty - deduct;
+        b.simQty = rem; // update simulated balance
+        needed -= deduct;
+        batchesImpactedCount++;
+
+        planChips.push({
+          exp: b.expDate || 'No Exp',
+          brand: b.brandName,
+          deduct: deduct,
+          remaining: rem,
+          state: rem === 0 ? 'zeroed' : 'partial'
+        });
+      }
+
+      const isShortage = needed > 0;
+      let status = 'READY';
+      if (isShortage) {
+        status = totalSheetStockBefore === 0 ? 'OUT_OF_STOCK' : 'SHORTAGE';
+      }
+
+      previewList.push({
+        itemCode: rawCode,
+        medicine: rawDesc || matchingBatches[0].itemDesc,
+        consumptionQty: rec.consumptionQty || 0,
+        storageQty: rec.storageQty || 0,
+        dispensingQty: rec.dispensingQty || 0,
+        totalDeductQty: neededQty,
+        sheetTotalStock: totalSheetStockBefore,
+        shortageAmount: isShortage ? needed : 0,
+        planChips: planChips,
+        status: status
+      });
+    });
+
+    injectionState.previewItems = previewList;
+
+    // Update UI elements
+    const dropLabel = document.getElementById('injection-dropzone-label');
+    if (dropLabel) {
+      dropLabel.textContent = `Loaded ${fileNamesList.length} file(s) • ${aggregatedRecords.length.toLocaleString()} unique items combined`;
+    }
+
+    const summaryEl = document.getElementById('injection-file-summary');
+    if (summaryEl) summaryEl.textContent = filesSummary;
+
+    const totalEl = document.getElementById('stat-inj-total-items');
+    if (totalEl) totalEl.textContent = aggregatedRecords.length.toLocaleString();
+
+    const matchedEl = document.getElementById('stat-inj-matched');
+    if (matchedEl) matchedEl.textContent = `${matchedCount.toLocaleString()} (${((matchedCount / aggregatedRecords.length) * 100).toFixed(0)}%)`;
+
+    const deductEl = document.getElementById('stat-inj-deduct-units');
+    if (deductEl) deductEl.textContent = `-${totalDeductUnits.toLocaleString()}`;
+
+    const batchesEl = document.getElementById('stat-inj-batches-impacted');
+    if (batchesEl) batchesEl.textContent = batchesImpactedCount.toLocaleString();
+
+    const configBar = document.getElementById('injection-config-bar');
+    if (configBar) configBar.style.display = 'block';
+
+    const previewCard = document.getElementById('injection-preview-card');
+    if (previewCard) previewCard.style.display = 'block';
+
+    renderInjectionPreviewTable(previewList);
+    showToast(`Aggregated ${aggregatedRecords.length.toLocaleString()} unique medicines from ${fileNamesList.length} file(s). Review FEFO plan below.`, 'success');
+  }
+
+  function renderInjectionPreviewTable(items) {
+    const tbody = document.getElementById('injection-preview-tbody');
+    const counter = document.getElementById('injection-preview-counter');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    const query = (document.getElementById('injection-preview-search')?.value || '').toLowerCase().trim();
+
+    const filtered = (items || []).filter(item => {
+      if (!query) return true;
+      return (item.itemCode || '').toLowerCase().includes(query) ||
+             (item.medicine || '').toLowerCase().includes(query);
+    });
+
+    const limit = injectionState.previewRenderLimit || 150;
+    const toRender = filtered.slice(0, limit);
+
+    if (counter) {
+      counter.textContent = filtered.length > limit
+        ? `Showing top ${limit.toLocaleString()} of ${filtered.length.toLocaleString()} items`
+        : `Showing ${filtered.length.toLocaleString()} items`;
+    }
+
+    if (toRender.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8;">No matching injection records found.</td></tr>';
+      return;
+    }
+
+    toRender.forEach(item => {
+      const tr = document.createElement('tr');
+
+      // Build source breakdown badges
+      const srcBadges = [];
+      if (item.consumptionQty > 0) {
+        srcBadges.push(`<span class="source-badge source-badge-cons">Cons: ${item.consumptionQty.toLocaleString()}</span>`);
+      }
+      if (item.storageQty > 0) {
+        srcBadges.push(`<span class="source-badge source-badge-storage">Storage: ${item.storageQty.toLocaleString()}</span>`);
+      }
+      if (item.dispensingQty > 0) {
+        srcBadges.push(`<span class="source-badge source-badge-disp">Disp: ${item.dispensingQty.toLocaleString()}</span>`);
+      }
+      const sourceBreakdownHtml = srcBadges.length > 0
+        ? `<div class="source-breakdown-cell">${srcBadges.join('')}</div>`
+        : '<span style="color:#94a3b8; font-size:11px;">--</span>';
+
+      // Build plan chips HTML
+      let planHtml = '';
+      if (item.planChips && item.planChips.length > 0) {
+        planHtml = item.planChips.map(c => {
+          const brandBadge = c.brand ? `<span style="opacity:0.75; font-size:10px;">(${escapeHtml(c.brand)})</span>` : '';
+          const arrow = c.deduct > 0 
+            ? `<strong>-${c.deduct.toLocaleString()}</strong> → ${c.remaining.toLocaleString()}` 
+            : `${c.remaining.toLocaleString()}`;
+          return `<span class="fefo-plan-chip ${c.state}">
+            ${escapeHtml(c.exp)} ${brandBadge}: ${arrow}
+          </span>`;
+        }).join('');
+      } else {
+        planHtml = item.planSummary || '<span style="color:#94a3b8; font-style:italic;">--</span>';
+      }
+
+      let statusBadge = '';
+      if (item.status === 'READY') {
+        statusBadge = '<span class="badge badge-safe">✓ Ready</span>';
+      } else if (item.status === 'SHORTAGE') {
+        statusBadge = `<span class="badge badge-critical" title="Shortage of ${item.shortageAmount.toLocaleString()}">⚠️ -${item.shortageAmount.toLocaleString()} Short</span>`;
+        tr.style.backgroundColor = '#fff7ed';
+      } else if (item.status === 'OUT_OF_STOCK') {
+        statusBadge = '<span class="badge badge-critical">Out of Stock</span>';
+        tr.style.backgroundColor = '#fff1f2';
+      } else {
+        statusBadge = '<span class="badge badge-neutral" style="font-size:10px;">Unmapped</span>';
+      }
+
+      tr.innerHTML = `
+        <td style="font-family:monospace; font-weight:700; color:#1e293b;">${escapeHtml(item.itemCode)}</td>
+        <td>
+          <div style="font-weight:600; color:#0f172a; font-size:12px;">${escapeHtml(item.medicine)}</div>
+        </td>
+        <td>${sourceBreakdownHtml}</td>
+        <td style="text-align:right; font-weight:700; color:#dc2626;">-${item.totalDeductQty.toLocaleString()}</td>
+        <td style="text-align:right; font-weight:600; color:#1e293b;">${item.sheetTotalStock.toLocaleString()}</td>
+        <td>
+          <div style="display:flex; flex-wrap:wrap; align-items:center;">${planHtml}</div>
+        </td>
+        <td style="text-align:center;">${statusBadge}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  function filterInjectionPreviewTable() {
+    renderInjectionPreviewTable(injectionState.previewItems || []);
+  }
+
+  function clearInjectionFile() {
+    injectionState.sourceFileName = '';
+    injectionState.fileType = '';
+    injectionState.parsedRecords = [];
+    injectionState.previewItems = [];
+
+    const dropLabel = document.getElementById('injection-dropzone-label');
+    if (dropLabel) dropLabel.textContent = 'Drag & drop your 3 cleaned HIS files here, or click to browse (Multi-select enabled)';
+
+    const fileInput = document.getElementById('injection-file-input');
+    if (fileInput) fileInput.value = '';
+
+    const configBar = document.getElementById('injection-config-bar');
+    if (configBar) configBar.style.display = 'none';
+
+    const previewCard = document.getElementById('injection-preview-card');
+    if (previewCard) previewCard.style.display = 'none';
+
+    showToast('File injection cleared.', 'info');
+  }
+
+  function executeInjectionFefoSync() {
+    if (!injectionState.parsedRecords || injectionState.parsedRecords.length === 0) {
+      showToast('No parsed records to inject.', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btn-execute-injection');
+    const txInput = document.getElementById('injection-tx-date');
+    const cleanDate = txInput ? txInput.value : '';
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner" style="width:12px; height:12px; border-width:2px; display:inline-block; vertical-align:middle; margin-right:4px;"></span> Deducting FEFO...';
+    }
+
+    const payload = {
+      sourceFileName: injectionState.sourceFileName,
+      fileType: injectionState.fileType,
+      transactionDate: cleanDate,
+      records: injectionState.parsedRecords
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
+          }
+          if (!res || !res.success) {
+            showToast(res ? res.error : 'File injection failed.', 'error');
+            return;
+          }
+
+          flashBtnSuccess('btn-execute-injection', 'Deducted!', () => {
+            showToast(res.message || 'FEFO deductions executed successfully!', 'success');
+            clearInjectionFile();
+            loadInventory();
+            loadLogs();
+          });
+        })
+        .withFailureHandler((err) => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
+          }
+          showToast(`Execution error: ${err.message || err}`, 'error');
+        })
+        .executeFileInjectionDeduction(payload);
+    } else {
+      // Offline / Preview mock
+      setTimeout(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
+        }
+        showToast(`[Preview Mock] Successfully executed FEFO deductions for ${payload.records.length} items!`, 'success');
+        clearInjectionFile();
+      }, 700);
+    }
+  }
+
 </script>
 
 

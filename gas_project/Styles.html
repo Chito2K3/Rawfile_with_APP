@@ -528,6 +528,12 @@
     border: 1px solid #fde68a;
   }
 
+  .exp-preview-pending {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+  }
+
   .exp-preview-safe {
     background: #f0fdf4;
     color: #047857;
@@ -1718,5 +1724,131 @@
     .verify-batch-item {
       grid-template-columns: 1fr 1fr;
     }
+  }
+
+  /* File Injection & Cascading FEFO Styles */
+  .injection-dropzone {
+    border: 2px dashed #93c5fd;
+    background: #f0f7ff;
+    border-radius: 10px;
+    padding: 30px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .injection-dropzone:hover, .injection-dropzone.dragover {
+    border-color: #2563eb;
+    background: #e0f2fe;
+    transform: translateY(-1px);
+  }
+  .fefo-plan-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    margin: 2px 4px 2px 0;
+    line-height: 1.3;
+    font-weight: 500;
+  }
+  .fefo-plan-chip.zeroed {
+    background: #fef2f2;
+    border-color: #fecaca;
+    color: #b91c1c;
+    font-weight: 600;
+  }
+  .fefo-plan-chip.partial {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #b45309;
+    font-weight: 600;
+  }
+  .fefo-plan-chip.untouched {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+    color: #64748b;
+  }
+  .source-breakdown-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+  }
+  .source-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    line-height: 1.2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .source-badge-cons {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+  }
+  .source-badge-storage {
+    background: #fdf4ff;
+    color: #86198f;
+    border: 1px solid #f5d0fe;
+  }
+  .source-badge-disp {
+    background: #f0fdf4;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+  }
+
+  /* Consolidated Batch Accordion Styles */
+  .sub-batches-accordion-row {
+    background: #f8fafc !important;
+    transition: all 0.2s ease;
+  }
+  .sub-batch-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .sub-batch-table th {
+    background: #f1f5f9;
+    color: #475569;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 7px 10px;
+    border-bottom: 1px solid #cbd5e1;
+  }
+  .sub-batch-table td {
+    padding: 7px 10px;
+    font-size: 11.5px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+  }
+  .sub-batch-table tr:last-child td {
+    border-bottom: none;
+  }
+  .badge-consolidated {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    font-weight: 600;
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .badge-consolidated:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
   }
 </style>
