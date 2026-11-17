@@ -1858,6 +1858,52 @@
     background: #dbeafe;
     border-color: #93c5fd;
   }
+
+  /* Animated File Injection Progress Bar */
+  .inj-progress-track {
+    width: 100%;
+    height: 14px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+  .inj-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #1d4ed8 100%);
+    background-size: 200% 100%;
+    animation: injShimmer 1.4s linear infinite;
+    transition: width 0.35s ease;
+    position: relative;
+  }
+  .inj-progress-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.22) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.22) 50%,
+      rgba(255, 255, 255, 0.22) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 24px 24px;
+    animation: injStripes 0.8s linear infinite;
+  }
+  @keyframes injShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+  @keyframes injStripes {
+    0% { background-position: 0 0; }
+    100% { background-position: 24px 0; }
+  }
 </style>
 </head>
 <body>
@@ -2084,8 +2130,37 @@
             </div>
           </div>
 
+          <!-- Recent File Injection & 1-Click Rollback Bar -->
+          <div id="recent-injection-rollback-bar" style="display:none; margin-top:12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:16px;">🛡️</span>
+              <div>
+                <div style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase;">Last File Injection Recorded</div>
+                <div id="recent-injection-summary-text" style="font-size:12px; color:#1e293b; font-weight:600;">--</div>
+              </div>
+            </div>
+            <button type="button" id="btn-revert-last-injection" class="btn btn-outline btn-sm" style="border-color:#fca5a5; color:#dc2626; background:#ffffff; font-weight:700;" onclick="promptRevertLastFileInjection()">
+              ↩️ Undo / Revert Last Injection
+            </button>
+          </div>
+
           <!-- Configuration & File Status Bar (Shown after file loaded) -->
           <div id="injection-config-bar" style="display:none; margin-top:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px;">
+            <!-- Duplicate File Alert Banner -->
+            <div id="injection-duplicate-warning" style="display:none; margin-bottom:12px; background:#fef2f2; border:2px solid #dc2626; border-radius:8px; padding:12px 14px; color:#991b1b;">
+              <div style="display:flex; align-items:flex-start; gap:10px;">
+                <span style="font-size:20px; line-height:1;">🛑</span>
+                <div style="flex:1;">
+                  <div style="font-weight:800; font-size:13px; color:#dc2626; text-transform:uppercase; letter-spacing:0.3px;">
+                    Duplicate File Injection Detected — Accidental Double-Subtraction Blocked!
+                  </div>
+                  <div id="injection-duplicate-warning-detail" style="font-size:12px; margin-top:4px; color:#7f1d1d; font-weight:500;">
+                    This file has already been injected and subtracted from your inventory sheet.
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
               <div>
                 <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; display:block;">Loaded Files & Mode</span>
@@ -2097,7 +2172,7 @@
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <button type="button" class="btn btn-outline btn-sm" onclick="clearInjectionFile()">✕ Clear</button>
-                <button type="button" id="btn-execute-injection" class="btn btn-primary" onclick="executeInjectionFefoSync()">
+                <button type="button" id="btn-execute-injection" class="btn btn-primary" onclick="openConfirmInjectionModal()">
                   ⚡ Confirm & Apply FEFO Deductions
                 </button>
               </div>
@@ -2928,6 +3003,132 @@
     </div>
   </div>
 
+  <!-- MODAL: FILE INJECTION SAFETY CONFIRMATION -->
+  <div id="modal-confirm-injection" class="modal-backdrop" style="display:none;">
+    <div class="modal-card" style="max-width:540px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">🛡️</span>
+          <div class="modal-title" style="margin:0;">Confirm File Injection & Stock Deduction</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-confirm-injection')">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:18px;">
+        <!-- Duplicate Status Box inside Modal -->
+        <div id="confirm-inj-safe-badge" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; margin-bottom:14px; display:flex; align-items:center; gap:8px; color:#166534; font-size:12px; font-weight:600;">
+          <span>✅</span>
+          <span>Verified New Injection — None of these files have been injected previously.</span>
+        </div>
+
+        <div id="confirm-inj-duplicate-box" style="display:none; background:#fef2f2; border:2px solid #dc2626; border-radius:8px; padding:12px; margin-bottom:14px; color:#991b1b;">
+          <div style="font-weight:800; font-size:13px; color:#dc2626; margin-bottom:4px;">
+            🛑 STOP! DUPLICATE FILE DETECTED!
+          </div>
+          <div id="confirm-inj-duplicate-msg" style="font-size:12px; color:#7f1d1d; margin-bottom:10px;">
+            This file was already injected previously. Subtracting it again will cause double stock deduction!
+          </div>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; font-weight:700; color:#991b1b; cursor:pointer; background:#fee2e2; padding:8px; border-radius:6px;">
+            <input type="checkbox" id="chk-force-duplicate-injection" onchange="onToggleForceDuplicateCheckbox()" style="margin-top:2px;">
+            <span>I understand this file was already injected and I intentionally want to subtract these quantities again.</span>
+          </label>
+        </div>
+
+        <!-- Summary Breakdown -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">File(s) to Inject</div>
+            <div id="confirm-inj-files" style="font-size:12.5px; font-weight:700; color:#0f172a; word-break:break-all; margin-top:2px;">--</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; border-top:1px solid #e2e8f0; padding-top:10px;">
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Transaction Date</div>
+              <div id="confirm-inj-date" style="font-size:14px; font-weight:700; color:#1e293b;">--</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Matched Medicines</div>
+              <div id="confirm-inj-matched" style="font-size:14px; font-weight:700; color:#15803d;">0</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Total Stock to Subtract</div>
+              <div id="confirm-inj-units" style="font-size:16px; font-weight:800; color:#dc2626;">-0 units</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Sheet Batches Impacted</div>
+              <div id="confirm-inj-batches" style="font-size:14px; font-weight:700; color:#2563eb;">0 batches</div>
+            </div>
+          </div>
+        </div>
+
+        <p style="font-size:12px; color:#475569; margin:12px 0 0 0;">
+          Please verify the above numbers before proceeding. Once confirmed, quantities will be deducted in FEFO order from the <strong>STORAGE</strong> sheet.
+        </p>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-confirm-injection')">Cancel</button>
+        <button type="button" id="btn-modal-confirm-injection" class="btn btn-primary" onclick="executeInjectionFefoSync()">
+          ⚡ Yes, Subtract Stocks Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRM REVERT / UNDO LAST FILE INJECTION -->
+  <div id="modal-revert-injection" class="modal-backdrop" style="display:none;">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">↩️</span>
+          <div class="modal-title" style="margin:0;">Undo / Revert Last File Injection</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-revert-injection')">✕</button>
+      </div>
+      <div class="modal-body" style="padding:18px;">
+        <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px; margin-bottom:14px; color:#9a3412; font-size:12px;">
+          <strong>How Rollback Works:</strong> This will restore the exact subtracted quantities from the last File Injection back into their original rows in the <strong>STORAGE</strong> sheet and mark the log entries as <code>[REVERTED]</code>.
+        </div>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; font-size:12.5px;">
+          <div style="margin-bottom:6px;"><strong>Injected File(s):</strong> <span id="revert-modal-files">--</span></div>
+          <div style="margin-bottom:6px;"><strong>Injected Timestamp:</strong> <span id="revert-modal-ts">--</span></div>
+          <div><strong>Total Units to Restore:</strong> <span id="revert-modal-units" style="font-weight:800; color:#15803d;">+0 units</span></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-revert-injection')">Cancel</button>
+        <button type="button" id="btn-confirm-revert-injection" class="btn btn-primary" style="background:#dc2626; border-color:#dc2626;" onclick="executeRevertLastFileInjection()">
+          ↩️ Confirm & Restore Stocks
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ANIMATED FILE INJECTION PROGRESS -->
+  <div id="modal-injection-progress" class="modal-backdrop" style="display:none; z-index:9999;">
+    <div class="modal-card" style="max-width:460px; padding:24px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="spinner" style="width:20px; height:20px; border-width:2.5px;"></div>
+          <h3 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">Executing FEFO File Injection...</h3>
+        </div>
+        <span id="inj-progress-timer" style="font-family:monospace; font-size:12px; font-weight:700; color:#2563eb; background:#eff6ff; padding:3px 8px; border-radius:6px;">00:00s</span>
+      </div>
+
+      <div class="inj-progress-track" style="margin-bottom:10px;">
+        <div id="inj-progress-fill" class="inj-progress-fill"></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:12px;">
+        <span id="inj-progress-stage" style="color:#334155; font-weight:600;">🛡️ Validating duplicate file guard...</span>
+        <span id="inj-progress-pct" style="font-weight:800; color:#1d4ed8;">10%</span>
+      </div>
+
+      <div style="font-size:11px; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
+        Please wait and do not close this tab while Google Sheets updates your inventory balances and audit log.
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div id="toast-container" class="toast-container"></div>
 
@@ -3001,7 +3202,7 @@
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    
+
     let icon = 'ℹ️';
     if (type === 'success') icon = '✅';
     if (type === 'error') icon = '❌';
@@ -3059,7 +3260,7 @@
   }
 
   // Default Master DCI Catalog (291 items from Sheet1)
-  const DEFAULT_MOCK_DCI_CATALOG = [{"code":"DMDON001151","desc":"(DON) CARBAMAZEPINE 200MG TABLET"},{"code":"DMDON000506","desc":"(DON) GABAPENTIN 300MG CAPSULE"},{"code":"DMDON000808","desc":"(DON) OSELTAMIVIR PHOSPHATE 75MG CAPSULE"},{"code":"DMDON000909","desc":"(DON) PRAZIQUANTEL 600MG TABLET (AVAILABLE UNDER DOH PROGRAM)"},{"code":"DMR000023","desc":"ACETYLCYSTEINE 600MG EFFERVESCENT TABLET"},{"code":"DMR000029","desc":"ACICLOVIR 400MG TABLET"},{"code":"DMR000030","desc":"ACICLOVIR 800MG TABLET"},{"code":"DMR000060","desc":"AMLODIPINE BESILATE 10MG TABLET"},{"code":"DMR000061","desc":"AMLODIPINE BESILATE 5MG TABLET"},{"code":"DMR000066","desc":"AMOXICILLIN TRIHYDRATE 500MG CAPSULE"},{"code":"DMR000079","desc":"APIXABAN 2.5MG TABLET"},{"code":"DMR000088","desc":"ASCORBIC ACID 500MG TABLET"},{"code":"DMR000099","desc":"ASPIRIN 80MG TABLET"},{"code":"DMR000113","desc":"AZITHROMYCIN DIHYDRATE 500MG TABLET"},{"code":"DMR000129","desc":"BETAHISTINE HYDROCHLORIDE 16MG TABLET"},{"code":"DMR000130","desc":"BETAHISTINE HYDROCHLORIDE 24MG TABLET"},{"code":"DMR000138","desc":"BISACODYL 10MG (ADULT) SUPPOSITORY"},{"code":"DMR000148","desc":"BUDESONIDE + FORMOTEROL FUMARATE DIHYDRATE (160 MICROGRAMS BUDESONIDE + 4.5 MICROGRAMS FORMOTEROL) X 60 DOSES WITH APPROPRIATE ACCOMPANYING DISPENSER"},{"code":"DMR000150","desc":"BUDESONIDE 200MCG/DOSE X 200 DOSES DPI"},{"code":"DMR000151","desc":"BUDESONIDE 250MCG/ML,2ML RESPIRATORY SOLUTION FOR NEBULIZATION"},{"code":"DMR000198","desc":"CARVEDILOL 25MG TABLET"},{"code":"DMR000205","desc":"CEFALEXIN MONOHYDRATE 500MG CAPSULE"},{"code":"DMR000212","desc":"CEFIXIME 200MG CAPSULE"},{"code":"DMR000229","desc":"CEFUROXIME AXETIL 500MG TABLET"},{"code":"DMR000234","desc":"CELECOXIB 200MG CAPSULE"},{"code":"DMR000237","desc":"CETIRIZINE DIHYDROCHLORIDE 10MG TABLET"},{"code":"DMR000255","desc":"CICLOSPORIN 100MG CAPSULE"},{"code":"DMR000258","desc":"CICLOSPORIN 25MG CAPSULE"},{"code":"DMR000283","desc":"CLINDAMYCIN HYDROCHLORIDE 300MG CAPSULE"},{"code":"DMR000293","desc":"CLONIDINE HYDROCHLORIDE 75MCG TABLET"},{"code":"DMR000294","desc":"CLOPIDOGREL 75 MG TABLET"},{"code":"DMR000300","desc":"CLOXACILLIN SODIUM 500MG CAPSULE"},{"code":"DMR000301","desc":"CLOZAPINE 100 MG TABLET"},{"code":"DMR000303","desc":"CO-AMOXICLAV (AMOXICILLIN + POTASSIUM CLAVULANATE) 875MG AMOXICILLIN TRIHYDRATE + 125MG POTASSIUM CLAVULANATE TABLET"},{"code":"DMR000306","desc":"CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 500 MG AMOXICILLIN TRIHYDRATE + 125 MG POTASSIUM CLAVULANATE PER TABLET"},{"code":"DMR000319","desc":"COTRIMOXAZOLE (SULFAMETHOXAZOLE + TRIMETHOPRIM) 800 MG SULFAMETHOXAZOLE + 160 MG TRIMETHOPRIM TABLET"},{"code":"DMR000333","desc":"DAPAGLIFLOZIN 10MG TABLET"},{"code":"DMR000340","desc":"DEXAMETHASONE 4MG TABLET"},{"code":"DMR000352","desc":"DICLOFENAC SODIUM 50MG TABLET/CAPSULE/ENTERIC COATED TABLET/MR TABLET"},{"code":"DMR000360","desc":"DIGOXIN 250MCG TABLET"},{"code":"DMR000363","desc":"DIGOXIN 50MCG/ML ELIXIR, 60ML BOTTLE"},{"code":"DMR000394","desc":"DOXYCYCLINE HYCLATE 100MG CAPSULE"},{"code":"DMR000422","desc":"ESCITALOPRAM 10 MG TABLET"},{"code":"DMR000450","desc":"FLUCONAZOLE 150MG CAPSULE"},{"code":"DMR000451","desc":"FLUCONAZOLE 200MG CAPSULE"},{"code":"DMR000505","desc":"GABAPENTIN 100MG CAPSULE"},{"code":"DMR000506","desc":"GABAPENTIN 300MG CAPSULE"},{"code":"DMR000548","desc":"HYOSCINE N-BUTYL BROMIDE 10MG TABLET"},{"code":"DMR000562","desc":"INDACATEROL MALEATE + GLYCOPYRRONIUM BROMIDE 110 MCG + 50 MCG INHALATION POWDER IN HARD CAPSULES"},{"code":"DMR000589","desc":"IRBESARTAN + HYDROCHLOROTHIAZIDE 150MG IRBESARTAN + 12.5MG HYDROCHLOROTHIAZIDE TABLET"},{"code":"DMR000590","desc":"IRBESARTAN 150MG TABLET"},{"code":"DMR000607","desc":"ISOXSUPRINE HYDROCHLORIDE 10MG TABLET"},{"code":"DMR000634","desc":"LEVETIRACETAM 250MG FILM COATED TABLET"},{"code":"DMR000644","desc":"LEVOFLOXACIN 500MG TABLET"},{"code":"DMR000660","desc":"LINEZOLID 600MG TABLET/FILM-COATED TABLET"},{"code":"DMR000673","desc":"LORATIDINE 10MG TABLET/FILM COATED TABLET"},{"code":"DMR000689","desc":"MEFENAMIC ACID 500MG CAPSULE/TABLET"},{"code":"DMR000700","desc":"METHIMAZOLE (THIAMAZOLE) 5MG TABLET"},{"code":"DMR000722","desc":"METRONIDAZOLE 500MG TABLET"},{"code":"DMR000740","desc":"MONTELUKAST SODIUM 10MG TABLET"},{"code":"DMR000741","desc":"MONTELUKAST SODIUM 4MG CHEWABLE TABLET"},{"code":"DMR000751","desc":"MULTIVITAMINS ADULTS CAPSULE/TABLET"},{"code":"DMR000780","desc":"NIFEDIPINE 10MG CAPSULE"},{"code":"DMR000798","desc":"OLANZAPINE 10MG TABLET"},{"code":"DMR000799","desc":"OMEPRAZOLE 20MG CAPSULE"},{"code":"DMR000806","desc":"ORAL REHYDRATION SALTS (ORS-75 REPLACEMENT) 20.5G SACHET"},{"code":"DMR000844","desc":"PARACETAMOL 250MG SUPPOSITORY"},{"code":"DMR000846","desc":"PARACETAMOL 500MG TABLET"},{"code":"DMR000877","desc":"PHENOXYMETHYL PENICILIN 250MG TABLET/CAPSULE"},{"code":"DMR000905","desc":"POTASSIUM CHLORIDE 600MG TABLET"},{"code":"DMR000937","desc":"QUETIAPINE FUMARATE 25MG TABLET"},{"code":"DMR000966","desc":"RISPERIDONE 2MG TABLET"},{"code":"DMR000973","desc":"ROSUVASTATIN CALCIUM 10MG TABLET"},{"code":"DMR000975","desc":"ROSUVASTATIN CALCIUM 20MG TABLET"},{"code":"DMR000976","desc":"SACUBITRIL/VALSARTAN 100MG TABLET"},{"code":"DMR000977","desc":"SACUBITRIL/VALSARTAN 200MG TABLET"},{"code":"DMR000978","desc":"SACUBITRIL/VALSARTAN 50MG TABLET"},{"code":"DMR000981","desc":"SALBUTAMOL SULFATE MDI 100MCG/DOSE X 200 ACTUATIONS"},{"code":"DMR000986","desc":"SEVELAMER CARBONATE 800MG TABLET"},{"code":"DMR000998","desc":"SODIUM BICARBONATE 325MG TABLET"},{"code":"DMR001000","desc":"SODIUM BICARBONATE 650 MG TABLET"},{"code":"DMR001008","desc":"SPIRONOLACTONE 25MG TABLET"},{"code":"DMR001011","desc":"SPIRONOLACTONE 50MG TABLET"},{"code":"DMR001022","desc":"SUCRALFATE 1G TABLET"},{"code":"DMR001057","desc":"TOLVAPTAN 15MG TABLET"},{"code":"DMR001074","desc":"TRIMETAZIDINE HYDROCHLORIDE 35MG TABLET"},{"code":"DMR001095","desc":"VALGANCICLOVIR 450 MG TABLET"},{"code":"DMR000378","desc":"DIVALPROEX SODIUM 250 MG TABLET"},{"code":"DMR000379","desc":"DIVALPROEX SODIUM 500MG CONTROLLED RELEASE TABLET"},{"code":"DMR001102","desc":"VALSARTAN 80MG TABLET/FILM COATED TABLET"},{"code":"DMR001114","desc":"VITAMIN B COMPLEX (VITAMIN B1 B6 B12) 100 MG B1 + 5 MG B6 + 50 MCG B12 TABLET/CAPSULE"},{"code":"DMR001119","desc":"WARFARIN SODIUM 2.5MG TABLET"},{"code":"DMDON000652","desc":"(DON) LIDOCAINE HYDROCHLORIDE 2% (20MG/ML) 50ML AMPULE/VIAL (IM/IV)"},{"code":"DMDON000803","desc":"(DON) ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMCSP000002","desc":"(DONCSP) CISPLATIN 1MG/ML, 50ML VIAL (IV)"},{"code":"DMR000028","desc":"ACICLOVIR 25MG/ML, 10ML VIAL (IV INFUSION)"},{"code":"DMR000048","desc":"AMIKACIN SULFATE 125MG/ML,2ML VIAL"},{"code":"DMR000049","desc":"AMIKACIN SULFATE 250MG/ML, 2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000050","desc":"AMIKACIN SULFATE 50MG/ML, 2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000087","desc":"ASCORBIC ACID 250MG/ML, 2ML AMPULE (IV)"},{"code":"DMR000109","desc":"ATROPINE SULFATE 1MG/ML, 1ML AMPULE (IM,IV,SC)"},{"code":"DMR000112","desc":"AZITHROMYCIN DIHYDRATE 500MG POWDER, VIAL (IV INFUSION)"},{"code":"DMR000157","desc":"BUPIVACAINE HYDROCHLORIDE 0.5% + 8% DEXTROSE, 4ML AMPULE"},{"code":"DMR000155","desc":"BUPIVACAINE HYDROCHLORIDE 0.5%, 10ML AMPULE (ISOBARIC)"},{"code":"DMR000159","desc":"BUTORPHANOL TARTRATE 2MG/ML,1ML AMPULE/VIAL (IM,IV)."},{"code":"DMR000168","desc":"CALCIUM GLUCONATE 10%, 10ML VIAL/AMPULE (IV)"},{"code":"DMR000209","desc":"CEFEPIME HYDROCHLORIDE 2 G VIAL (IM,IV)"},{"code":"DMR001128","desc":"CLINDAMYCIN PHOSPHATE 150 MG/ML,2ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000328","desc":"CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 1ML VIAL/AMPULE"},{"code":"DMR000380","desc":"DOBUTAMINE HYDROCHLORIDE 50MG/ML, 5ML AMPULE (IV INFUSION)"},{"code":"DMR000389","desc":"DOPAMINE HYDROCHLORIDE 40MG/ML, 5ML VIAL/AMPULE (IV)"},{"code":"DMR000401","desc":"ENOXAPARIN SODIUM 100MG/ML, 0.4ML PRE‐FILLED SYRINGE (SC)"},{"code":"DMR000411","desc":"EPINEPHRINE HYDROCHLORIDE 1MG/ML, 1ML AMPULE (IV, IM,SC)"},{"code":"DMR000489","desc":"FUROSEMIDE 10MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMR000511","desc":"GADOTERIC ACID, 0.5 MMOL/ML SOLUTION FOR INJECTION, 10 ML VIAL"},{"code":"DMR000522","desc":"GOSERELIN ACETATE 3.6 MG DEPOT SOLUTION, PRE‐FILLED SYRINGE (SC)"},{"code":"DMR000525","desc":"HEPARIN SODIUM 5000IU/ML,5ML VIAL"},{"code":"DMR000534","desc":"HYDRALAZINE HYDROCHLORIDE 20MG/ML, 1ML AMPULE (IM,IV)"},{"code":"DMR000541","desc":"HYDROCORTISONE SODIUM SUCCINATE POWDER 250MG VIAL (IV)"},{"code":"DMR000571","desc":"IOHEXOL 300MG IODINE/ML, 100 ML VIAL"},{"code":"DMR000573","desc":"IOHEXOL 350MG IODINE/ML, 100 ML VIAL"},{"code":"DMR000586","desc":"IPRATROPIUM + SALBUTAMOL (500MCG IPRATROPIUM BROMIDE + 2.5MG SALBUTAMOL), 2.5ML NEBULE"},{"code":"DMR000594","desc":"IRON SUCROSE 20MG/ML, 5ML AMPULE"},{"code":"DMR000595","desc":"ISOFLURANE INHALATION 100ML BOTTLE"},{"code":"DMR000602","desc":"ISOSORBIDE DINITRATE 1MG/ML, 10ML AMPULE (IV)"},{"code":"DMR000630","desc":"LEUPRORELINE ACETATE 11.25 MG DEPOT SOLUTION, VIAL WITH SYRINGE (IM, SC)"},{"code":"DMR000631","desc":"LEUPRORELINE ACETATE 3.75 MG/ 2 ML VIAL WITH SYRINGE (IM, SC) POWDER"},{"code":"DMR000637","desc":"LEVETIRACETAM 500MG/5 ML (100 MG/ML) CONCENTRATE SOLUTION FOR IV INFUSION, 5 ML VIAL"},{"code":"DMR000643","desc":"LEVOFLOXACIN (0.5% W/V), 5MG/ML, OPHTHALMIC SOLUTION"},{"code":"DMR000675","desc":"LOSARTAN + HYDROCHLOROTHIAZIDE (50 MG LOSARTAN + 12.5 MG HYDROCHLOROTHIAZIDE) TABLET"},{"code":"DMR000715","desc":"METHYLPREDNISOLONE SODIUM SUCCINATE POWDER 1G/16ML + DILUENT VIAL (IM, IV, IV INFUSION)"},{"code":"DMR000716","desc":"METHYLPREDNISONLONE SODIUM SUCCINATE POWDER 500MG/8.0ML + DILUENT VIAL (IM, IV, IV INFUSION)"},{"code":"DMR000787","desc":"NOREPINEPHRINE BITARTRATE 1MG/ML, 2ML AMPULE (IV INFUSION)"},{"code":"DMR000789","desc":"NOREPINEPHRINE BITARTRATE 2MG/ML, 4ML AMPULE (8MG/4ML) SOLUTION FOR INJECTION"},{"code":"DMR000803","desc":"ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)"},{"code":"DMR000826","desc":"OXYTOCIN 10 IU/ML, 1 ML AMPULE (IM,IV)"},{"code":"DMR000830","desc":"PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)"},{"code":"DMR000894","desc":"PHYTOMENADIONE 10MG/ML ,1ML AMPULE (IM,IV,SC)"},{"code":"DMR000902","desc":"POLYMYXIN B SULFATE 500,000 UNITS POWDER FOR SOLUTION FOR INJECTION (INTRATHECAL/IM/IV), 5ML VIAL"},{"code":"DMR000904","desc":"POTASSIUM CHLORIDE 2MEQ/ML, 20ML VIAL (IV INFUSION)"},{"code":"DMR000925","desc":"PROPRANOLOL HYDROCHLORIDE 40MG TABLET"},{"code":"DMR000948","desc":"RANITIDINE 300MG TABLET"},{"code":"DMR000972","desc":"ROPIVACAINE HYDROCHLORIDE 10MG/ML ,10ML AMPULE (IV)"},{"code":"DMR001001","desc":"SODIUM CHLORIDE 2.5MEQ/ML , 20ML VIAL"},{"code":"DMR001023","desc":"SUGAMMADEX 100MG/ML SOLUTION FOR INJECTION, 2ML VIAL (IV)"},{"code":"DMR001066","desc":"TRAMADOL HYDROCHLORIDE 50MG/ML,2ML AMPULE (IM,SC,IV)"},{"code":"DMR001068","desc":"TRANEXAMIC ACID 100MG/ML, 5ML AMPULE (IM,IV)"},{"code":"DMR001103","desc":"VANCOMYCIN HYDROCHLORIDE 1G VIAL (IV)"},{"code":"DMR001113","desc":"VITAMIN B COMPLEX (IV) (VITAMIN B1 B6 B12) 100 MG B1 + 100 MG B6 + 1 MG B12, 3 ML AMPULE (IV)"},{"code":"DMR001117","desc":"VORICONAZOLE 200MG LYOPHILIZED POWDER FOR SOLUTION FOR IV INFUSION, 30ML VIAL"},{"code":"DMC000861","desc":"(C) PHENOBARBITAL 15 MG TABLET"},{"code":"DMC000868","desc":"(C) PHENOBARBITAL 30 MG TABLET"},{"code":"DMC000871","desc":"(C) PHENOBARBITAL 60 MG TAB"},{"code":"DMC000873","desc":"(C) PHENOBARBITAL 90 MG TABLET"},{"code":"DMDON001127","desc":"(DON) OXYCODONE HYDROCHLORIDE 10MG/ML, 2ML AMPULE (IV INFUSION)"},{"code":"DMCSP000004","desc":"(DONCSP) FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)"},{"code":"DMR000348","desc":"DIAZEPAM 5MG/ML, 2ML AMPULE (IM, IV)"},{"code":"DMR000409","desc":"EPHEDRINE SULFATE 30MG/ML, 1ML AMPULE (IM, IV)"},{"code":"DMR000410","desc":"EPHEDRINE SULFATE 50MG/ML, 1ML AMPULE (IM, IV)"},{"code":"DMR000438","desc":"FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)"},{"code":"DMR000611","desc":"KETAMINE HYDROCHLORIDE 50MG/ML, 10ML VIAL (IM/IV)"},{"code":"DMR000730","desc":"MIDAZOLAM 1MG/ML, 5ML AMPULE/VIAL (IM,IV)"},{"code":"DMR000731","desc":"MIDAZOLAM 5MG/ML, 1ML AMPULE (IM,IV)"},{"code":"DMR000732","desc":"MIDAZOLAM 5MG/ML, 3ML AMPULE (IM,IV)"},{"code":"DMR000746","desc":"MORPHINE SULFATE 10MG TABLET/CAPSULE"},{"code":"DMR000747","desc":"MORPHINE SULFATE 10MG/ML, 1ML AMPULE (IM,IV,SC)"},{"code":"DMR000764","desc":"NALBUPHINE HYDROCHLORIDE 10MG/ML, 1ML AMPULE (IM, IV, SC)"},{"code":"DMR000857","desc":"PETHIDINE (MEPERIDINE) HYDROCHLORIDE 50MG/ML, 2ML AMPULE (IM, IV, SC)"},{"code":"DMDON000412","desc":"(DON) EPIRUBICIN HCL 50MG VIAL CSPMAP"},{"code":"DMR000074","desc":"ANASTRAZOLE 1MG FILM COATED TABLET"},{"code":"DMR000174","desc":"CAPECITABINE 500MG TABLET"},{"code":"DMR000192","desc":"CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)"},{"code":"DMR000275","desc":"CISPLATIN 1MG/ML, 50ML VIAL (IV)"},{"code":"DMR000382","desc":"DOCETAXEL ANHYDROUS 20MG/0.5 ML, 0.5ML VIAL (IV INFUSION)"},{"code":"DMR000383","desc":"DOCETAXEL ANHYDROUS 40MG/ML, 2ML (80MG/2ML) VIAL (IV INFUSION)"},{"code":"DMR000412","desc":"EPIRUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)"},{"code":"DMR000546","desc":"HYDROXYUREA 500MG CAPSULE"},{"code":"DMR000557","desc":"IMATINIB 100MG TABLET"},{"code":"DMR000593","desc":"IRINOTECAN HYDROCHLORIDE 40MG/2ML VIAL, CONCENTRATE, VIAL (IV INFUSION)"},{"code":"DMR000628","desc":"LETROZOLE 2.5MG TABLET/FILM-COATED TABLET"},{"code":"DMR000696","desc":"MESNA (SODIUM-2- MERCAPTOETHANESULPHONATE) 100MG/ML, 4ML AMPULE"},{"code":"DMR001027","desc":"TAMOXIFEN CITRATE 20MG TABLET"},{"code":"DMR001125","desc":"ZOLEDRONIC ACID (4MG/5ML CONCENTRATED SOLUTION FOR IV INFUSION) VIAL"},{"code":"DMR000019","desc":"ACETYLCYSTEINE 100MG/ML, 3ML AMPULE SOLUTION FOR INHALATION"},{"code":"DMR000021","desc":"ACETYLCYSTEINE 200 MG/ML, 25 ML BOTTLE (IV INFUSION)"},{"code":"DMR000065","desc":"AMOXICILLIN TRIHYDRATE 250MG/5ML GRANULES/POWDER FOR SUSPENSION, 60ML BOTTLE"},{"code":"DMR000084","desc":"ASCORBIC ACID 100MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000110","desc":"AZITHROMYCIN DIHYDRATE 200MG/5ML POWDER FOR SUSPENSION, 15ML BOTTLE"},{"code":"DMR000236","desc":"CETIRIZINE DIHYDROCHLORIDE 10 MG/ML DROPS, 10 ML BOTTLE"},{"code":"DMR000239","desc":"CETIRIZINE DIHYDROCHLORIDE 1MG/ML SOLUTION 60 ML BOTTLE"},{"code":"DMR000240","desc":"CETIRIZINE DIHYDROCHLORIDE 2.5MG/ML SYRUP ORAL DROPS, 10ML BOTTLE"},{"code":"DMR000241","desc":"CETIRIZINE DIHYDROCHLORIDE 5MG/5ML SYRUP, 60 ML BOTTLE"},{"code":"DMR000305","desc":"CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 400 MG AMOXICILLIN TRIHYDRATE + 57 MG POTASSIUM CLAVULANATE PER 5 ML GRANULES/POWDER FOR SUSPENSION, 70 ML BOTTLE"},{"code":"DMR000371","desc":"DIPHENHYDRAMINE HYDROCHLORIDE 12.5MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000533","desc":"HUMAN RECOMBINANT TISSUE TYPE PLASMINOGEN ACTIVATOR (ALTEPLASE) 50MG POWDER FOR IV INFUSION"},{"code":"DMR000724","desc":"METRONIDAZOLE BENZOATE 125MG/5ML, SUSPENSION 60ML BOTTLE"},{"code":"DMR000750","desc":"MOXIFLOXACIN HYDROCHLORIDE 5MG/ML (0.5% W/V) STERILE OPHTHALMIC SOLUTION, 5 ML BOTTLE"},{"code":"DMR000754","desc":"MULTIVITAMINS PER 5ML,60ML SYRUP BOTTLE"},{"code":"DMR000760","desc":"MUPIROCIN OINTMENT 2% 5G TUBE"},{"code":"DMR000791","desc":"NYSTATIN 100,000 UNITS/ML, SUSPENSION 30ML BOTTLE"},{"code":"DMR000835","desc":"PARACETAMOL 100MG/ML DROPS, 15ML BOTTLE"},{"code":"DMR000843","desc":"PARACETAMOL 250MG/5ML SYRUP, 60ML BOTTLE"},{"code":"DMR000891","desc":"PHENYTOIN SODIUM 100MG CAPSULE"},{"code":"DMR000906","desc":"POTASSIUM CHLORIDE 750MG DURULES TABLET"},{"code":"DMR000988","desc":"SILVER SULFADIAZINE CREAM 1% ,15G TUBE"},{"code":"DMR000989","desc":"SILVER SULFADIAZINE CREAM 1% ,25G TUBE"},{"code":"DMR000990","desc":"SILVER SULFADIAZINE CREAM 1% ,500G JAR"},{"code":"DMR001002","desc":"SODIUM HYALURONATE OPHTHALMIC SOLUTION 0.1% (1MG/ML), 5ML BOTTLE"},{"code":"DMR001051","desc":"TOBRAMYCIN + DEXAMETHASONE EYE DROP SUSPENSION 0.3% + 0.1%, 5ML BOTTLE"},{"code":"DMR001075","desc":"TROPICAMIDE+ PHENYLEPHRINE HYDROCHLORIDE 5MG + 5MG/ML EYE DROPS FIXED DOSE COMBINATION, 10ML BOTTLE"},{"code":"DMDON000944","desc":"(DON) RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)"},{"code":"DMDON000943","desc":"(DON) VACCINE, RABIES (CHICK EMBRYO CELL) PURIFIED INACTIVATED 2.5 IU/ ML, 1 DOSE + 1 ML DILUENT VIAL ( WHO PRE-QUALIFIED)"},{"code":"DMR000067","desc":"AMPHOTERICIN B (LIPID COMPLEX) 50MG VIAL (IV INFUSION)"},{"code":"DMR000068","desc":"AMPHOTERICIN B (NON-LIPID COMPLEX) 50MG LYOPHILIZED POWDER,VIAL (IV INFUSION)"},{"code":"DMR000078","desc":"ANTI-TETANUS SERUM (EQUINE) 1500 IU/0.7ML SOLUTION FOR INJECTION AMPULE/VIAL (IM)"},{"code":"DMR000107","desc":"ATRACURIUM BESILATE 10MG/ML, 2.5ML AMPULE (IV)"},{"code":"DMR000123","desc":"BCG VACCINE 500MCG/ML VIAL + 1ML DILUENT IN AMPULE (ID) 20 DOSES"},{"code":"DMR000126","desc":"BERACTANT 25MG/ML SUSPENSION, 4ML VIAL (INTRATRACHEAL ADMINISTRATION)"},{"code":"DMR000127","desc":"BERACTANT 25MG/ML SUSPENSION, 8ML VIAL (INTRATRACHEAL ADMINISTRATION)"},{"code":"DMR000136","desc":"BIPHASIC ISOPHANE HUMAN INSULIN 70/30 (RECOMBINANT DNA) ,70% ISOPHANE SUSPENSION + 30% SOLUBLE INSULIN IN 100 IU/ML, 10ML VIAL (SC)"},{"code":"DMR000193","desc":"CARBOPROST 125MCG/ML, 0.5ML SOLUTION FOR INJECTION"},{"code":"DMR000194","desc":"CARBOPROST 250MCG/ML SOLUTION FOR INJECTION,1ML AMPULE/VIAL"},{"code":"DMR000413","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 10,000 IU/ML, PRE-FILLED SYRINGE (IV,SC)"},{"code":"DMR000415","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4,000 IU/0.4 ML, PRE‐FILLED SYRINGE (IV,SC)"},{"code":"DMR000445","desc":"FILGRASTIM (G-CSF) 300MCG/ML 0.5 ML SOLUTION FOR INJECTION IN PREFILLED SYRINGE (IV, SC)"},{"code":"DMR000448","desc":"FILGRASTIM 300MCG, 0.9ML PRE FILLED SYRINGE,"},{"code":"DMR000526","desc":"HEPATITIS A INACTIVATED VACCINE VIRAL ANTIGEN NOT LESS THAN 1440 EU IN 1.0 ML MONODOSE VIAL (IM) (ADULT)"},{"code":"DMR000527","desc":"HEPATITIS B IMMUNOGLOBULIN (HUMAN) 0.5ML VIAL (IM)"},{"code":"DMR000528","desc":"HEPATITIS B VACCINE (RECOMBINANT DNA) 20 MICROGRAMS/ML MONODOSE VIAL (IM) ADULT"},{"code":"DMR000529","desc":"HEPATITIS B VACCINE (RECOMBINANT DNA)10MCG/0.5ML MONODOSE VIAL (IM) (PEDIATRIC"},{"code":"DMR001133","desc":"IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 200ML VIAL (IV)"},{"code":"DMR000559","desc":"IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 100ML VIAL (IV)"},{"code":"DMR000563","desc":"INFLUENZA POLYVALENT VACCINE 0.5ML, SUSPENSION FOR INJECTION ( VAXIGRIP TETRA PRE-FILED SYRINGE)"},{"code":"DMR000600","desc":"ISOPHANE INSULIN HUMAN (RECOMBINANT DNA) 100IU/ML, 10ML VIAL (SC)"},{"code":"DMR000792","desc":"OCTREOTIDE ACETATE 100MCG/ML, 1 ML AMPULE (IV INFUSION)"},{"code":"DMR000943","desc":"RABIES VACCINE,CHICK EMBRYO CELL (PURIFIED INACTIVATED) LYOPHILIZED POWDER, 2.5 IU/ML, 1 DOSE VIAL + 1 ML DILUENT (ID, IM)"},{"code":"DMR000944","desc":"RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)"},{"code":"DMR000951","desc":"REGULAR, INSULIN (RECOMBINANT DNA HUMAN) 100 IU/ML, 10ML VIAL (SC, IV/IM)"},{"code":"DMR000971","desc":"ROCURONIUM BROMIDE 10MG/ML, 5ML AMPULE/VIAL (IV)"},{"code":"DMR001025","desc":"SUXAMETHONIUM (SUCCINYLCHOLINE) CHLORIDE 20MG/ML, 10ML VIAL (IV)"},{"code":"DMR001026","desc":"TAFLUPROST OPHTHALMIC SOLUTION 15MCG/ML, 0.3ML BOTTLE SINGLE DOSE"},{"code":"DMR001042","desc":"TETANUS IMMUNOGLOBULIN (HUMAN) 250 IU/ML, 1ML AMPULE (IM)"},{"code":"DMR001044","desc":"TETANUS TOXOID 0.5ML AMPULE (IM)"},{"code":"DMR001106","desc":"VASOPRESSIN 20IU/ML VIAL/AMPULE (IM, IV)"},{"code":"DMR000070","desc":"AMPICILLIN + SULBACTAM (500MG AMPICILLIN + 250MG SULBACTAM) VIAL (IM,IV)"},{"code":"DMR000071","desc":"AMPICILLIN SODIUM 1G VIAL (IM,IV)"},{"code":"DMR000072","desc":"AMPICILLIN SODIUM 250MG VIAL (IM,IV)"},{"code":"DMR000520","desc":"GLUCOSE (DEXTROSE) 50%, 50ML VIAL (IV)"},{"code":"DMR000577","desc":"IOPAMIDOL 755MG/ML EQUIV. TO 370 MG IODINE, 100 ML VIAL/BOTTLE"},{"code":"DMR000656","desc":"LIDOCAINE SPRAY 10%, 50ML BOTTLE"},{"code":"DMR000848","desc":"PENICILLIN G CRYSTALLINE SODIUM (BENZYLPENICILLIN) 1M UNITS VIAL (IM/IV)"},{"code":"DMR000849","desc":"PENICILLIN G CRYSTALLINE SODIUM 5M UNITS VIAL (IM,IV)"},{"code":"DMDON000719","desc":"(DON) (ACTU USE ONLY) METOCLOPRAMIDE HYDROCHLORIDE 5MG/ML, 2ML AMPULE (IM, IV)"},{"code":"DMDON000382","desc":"(DON) (ACTU USE) DOCETAXEL 20MG/0.5ML (40MG/ML),1ML CONCENTRATE FOR SOLUTION FOR INFUSION (AS TRIHYDRATE)"},{"code":"DMDON000804","desc":"(DON) (FOR ACTU USE ONLY) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMDON000329","desc":"(DON) CYTARABINE 100MG/ML, 5ML VIAL CSPMAP"},{"code":"DMDON000383","desc":"(DON) DOCETAXEL 40MG/ML (80MG/2ML), 2ML CONCENTRATE FOR SOLUTION FOR IV INFUSION"},{"code":"DMDON000393","desc":"(DON) DOXORUBICIN 50MG VIAL"},{"code":"DMDON000815","desc":"(DON) OXALIPLATIN 5 MG/ML CONCENTRATE SOLUTION 10 ML VIAL (IV INFUSION)"},{"code":"DMDON000830","desc":"(DON) PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)"},{"code":"DMCSP000012","desc":"(DONCSP)CAPECITABINE 500MG TABLET"},{"code":"DMCSP000014","desc":"(DONCSP) CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)"},{"code":"DMCSP000011","desc":"(DONCSP) LETROZOLE 2.5MG TABLET/FILM-COATED TABLET"},{"code":"DMCSP000005","desc":"(DONCSP) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMCSP000010","desc":"(DONCSP) TAMOXIFEN 20MG TABLET"},{"code":"DMDON000390","desc":"(DON) DOXORUBICIN HCL 10MG VIAL (DOANTION)-CSPMAP"},{"code":"DMDON000967","desc":"(DON) RITUXIMAB 10MG/ML, 10 ML VIAL (IV)"},{"code":"DMDON000968","desc":"(DON) RITUXIMAB 10MG/ML, 50 ML VIAL (IV)"},{"code":"DMCSP000008","desc":"(DONCSP) FILGRASTIM 300MCG/0.9ML SOLUTION (IV,SC), 0.9ML PRE-FILLED SYRINGE"},{"code":"DMR000392","desc":"DOXORUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)"},{"code":"DMR000967","desc":"RITUXIMAB 10MG/ML, 10 ML VIAL (IV)"},{"code":"DMR000968","desc":"RITUXIMAB 10MG/ML, 50 ML VIAL (IV)"},{"code":"DMR001071","desc":"TRASTUZUMAB 150 MG LYOPHILIZED POWDER (IV INFUSION) VIAL"},{"code":"DMR001072","desc":"TRASTUZUMAB 600MG/5ML (120MG/ML) SOLUTION FOR INJECTION, 5ML VIAL"},{"code":"DMR000037","desc":"ALBUMIN, HUMAN 25% 50ML BOTTLE (IV, IV INFUSION)"},{"code":"DMR000166","desc":"CALCIUM CARBONATE 500MG TABLET/CHEWABLE TABLET"},{"code":"DMR000248","desc":"CHLORHEXIDINE GLUCONATE 4% SOLUTION 500 ML BOTTLE"},{"code":"DMR000441","desc":"FERROUS SULFATE + FOLIC ACID 60 MG ELEMENTAL IRON + 400 MICROGRAM FOLIC ACID PER TABLET/CAPSULE/FILM COATED TABLET"},{"code":"DMR000572","desc":"IOHEXOL 300MG IODINE/ML, 50 ML VIAL"},{"code":"DMR000681","desc":"MAGNESIUM SULFATE HEPTAHYDRATE 250MG/ML, 20ML VIAL (IV)"},{"code":"DMDON000558","desc":"(DON) IMATINIB (as mesylate) 400MG TABLET"},{"code":"DMDON000631","desc":"(DON) LEUPRORELINE ACETATE 3.75MG PRE-FILLED SYRINGE"},{"code":"DMDON000829","desc":"(DON) PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL"},{"code":"DMCSP000003","desc":"(DONCSP) ANASTRAZOLE 1MG FILM COATED TABLET"},{"code":"DMR000326","desc":"CYCLOPHOSPHAMIDE POWDER 500MG VIAL (IV)"},{"code":"DMR000329","desc":"CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 5ML VIAL/AMPULE"},{"code":"DMR000804","desc":"ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)"},{"code":"DMR000816","desc":"OXALIPLATIN POWDER 50MG VIAL (IV INFUSION)"},{"code":"DMR000829","desc":"PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL"},{"code":"DMR000416","desc":"EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4000IU/ML SOLUTION FOR INJECTION, 1ML PREFILLED SYRINGE (IV, SC)"},{"code":"DMR000560","desc":"IMMUNOGLOBULIN NORMAL, HUMAN (IGIV) 50MG/ML, 50ML VIAL (IV)"}];
+  const DEFAULT_MOCK_DCI_CATALOG = [{ "code": "DMDON001151", "desc": "(DON) CARBAMAZEPINE 200MG TABLET" }, { "code": "DMDON000506", "desc": "(DON) GABAPENTIN 300MG CAPSULE" }, { "code": "DMDON000808", "desc": "(DON) OSELTAMIVIR PHOSPHATE 75MG CAPSULE" }, { "code": "DMDON000909", "desc": "(DON) PRAZIQUANTEL 600MG TABLET (AVAILABLE UNDER DOH PROGRAM)" }, { "code": "DMR000023", "desc": "ACETYLCYSTEINE 600MG EFFERVESCENT TABLET" }, { "code": "DMR000029", "desc": "ACICLOVIR 400MG TABLET" }, { "code": "DMR000030", "desc": "ACICLOVIR 800MG TABLET" }, { "code": "DMR000060", "desc": "AMLODIPINE BESILATE 10MG TABLET" }, { "code": "DMR000061", "desc": "AMLODIPINE BESILATE 5MG TABLET" }, { "code": "DMR000066", "desc": "AMOXICILLIN TRIHYDRATE 500MG CAPSULE" }, { "code": "DMR000079", "desc": "APIXABAN 2.5MG TABLET" }, { "code": "DMR000088", "desc": "ASCORBIC ACID 500MG TABLET" }, { "code": "DMR000099", "desc": "ASPIRIN 80MG TABLET" }, { "code": "DMR000113", "desc": "AZITHROMYCIN DIHYDRATE 500MG TABLET" }, { "code": "DMR000129", "desc": "BETAHISTINE HYDROCHLORIDE 16MG TABLET" }, { "code": "DMR000130", "desc": "BETAHISTINE HYDROCHLORIDE 24MG TABLET" }, { "code": "DMR000138", "desc": "BISACODYL 10MG (ADULT) SUPPOSITORY" }, { "code": "DMR000148", "desc": "BUDESONIDE + FORMOTEROL FUMARATE DIHYDRATE (160 MICROGRAMS BUDESONIDE + 4.5 MICROGRAMS FORMOTEROL) X 60 DOSES WITH APPROPRIATE ACCOMPANYING DISPENSER" }, { "code": "DMR000150", "desc": "BUDESONIDE 200MCG/DOSE X 200 DOSES DPI" }, { "code": "DMR000151", "desc": "BUDESONIDE 250MCG/ML,2ML RESPIRATORY SOLUTION FOR NEBULIZATION" }, { "code": "DMR000198", "desc": "CARVEDILOL 25MG TABLET" }, { "code": "DMR000205", "desc": "CEFALEXIN MONOHYDRATE 500MG CAPSULE" }, { "code": "DMR000212", "desc": "CEFIXIME 200MG CAPSULE" }, { "code": "DMR000229", "desc": "CEFUROXIME AXETIL 500MG TABLET" }, { "code": "DMR000234", "desc": "CELECOXIB 200MG CAPSULE" }, { "code": "DMR000237", "desc": "CETIRIZINE DIHYDROCHLORIDE 10MG TABLET" }, { "code": "DMR000255", "desc": "CICLOSPORIN 100MG CAPSULE" }, { "code": "DMR000258", "desc": "CICLOSPORIN 25MG CAPSULE" }, { "code": "DMR000283", "desc": "CLINDAMYCIN HYDROCHLORIDE 300MG CAPSULE" }, { "code": "DMR000293", "desc": "CLONIDINE HYDROCHLORIDE 75MCG TABLET" }, { "code": "DMR000294", "desc": "CLOPIDOGREL 75 MG TABLET" }, { "code": "DMR000300", "desc": "CLOXACILLIN SODIUM 500MG CAPSULE" }, { "code": "DMR000301", "desc": "CLOZAPINE 100 MG TABLET" }, { "code": "DMR000303", "desc": "CO-AMOXICLAV (AMOXICILLIN + POTASSIUM CLAVULANATE) 875MG AMOXICILLIN TRIHYDRATE + 125MG POTASSIUM CLAVULANATE TABLET" }, { "code": "DMR000306", "desc": "CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 500 MG AMOXICILLIN TRIHYDRATE + 125 MG POTASSIUM CLAVULANATE PER TABLET" }, { "code": "DMR000319", "desc": "COTRIMOXAZOLE (SULFAMETHOXAZOLE + TRIMETHOPRIM) 800 MG SULFAMETHOXAZOLE + 160 MG TRIMETHOPRIM TABLET" }, { "code": "DMR000333", "desc": "DAPAGLIFLOZIN 10MG TABLET" }, { "code": "DMR000340", "desc": "DEXAMETHASONE 4MG TABLET" }, { "code": "DMR000352", "desc": "DICLOFENAC SODIUM 50MG TABLET/CAPSULE/ENTERIC COATED TABLET/MR TABLET" }, { "code": "DMR000360", "desc": "DIGOXIN 250MCG TABLET" }, { "code": "DMR000363", "desc": "DIGOXIN 50MCG/ML ELIXIR, 60ML BOTTLE" }, { "code": "DMR000394", "desc": "DOXYCYCLINE HYCLATE 100MG CAPSULE" }, { "code": "DMR000422", "desc": "ESCITALOPRAM 10 MG TABLET" }, { "code": "DMR000450", "desc": "FLUCONAZOLE 150MG CAPSULE" }, { "code": "DMR000451", "desc": "FLUCONAZOLE 200MG CAPSULE" }, { "code": "DMR000505", "desc": "GABAPENTIN 100MG CAPSULE" }, { "code": "DMR000506", "desc": "GABAPENTIN 300MG CAPSULE" }, { "code": "DMR000548", "desc": "HYOSCINE N-BUTYL BROMIDE 10MG TABLET" }, { "code": "DMR000562", "desc": "INDACATEROL MALEATE + GLYCOPYRRONIUM BROMIDE 110 MCG + 50 MCG INHALATION POWDER IN HARD CAPSULES" }, { "code": "DMR000589", "desc": "IRBESARTAN + HYDROCHLOROTHIAZIDE 150MG IRBESARTAN + 12.5MG HYDROCHLOROTHIAZIDE TABLET" }, { "code": "DMR000590", "desc": "IRBESARTAN 150MG TABLET" }, { "code": "DMR000607", "desc": "ISOXSUPRINE HYDROCHLORIDE 10MG TABLET" }, { "code": "DMR000634", "desc": "LEVETIRACETAM 250MG FILM COATED TABLET" }, { "code": "DMR000644", "desc": "LEVOFLOXACIN 500MG TABLET" }, { "code": "DMR000660", "desc": "LINEZOLID 600MG TABLET/FILM-COATED TABLET" }, { "code": "DMR000673", "desc": "LORATIDINE 10MG TABLET/FILM COATED TABLET" }, { "code": "DMR000689", "desc": "MEFENAMIC ACID 500MG CAPSULE/TABLET" }, { "code": "DMR000700", "desc": "METHIMAZOLE (THIAMAZOLE) 5MG TABLET" }, { "code": "DMR000722", "desc": "METRONIDAZOLE 500MG TABLET" }, { "code": "DMR000740", "desc": "MONTELUKAST SODIUM 10MG TABLET" }, { "code": "DMR000741", "desc": "MONTELUKAST SODIUM 4MG CHEWABLE TABLET" }, { "code": "DMR000751", "desc": "MULTIVITAMINS ADULTS CAPSULE/TABLET" }, { "code": "DMR000780", "desc": "NIFEDIPINE 10MG CAPSULE" }, { "code": "DMR000798", "desc": "OLANZAPINE 10MG TABLET" }, { "code": "DMR000799", "desc": "OMEPRAZOLE 20MG CAPSULE" }, { "code": "DMR000806", "desc": "ORAL REHYDRATION SALTS (ORS-75 REPLACEMENT) 20.5G SACHET" }, { "code": "DMR000844", "desc": "PARACETAMOL 250MG SUPPOSITORY" }, { "code": "DMR000846", "desc": "PARACETAMOL 500MG TABLET" }, { "code": "DMR000877", "desc": "PHENOXYMETHYL PENICILIN 250MG TABLET/CAPSULE" }, { "code": "DMR000905", "desc": "POTASSIUM CHLORIDE 600MG TABLET" }, { "code": "DMR000937", "desc": "QUETIAPINE FUMARATE 25MG TABLET" }, { "code": "DMR000966", "desc": "RISPERIDONE 2MG TABLET" }, { "code": "DMR000973", "desc": "ROSUVASTATIN CALCIUM 10MG TABLET" }, { "code": "DMR000975", "desc": "ROSUVASTATIN CALCIUM 20MG TABLET" }, { "code": "DMR000976", "desc": "SACUBITRIL/VALSARTAN 100MG TABLET" }, { "code": "DMR000977", "desc": "SACUBITRIL/VALSARTAN 200MG TABLET" }, { "code": "DMR000978", "desc": "SACUBITRIL/VALSARTAN 50MG TABLET" }, { "code": "DMR000981", "desc": "SALBUTAMOL SULFATE MDI 100MCG/DOSE X 200 ACTUATIONS" }, { "code": "DMR000986", "desc": "SEVELAMER CARBONATE 800MG TABLET" }, { "code": "DMR000998", "desc": "SODIUM BICARBONATE 325MG TABLET" }, { "code": "DMR001000", "desc": "SODIUM BICARBONATE 650 MG TABLET" }, { "code": "DMR001008", "desc": "SPIRONOLACTONE 25MG TABLET" }, { "code": "DMR001011", "desc": "SPIRONOLACTONE 50MG TABLET" }, { "code": "DMR001022", "desc": "SUCRALFATE 1G TABLET" }, { "code": "DMR001057", "desc": "TOLVAPTAN 15MG TABLET" }, { "code": "DMR001074", "desc": "TRIMETAZIDINE HYDROCHLORIDE 35MG TABLET" }, { "code": "DMR001095", "desc": "VALGANCICLOVIR 450 MG TABLET" }, { "code": "DMR000378", "desc": "DIVALPROEX SODIUM 250 MG TABLET" }, { "code": "DMR000379", "desc": "DIVALPROEX SODIUM 500MG CONTROLLED RELEASE TABLET" }, { "code": "DMR001102", "desc": "VALSARTAN 80MG TABLET/FILM COATED TABLET" }, { "code": "DMR001114", "desc": "VITAMIN B COMPLEX (VITAMIN B1 B6 B12) 100 MG B1 + 5 MG B6 + 50 MCG B12 TABLET/CAPSULE" }, { "code": "DMR001119", "desc": "WARFARIN SODIUM 2.5MG TABLET" }, { "code": "DMDON000652", "desc": "(DON) LIDOCAINE HYDROCHLORIDE 2% (20MG/ML) 50ML AMPULE/VIAL (IM/IV)" }, { "code": "DMDON000803", "desc": "(DON) ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)" }, { "code": "DMCSP000002", "desc": "(DONCSP) CISPLATIN 1MG/ML, 50ML VIAL (IV)" }, { "code": "DMR000028", "desc": "ACICLOVIR 25MG/ML, 10ML VIAL (IV INFUSION)" }, { "code": "DMR000048", "desc": "AMIKACIN SULFATE 125MG/ML,2ML VIAL" }, { "code": "DMR000049", "desc": "AMIKACIN SULFATE 250MG/ML, 2ML AMPULE/VIAL (IM,IV)" }, { "code": "DMR000050", "desc": "AMIKACIN SULFATE 50MG/ML, 2ML AMPULE/VIAL (IM,IV)" }, { "code": "DMR000087", "desc": "ASCORBIC ACID 250MG/ML, 2ML AMPULE (IV)" }, { "code": "DMR000109", "desc": "ATROPINE SULFATE 1MG/ML, 1ML AMPULE (IM,IV,SC)" }, { "code": "DMR000112", "desc": "AZITHROMYCIN DIHYDRATE 500MG POWDER, VIAL (IV INFUSION)" }, { "code": "DMR000157", "desc": "BUPIVACAINE HYDROCHLORIDE 0.5% + 8% DEXTROSE, 4ML AMPULE" }, { "code": "DMR000155", "desc": "BUPIVACAINE HYDROCHLORIDE 0.5%, 10ML AMPULE (ISOBARIC)" }, { "code": "DMR000159", "desc": "BUTORPHANOL TARTRATE 2MG/ML,1ML AMPULE/VIAL (IM,IV)." }, { "code": "DMR000168", "desc": "CALCIUM GLUCONATE 10%, 10ML VIAL/AMPULE (IV)" }, { "code": "DMR000209", "desc": "CEFEPIME HYDROCHLORIDE 2 G VIAL (IM,IV)" }, { "code": "DMR001128", "desc": "CLINDAMYCIN PHOSPHATE 150 MG/ML,2ML AMPULE/VIAL (IM,IV)" }, { "code": "DMR000328", "desc": "CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 1ML VIAL/AMPULE" }, { "code": "DMR000380", "desc": "DOBUTAMINE HYDROCHLORIDE 50MG/ML, 5ML AMPULE (IV INFUSION)" }, { "code": "DMR000389", "desc": "DOPAMINE HYDROCHLORIDE 40MG/ML, 5ML VIAL/AMPULE (IV)" }, { "code": "DMR000401", "desc": "ENOXAPARIN SODIUM 100MG/ML, 0.4ML PRE‐FILLED SYRINGE (SC)" }, { "code": "DMR000411", "desc": "EPINEPHRINE HYDROCHLORIDE 1MG/ML, 1ML AMPULE (IV, IM,SC)" }, { "code": "DMR000489", "desc": "FUROSEMIDE 10MG/ML, 2ML AMPULE (IM,IV)" }, { "code": "DMR000511", "desc": "GADOTERIC ACID, 0.5 MMOL/ML SOLUTION FOR INJECTION, 10 ML VIAL" }, { "code": "DMR000522", "desc": "GOSERELIN ACETATE 3.6 MG DEPOT SOLUTION, PRE‐FILLED SYRINGE (SC)" }, { "code": "DMR000525", "desc": "HEPARIN SODIUM 5000IU/ML,5ML VIAL" }, { "code": "DMR000534", "desc": "HYDRALAZINE HYDROCHLORIDE 20MG/ML, 1ML AMPULE (IM,IV)" }, { "code": "DMR000541", "desc": "HYDROCORTISONE SODIUM SUCCINATE POWDER 250MG VIAL (IV)" }, { "code": "DMR000571", "desc": "IOHEXOL 300MG IODINE/ML, 100 ML VIAL" }, { "code": "DMR000573", "desc": "IOHEXOL 350MG IODINE/ML, 100 ML VIAL" }, { "code": "DMR000586", "desc": "IPRATROPIUM + SALBUTAMOL (500MCG IPRATROPIUM BROMIDE + 2.5MG SALBUTAMOL), 2.5ML NEBULE" }, { "code": "DMR000594", "desc": "IRON SUCROSE 20MG/ML, 5ML AMPULE" }, { "code": "DMR000595", "desc": "ISOFLURANE INHALATION 100ML BOTTLE" }, { "code": "DMR000602", "desc": "ISOSORBIDE DINITRATE 1MG/ML, 10ML AMPULE (IV)" }, { "code": "DMR000630", "desc": "LEUPRORELINE ACETATE 11.25 MG DEPOT SOLUTION, VIAL WITH SYRINGE (IM, SC)" }, { "code": "DMR000631", "desc": "LEUPRORELINE ACETATE 3.75 MG/ 2 ML VIAL WITH SYRINGE (IM, SC) POWDER" }, { "code": "DMR000637", "desc": "LEVETIRACETAM 500MG/5 ML (100 MG/ML) CONCENTRATE SOLUTION FOR IV INFUSION, 5 ML VIAL" }, { "code": "DMR000643", "desc": "LEVOFLOXACIN (0.5% W/V), 5MG/ML, OPHTHALMIC SOLUTION" }, { "code": "DMR000675", "desc": "LOSARTAN + HYDROCHLOROTHIAZIDE (50 MG LOSARTAN + 12.5 MG HYDROCHLOROTHIAZIDE) TABLET" }, { "code": "DMR000715", "desc": "METHYLPREDNISOLONE SODIUM SUCCINATE POWDER 1G/16ML + DILUENT VIAL (IM, IV, IV INFUSION)" }, { "code": "DMR000716", "desc": "METHYLPREDNISONLONE SODIUM SUCCINATE POWDER 500MG/8.0ML + DILUENT VIAL (IM, IV, IV INFUSION)" }, { "code": "DMR000787", "desc": "NOREPINEPHRINE BITARTRATE 1MG/ML, 2ML AMPULE (IV INFUSION)" }, { "code": "DMR000789", "desc": "NOREPINEPHRINE BITARTRATE 2MG/ML, 4ML AMPULE (8MG/4ML) SOLUTION FOR INJECTION" }, { "code": "DMR000803", "desc": "ONDANSETRON 2MG/ML, 2ML AMPULE (IM,IV)" }, { "code": "DMR000826", "desc": "OXYTOCIN 10 IU/ML, 1 ML AMPULE (IM,IV)" }, { "code": "DMR000830", "desc": "PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)" }, { "code": "DMR000894", "desc": "PHYTOMENADIONE 10MG/ML ,1ML AMPULE (IM,IV,SC)" }, { "code": "DMR000902", "desc": "POLYMYXIN B SULFATE 500,000 UNITS POWDER FOR SOLUTION FOR INJECTION (INTRATHECAL/IM/IV), 5ML VIAL" }, { "code": "DMR000904", "desc": "POTASSIUM CHLORIDE 2MEQ/ML, 20ML VIAL (IV INFUSION)" }, { "code": "DMR000925", "desc": "PROPRANOLOL HYDROCHLORIDE 40MG TABLET" }, { "code": "DMR000948", "desc": "RANITIDINE 300MG TABLET" }, { "code": "DMR000972", "desc": "ROPIVACAINE HYDROCHLORIDE 10MG/ML ,10ML AMPULE (IV)" }, { "code": "DMR001001", "desc": "SODIUM CHLORIDE 2.5MEQ/ML , 20ML VIAL" }, { "code": "DMR001023", "desc": "SUGAMMADEX 100MG/ML SOLUTION FOR INJECTION, 2ML VIAL (IV)" }, { "code": "DMR001066", "desc": "TRAMADOL HYDROCHLORIDE 50MG/ML,2ML AMPULE (IM,SC,IV)" }, { "code": "DMR001068", "desc": "TRANEXAMIC ACID 100MG/ML, 5ML AMPULE (IM,IV)" }, { "code": "DMR001103", "desc": "VANCOMYCIN HYDROCHLORIDE 1G VIAL (IV)" }, { "code": "DMR001113", "desc": "VITAMIN B COMPLEX (IV) (VITAMIN B1 B6 B12) 100 MG B1 + 100 MG B6 + 1 MG B12, 3 ML AMPULE (IV)" }, { "code": "DMR001117", "desc": "VORICONAZOLE 200MG LYOPHILIZED POWDER FOR SOLUTION FOR IV INFUSION, 30ML VIAL" }, { "code": "DMC000861", "desc": "(C) PHENOBARBITAL 15 MG TABLET" }, { "code": "DMC000868", "desc": "(C) PHENOBARBITAL 30 MG TABLET" }, { "code": "DMC000871", "desc": "(C) PHENOBARBITAL 60 MG TAB" }, { "code": "DMC000873", "desc": "(C) PHENOBARBITAL 90 MG TABLET" }, { "code": "DMDON001127", "desc": "(DON) OXYCODONE HYDROCHLORIDE 10MG/ML, 2ML AMPULE (IV INFUSION)" }, { "code": "DMCSP000004", "desc": "(DONCSP) FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)" }, { "code": "DMR000348", "desc": "DIAZEPAM 5MG/ML, 2ML AMPULE (IM, IV)" }, { "code": "DMR000409", "desc": "EPHEDRINE SULFATE 30MG/ML, 1ML AMPULE (IM, IV)" }, { "code": "DMR000410", "desc": "EPHEDRINE SULFATE 50MG/ML, 1ML AMPULE (IM, IV)" }, { "code": "DMR000438", "desc": "FENTANYL CITRATE 50MCG/ML, 2ML AMPULE (IV)" }, { "code": "DMR000611", "desc": "KETAMINE HYDROCHLORIDE 50MG/ML, 10ML VIAL (IM/IV)" }, { "code": "DMR000730", "desc": "MIDAZOLAM 1MG/ML, 5ML AMPULE/VIAL (IM,IV)" }, { "code": "DMR000731", "desc": "MIDAZOLAM 5MG/ML, 1ML AMPULE (IM,IV)" }, { "code": "DMR000732", "desc": "MIDAZOLAM 5MG/ML, 3ML AMPULE (IM,IV)" }, { "code": "DMR000746", "desc": "MORPHINE SULFATE 10MG TABLET/CAPSULE" }, { "code": "DMR000747", "desc": "MORPHINE SULFATE 10MG/ML, 1ML AMPULE (IM,IV,SC)" }, { "code": "DMR000764", "desc": "NALBUPHINE HYDROCHLORIDE 10MG/ML, 1ML AMPULE (IM, IV, SC)" }, { "code": "DMR000857", "desc": "PETHIDINE (MEPERIDINE) HYDROCHLORIDE 50MG/ML, 2ML AMPULE (IM, IV, SC)" }, { "code": "DMDON000412", "desc": "(DON) EPIRUBICIN HCL 50MG VIAL CSPMAP" }, { "code": "DMR000074", "desc": "ANASTRAZOLE 1MG FILM COATED TABLET" }, { "code": "DMR000174", "desc": "CAPECITABINE 500MG TABLET" }, { "code": "DMR000192", "desc": "CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)" }, { "code": "DMR000275", "desc": "CISPLATIN 1MG/ML, 50ML VIAL (IV)" }, { "code": "DMR000382", "desc": "DOCETAXEL ANHYDROUS 20MG/0.5 ML, 0.5ML VIAL (IV INFUSION)" }, { "code": "DMR000383", "desc": "DOCETAXEL ANHYDROUS 40MG/ML, 2ML (80MG/2ML) VIAL (IV INFUSION)" }, { "code": "DMR000412", "desc": "EPIRUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)" }, { "code": "DMR000546", "desc": "HYDROXYUREA 500MG CAPSULE" }, { "code": "DMR000557", "desc": "IMATINIB 100MG TABLET" }, { "code": "DMR000593", "desc": "IRINOTECAN HYDROCHLORIDE 40MG/2ML VIAL, CONCENTRATE, VIAL (IV INFUSION)" }, { "code": "DMR000628", "desc": "LETROZOLE 2.5MG TABLET/FILM-COATED TABLET" }, { "code": "DMR000696", "desc": "MESNA (SODIUM-2- MERCAPTOETHANESULPHONATE) 100MG/ML, 4ML AMPULE" }, { "code": "DMR001027", "desc": "TAMOXIFEN CITRATE 20MG TABLET" }, { "code": "DMR001125", "desc": "ZOLEDRONIC ACID (4MG/5ML CONCENTRATED SOLUTION FOR IV INFUSION) VIAL" }, { "code": "DMR000019", "desc": "ACETYLCYSTEINE 100MG/ML, 3ML AMPULE SOLUTION FOR INHALATION" }, { "code": "DMR000021", "desc": "ACETYLCYSTEINE 200 MG/ML, 25 ML BOTTLE (IV INFUSION)" }, { "code": "DMR000065", "desc": "AMOXICILLIN TRIHYDRATE 250MG/5ML GRANULES/POWDER FOR SUSPENSION, 60ML BOTTLE" }, { "code": "DMR000084", "desc": "ASCORBIC ACID 100MG/5ML SYRUP, 60ML BOTTLE" }, { "code": "DMR000110", "desc": "AZITHROMYCIN DIHYDRATE 200MG/5ML POWDER FOR SUSPENSION, 15ML BOTTLE" }, { "code": "DMR000236", "desc": "CETIRIZINE DIHYDROCHLORIDE 10 MG/ML DROPS, 10 ML BOTTLE" }, { "code": "DMR000239", "desc": "CETIRIZINE DIHYDROCHLORIDE 1MG/ML SOLUTION 60 ML BOTTLE" }, { "code": "DMR000240", "desc": "CETIRIZINE DIHYDROCHLORIDE 2.5MG/ML SYRUP ORAL DROPS, 10ML BOTTLE" }, { "code": "DMR000241", "desc": "CETIRIZINE DIHYDROCHLORIDE 5MG/5ML SYRUP, 60 ML BOTTLE" }, { "code": "DMR000305", "desc": "CO-AMOXICLAV (AMOXICILLIN+POTASSIUM CLAVULANATE) 400 MG AMOXICILLIN TRIHYDRATE + 57 MG POTASSIUM CLAVULANATE PER 5 ML GRANULES/POWDER FOR SUSPENSION, 70 ML BOTTLE" }, { "code": "DMR000371", "desc": "DIPHENHYDRAMINE HYDROCHLORIDE 12.5MG/5ML SYRUP, 60ML BOTTLE" }, { "code": "DMR000533", "desc": "HUMAN RECOMBINANT TISSUE TYPE PLASMINOGEN ACTIVATOR (ALTEPLASE) 50MG POWDER FOR IV INFUSION" }, { "code": "DMR000724", "desc": "METRONIDAZOLE BENZOATE 125MG/5ML, SUSPENSION 60ML BOTTLE" }, { "code": "DMR000750", "desc": "MOXIFLOXACIN HYDROCHLORIDE 5MG/ML (0.5% W/V) STERILE OPHTHALMIC SOLUTION, 5 ML BOTTLE" }, { "code": "DMR000754", "desc": "MULTIVITAMINS PER 5ML,60ML SYRUP BOTTLE" }, { "code": "DMR000760", "desc": "MUPIROCIN OINTMENT 2% 5G TUBE" }, { "code": "DMR000791", "desc": "NYSTATIN 100,000 UNITS/ML, SUSPENSION 30ML BOTTLE" }, { "code": "DMR000835", "desc": "PARACETAMOL 100MG/ML DROPS, 15ML BOTTLE" }, { "code": "DMR000843", "desc": "PARACETAMOL 250MG/5ML SYRUP, 60ML BOTTLE" }, { "code": "DMR000891", "desc": "PHENYTOIN SODIUM 100MG CAPSULE" }, { "code": "DMR000906", "desc": "POTASSIUM CHLORIDE 750MG DURULES TABLET" }, { "code": "DMR000988", "desc": "SILVER SULFADIAZINE CREAM 1% ,15G TUBE" }, { "code": "DMR000989", "desc": "SILVER SULFADIAZINE CREAM 1% ,25G TUBE" }, { "code": "DMR000990", "desc": "SILVER SULFADIAZINE CREAM 1% ,500G JAR" }, { "code": "DMR001002", "desc": "SODIUM HYALURONATE OPHTHALMIC SOLUTION 0.1% (1MG/ML), 5ML BOTTLE" }, { "code": "DMR001051", "desc": "TOBRAMYCIN + DEXAMETHASONE EYE DROP SUSPENSION 0.3% + 0.1%, 5ML BOTTLE" }, { "code": "DMR001075", "desc": "TROPICAMIDE+ PHENYLEPHRINE HYDROCHLORIDE 5MG + 5MG/ML EYE DROPS FIXED DOSE COMBINATION, 10ML BOTTLE" }, { "code": "DMDON000944", "desc": "(DON) RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)" }, { "code": "DMDON000943", "desc": "(DON) VACCINE, RABIES (CHICK EMBRYO CELL) PURIFIED INACTIVATED 2.5 IU/ ML, 1 DOSE + 1 ML DILUENT VIAL ( WHO PRE-QUALIFIED)" }, { "code": "DMR000067", "desc": "AMPHOTERICIN B (LIPID COMPLEX) 50MG VIAL (IV INFUSION)" }, { "code": "DMR000068", "desc": "AMPHOTERICIN B (NON-LIPID COMPLEX) 50MG LYOPHILIZED POWDER,VIAL (IV INFUSION)" }, { "code": "DMR000078", "desc": "ANTI-TETANUS SERUM (EQUINE) 1500 IU/0.7ML SOLUTION FOR INJECTION AMPULE/VIAL (IM)" }, { "code": "DMR000107", "desc": "ATRACURIUM BESILATE 10MG/ML, 2.5ML AMPULE (IV)" }, { "code": "DMR000123", "desc": "BCG VACCINE 500MCG/ML VIAL + 1ML DILUENT IN AMPULE (ID) 20 DOSES" }, { "code": "DMR000126", "desc": "BERACTANT 25MG/ML SUSPENSION, 4ML VIAL (INTRATRACHEAL ADMINISTRATION)" }, { "code": "DMR000127", "desc": "BERACTANT 25MG/ML SUSPENSION, 8ML VIAL (INTRATRACHEAL ADMINISTRATION)" }, { "code": "DMR000136", "desc": "BIPHASIC ISOPHANE HUMAN INSULIN 70/30 (RECOMBINANT DNA) ,70% ISOPHANE SUSPENSION + 30% SOLUBLE INSULIN IN 100 IU/ML, 10ML VIAL (SC)" }, { "code": "DMR000193", "desc": "CARBOPROST 125MCG/ML, 0.5ML SOLUTION FOR INJECTION" }, { "code": "DMR000194", "desc": "CARBOPROST 250MCG/ML SOLUTION FOR INJECTION,1ML AMPULE/VIAL" }, { "code": "DMR000413", "desc": "EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 10,000 IU/ML, PRE-FILLED SYRINGE (IV,SC)" }, { "code": "DMR000415", "desc": "EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4,000 IU/0.4 ML, PRE‐FILLED SYRINGE (IV,SC)" }, { "code": "DMR000445", "desc": "FILGRASTIM (G-CSF) 300MCG/ML 0.5 ML SOLUTION FOR INJECTION IN PREFILLED SYRINGE (IV, SC)" }, { "code": "DMR000448", "desc": "FILGRASTIM 300MCG, 0.9ML PRE FILLED SYRINGE," }, { "code": "DMR000526", "desc": "HEPATITIS A INACTIVATED VACCINE VIRAL ANTIGEN NOT LESS THAN 1440 EU IN 1.0 ML MONODOSE VIAL (IM) (ADULT)" }, { "code": "DMR000527", "desc": "HEPATITIS B IMMUNOGLOBULIN (HUMAN) 0.5ML VIAL (IM)" }, { "code": "DMR000528", "desc": "HEPATITIS B VACCINE (RECOMBINANT DNA) 20 MICROGRAMS/ML MONODOSE VIAL (IM) ADULT" }, { "code": "DMR000529", "desc": "HEPATITIS B VACCINE (RECOMBINANT DNA)10MCG/0.5ML MONODOSE VIAL (IM) (PEDIATRIC" }, { "code": "DMR001133", "desc": "IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 200ML VIAL (IV)" }, { "code": "DMR000559", "desc": "IMMUNOGLOBULIN NORMAL, (IGIV) 50MG/ML, 100ML VIAL (IV)" }, { "code": "DMR000563", "desc": "INFLUENZA POLYVALENT VACCINE 0.5ML, SUSPENSION FOR INJECTION ( VAXIGRIP TETRA PRE-FILED SYRINGE)" }, { "code": "DMR000600", "desc": "ISOPHANE INSULIN HUMAN (RECOMBINANT DNA) 100IU/ML, 10ML VIAL (SC)" }, { "code": "DMR000792", "desc": "OCTREOTIDE ACETATE 100MCG/ML, 1 ML AMPULE (IV INFUSION)" }, { "code": "DMR000943", "desc": "RABIES VACCINE,CHICK EMBRYO CELL (PURIFIED INACTIVATED) LYOPHILIZED POWDER, 2.5 IU/ML, 1 DOSE VIAL + 1 ML DILUENT (ID, IM)" }, { "code": "DMR000944", "desc": "RABIES VACCINE,VERO CELL (PURIFIED) LYOPHILIZED POWDER 2.5 IU/ 0.5 ML, VIAL + DILUENT (ID,IM)" }, { "code": "DMR000951", "desc": "REGULAR, INSULIN (RECOMBINANT DNA HUMAN) 100 IU/ML, 10ML VIAL (SC, IV/IM)" }, { "code": "DMR000971", "desc": "ROCURONIUM BROMIDE 10MG/ML, 5ML AMPULE/VIAL (IV)" }, { "code": "DMR001025", "desc": "SUXAMETHONIUM (SUCCINYLCHOLINE) CHLORIDE 20MG/ML, 10ML VIAL (IV)" }, { "code": "DMR001026", "desc": "TAFLUPROST OPHTHALMIC SOLUTION 15MCG/ML, 0.3ML BOTTLE SINGLE DOSE" }, { "code": "DMR001042", "desc": "TETANUS IMMUNOGLOBULIN (HUMAN) 250 IU/ML, 1ML AMPULE (IM)" }, { "code": "DMR001044", "desc": "TETANUS TOXOID 0.5ML AMPULE (IM)" }, { "code": "DMR001106", "desc": "VASOPRESSIN 20IU/ML VIAL/AMPULE (IM, IV)" }, { "code": "DMR000070", "desc": "AMPICILLIN + SULBACTAM (500MG AMPICILLIN + 250MG SULBACTAM) VIAL (IM,IV)" }, { "code": "DMR000071", "desc": "AMPICILLIN SODIUM 1G VIAL (IM,IV)" }, { "code": "DMR000072", "desc": "AMPICILLIN SODIUM 250MG VIAL (IM,IV)" }, { "code": "DMR000520", "desc": "GLUCOSE (DEXTROSE) 50%, 50ML VIAL (IV)" }, { "code": "DMR000577", "desc": "IOPAMIDOL 755MG/ML EQUIV. TO 370 MG IODINE, 100 ML VIAL/BOTTLE" }, { "code": "DMR000656", "desc": "LIDOCAINE SPRAY 10%, 50ML BOTTLE" }, { "code": "DMR000848", "desc": "PENICILLIN G CRYSTALLINE SODIUM (BENZYLPENICILLIN) 1M UNITS VIAL (IM/IV)" }, { "code": "DMR000849", "desc": "PENICILLIN G CRYSTALLINE SODIUM 5M UNITS VIAL (IM,IV)" }, { "code": "DMDON000719", "desc": "(DON) (ACTU USE ONLY) METOCLOPRAMIDE HYDROCHLORIDE 5MG/ML, 2ML AMPULE (IM, IV)" }, { "code": "DMDON000382", "desc": "(DON) (ACTU USE) DOCETAXEL 20MG/0.5ML (40MG/ML),1ML CONCENTRATE FOR SOLUTION FOR INFUSION (AS TRIHYDRATE)" }, { "code": "DMDON000804", "desc": "(DON) (FOR ACTU USE ONLY) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)" }, { "code": "DMDON000329", "desc": "(DON) CYTARABINE 100MG/ML, 5ML VIAL CSPMAP" }, { "code": "DMDON000383", "desc": "(DON) DOCETAXEL 40MG/ML (80MG/2ML), 2ML CONCENTRATE FOR SOLUTION FOR IV INFUSION" }, { "code": "DMDON000393", "desc": "(DON) DOXORUBICIN 50MG VIAL" }, { "code": "DMDON000815", "desc": "(DON) OXALIPLATIN 5 MG/ML CONCENTRATE SOLUTION 10 ML VIAL (IV INFUSION)" }, { "code": "DMDON000830", "desc": "(DON) PACLITAXEL 6MG/ML, 25ML VIAL (IV, IV INFUSION)" }, { "code": "DMCSP000012", "desc": "(DONCSP)CAPECITABINE 500MG TABLET" }, { "code": "DMCSP000014", "desc": "(DONCSP) CARBOPLATIN 10MG/ML, 15 ML VIAL (IV)" }, { "code": "DMCSP000011", "desc": "(DONCSP) LETROZOLE 2.5MG TABLET/FILM-COATED TABLET" }, { "code": "DMCSP000005", "desc": "(DONCSP) ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)" }, { "code": "DMCSP000010", "desc": "(DONCSP) TAMOXIFEN 20MG TABLET" }, { "code": "DMDON000390", "desc": "(DON) DOXORUBICIN HCL 10MG VIAL (DOANTION)-CSPMAP" }, { "code": "DMDON000967", "desc": "(DON) RITUXIMAB 10MG/ML, 10 ML VIAL (IV)" }, { "code": "DMDON000968", "desc": "(DON) RITUXIMAB 10MG/ML, 50 ML VIAL (IV)" }, { "code": "DMCSP000008", "desc": "(DONCSP) FILGRASTIM 300MCG/0.9ML SOLUTION (IV,SC), 0.9ML PRE-FILLED SYRINGE" }, { "code": "DMR000392", "desc": "DOXORUBICIN HYDROCHLORIDE POWDER 50MG VIAL (IV)" }, { "code": "DMR000967", "desc": "RITUXIMAB 10MG/ML, 10 ML VIAL (IV)" }, { "code": "DMR000968", "desc": "RITUXIMAB 10MG/ML, 50 ML VIAL (IV)" }, { "code": "DMR001071", "desc": "TRASTUZUMAB 150 MG LYOPHILIZED POWDER (IV INFUSION) VIAL" }, { "code": "DMR001072", "desc": "TRASTUZUMAB 600MG/5ML (120MG/ML) SOLUTION FOR INJECTION, 5ML VIAL" }, { "code": "DMR000037", "desc": "ALBUMIN, HUMAN 25% 50ML BOTTLE (IV, IV INFUSION)" }, { "code": "DMR000166", "desc": "CALCIUM CARBONATE 500MG TABLET/CHEWABLE TABLET" }, { "code": "DMR000248", "desc": "CHLORHEXIDINE GLUCONATE 4% SOLUTION 500 ML BOTTLE" }, { "code": "DMR000441", "desc": "FERROUS SULFATE + FOLIC ACID 60 MG ELEMENTAL IRON + 400 MICROGRAM FOLIC ACID PER TABLET/CAPSULE/FILM COATED TABLET" }, { "code": "DMR000572", "desc": "IOHEXOL 300MG IODINE/ML, 50 ML VIAL" }, { "code": "DMR000681", "desc": "MAGNESIUM SULFATE HEPTAHYDRATE 250MG/ML, 20ML VIAL (IV)" }, { "code": "DMDON000558", "desc": "(DON) IMATINIB (as mesylate) 400MG TABLET" }, { "code": "DMDON000631", "desc": "(DON) LEUPRORELINE ACETATE 3.75MG PRE-FILLED SYRINGE" }, { "code": "DMDON000829", "desc": "(DON) PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL" }, { "code": "DMCSP000003", "desc": "(DONCSP) ANASTRAZOLE 1MG FILM COATED TABLET" }, { "code": "DMR000326", "desc": "CYCLOPHOSPHAMIDE POWDER 500MG VIAL (IV)" }, { "code": "DMR000329", "desc": "CYTARABINE 100MG/ML SOLUTION FOR INJECTION, 5ML VIAL/AMPULE" }, { "code": "DMR000804", "desc": "ONDANSETRON 2MG/ML, 4ML AMPULE (IM,IV)" }, { "code": "DMR000816", "desc": "OXALIPLATIN POWDER 50MG VIAL (IV INFUSION)" }, { "code": "DMR000829", "desc": "PACLITAXEL 6MG/ML(100MG/16.7ML), 20ML VIAL" }, { "code": "DMR000416", "desc": "EPOETIN ALFA (RECOMBINANT HUMAN ERYTHROPOIETIN) 4000IU/ML SOLUTION FOR INJECTION, 1ML PREFILLED SYRINGE (IV, SC)" }, { "code": "DMR000560", "desc": "IMMUNOGLOBULIN NORMAL, HUMAN (IGIV) 50MG/ML, 50ML VIAL (IV)" }];
 
   // Load Inventory from Google Apps Script Backend
   function loadInventory() {
@@ -3103,7 +3304,7 @@
     }
   }
 
-  
+
   // --- SMART BATCH CONSOLIDATION ENGINE ---
   function buildConsolidatedInventory(rawItems) {
     if (!rawItems || !Array.isArray(rawItems)) return [];
@@ -3228,8 +3429,8 @@
 
   function onInventoryLoaded(response) {
     setLoading(false);
-    if (!response.success) {
-      showToast(response.error || "Failed to load inventory.", "error");
+    if (!response || !response.success) {
+      showToast((response && response.error) || "Failed to load inventory (empty response from server).", "error");
       return;
     }
 
@@ -3300,8 +3501,8 @@
     const sourceList = state.viewMode === 'CONSOLIDATED' ? (state.consolidatedItems || []) : (state.rawItems || []);
 
     state.filteredItems = sourceList.filter(item => {
-      const matchQuery = !query || 
-        item.itemCode.toLowerCase().includes(query) || 
+      const matchQuery = !query ||
+        item.itemCode.toLowerCase().includes(query) ||
         item.itemDesc.toLowerCase().includes(query) ||
         (item.brandName && item.brandName.toLowerCase().includes(query)) ||
         (item.uom && item.uom.toLowerCase().includes(query)) ||
@@ -3356,26 +3557,26 @@
         badgeHtml = `<span class="badge badge-neutral"><span class="status-dot dot-neutral"></span>${item.expDate}</span>`;
       }
 
-      const catBadge = item.isDonation 
-        ? '<span class="badge badge-donation" style="margin-left:4px;">Donation</span>' 
+      const catBadge = item.isDonation
+        ? '<span class="badge badge-donation" style="margin-left:4px;">Donation</span>'
         : '';
 
-      const brandBadge = item.brandName 
+      const brandBadge = item.brandName
         ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>`
         : '<span style="color:#94a3b8; font-style:italic;">--</span>';
 
       const resolvedUom = item.uom || detectUomFromText(item.itemDesc);
       const uomDisplay = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
 
-      const qtyDisplay = item.isZeroStock 
-        ? '<span class="qty-zero">0 (Out of Stock)</span>' 
+      const qtyDisplay = item.isZeroStock
+        ? '<span class="qty-zero">0 (Out of Stock)</span>'
         : `<span style="font-weight:700; color:#0f172a; font-size:13.5px;">${item.qty.toLocaleString()}</span>`;
 
       const priceDisplay = (item.acquisitionPrice && item.acquisitionPrice > 0)
         ? `₱${Number(item.acquisitionPrice).toFixed(2)}`
         : '<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>';
 
-      const dateOutDisplay = item.dateOut 
+      const dateOutDisplay = item.dateOut
         ? `<span style="font-weight:600; color:#475569; font-size:12px;">${escapeHtml(item.dateOut)}</span>`
         : '<span style="color:#94a3b8; font-style:italic; font-size:12px;">--</span>';
 
@@ -3432,7 +3633,7 @@
       if (hasMultipleBatches && isExpanded) {
         const subTr = document.createElement('tr');
         subTr.className = 'sub-batches-accordion-row';
-        
+
         let subTableRows = '';
         item.subBatches.forEach(sb => {
           subTableRows += `
@@ -3563,7 +3764,7 @@
     const batchSuffix = item.batchId ? ` (${item.batchId})` : '';
     document.getElementById('so-code').textContent = item.itemCode + batchSuffix;
     document.getElementById('so-desc').textContent = item.itemDesc;
-    
+
     const brandEl = document.getElementById('so-brand-badge');
     brandEl.textContent = item.brandName || 'Brand Batch';
 
@@ -3573,7 +3774,7 @@
 
     const uomLabelEl = document.getElementById('so-uom-label');
     if (uomLabelEl) uomLabelEl.textContent = resolvedUom + 's';
-    
+
     document.getElementById('so-exp').textContent = item.expDate;
     document.getElementById('so-current-qty').textContent = `${item.qty.toLocaleString()} ${resolvedUom.toLowerCase()}s`;
     document.getElementById('so-input-qty').value = '';
@@ -3689,7 +3890,7 @@
     document.getElementById('edit-code').value = item.itemCode;
     document.getElementById('edit-desc').value = item.itemDesc;
     document.getElementById('edit-brand').value = item.brandName || '';
-    
+
     const editUomEl = document.getElementById('edit-uom');
     if (editUomEl) {
       editUomEl.value = item.uom || detectUomFromText(item.itemDesc);
@@ -4230,7 +4431,7 @@
     if (!val) return 999999;
     const s = String(val).trim();
     if (!s || s.toUpperCase() === 'NO EXPIRY') return 999999;
-    const monthMap = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+    const monthMap = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
     const mShort = s.match(/^([A-Za-z]{3})-(\d{2})$/);
     if (mShort) {
       return (2000 + parseInt(mShort[2], 10)) * 100 + (monthMap[mShort[1].toLowerCase()] || 0);
@@ -4419,8 +4620,8 @@
 
     zeroItems.forEach(item => {
       const tr = document.createElement('tr');
-      const brandBadge = item.brandName 
-        ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>` 
+      const brandBadge = item.brandName
+        ? `<span class="badge badge-brand">${escapeHtml(item.brandName)}</span>`
         : '<span style="color:#94a3b8;">--</span>';
       const resolvedUom = item.uom || detectUomFromText(item.itemDesc);
       const uomBadge = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
@@ -4460,6 +4661,7 @@
             state.logs = res.logs || [];
             updateAuditMetrics();
             filterLogsTable();
+            updateRecentFileInjectionRollbackBanner();
           } else {
             if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; color:#dc2626; padding:20px;">${escapeHtml(res ? res.error : 'Failed to load logs')}</td></tr>`;
           }
@@ -4471,65 +4673,66 @@
     } else {
       // Mock Logs for Offline / Preview
       state.logs = [
-        { 
-          timestamp: '2026-11-13 03:08:35', 
+        {
+          timestamp: '2026-11-13 03:08:35',
           dateOut: '2026-11-12',
-          itemCode: 'DMC001032', 
-          itemDesc: '(C) TELMISARTAN 40MG TABLET', 
-          brandName: 'Telgio', 
+          itemCode: 'DMC001032',
+          itemDesc: '(C) TELMISARTAN 40MG TABLET',
+          brandName: 'Telgio',
           uom: 'Tablet',
-          expDate: 'Mar-29', 
-          unitPrice: 4.73, 
-          qtyOut: 2000, 
-          previousQty: 2000, 
-          remainingBalance: 0, 
-          remarks: 'File Injection: CONSUMPTION_COMBINED_CLEANED_2026-11-12.xlsx (Cons: 8279)' 
+          expDate: 'Mar-29',
+          unitPrice: 4.73,
+          qtyOut: 2000,
+          previousQty: 2000,
+          remainingBalance: 0,
+          remarks: 'File Injection: CONSUMPTION_COMBINED_CLEANED_2026-11-12.xlsx (Cons: 8279)'
         },
-        { 
-          timestamp: '2026-11-13 03:08:35', 
+        {
+          timestamp: '2026-11-13 03:08:35',
           dateOut: '2026-11-12',
-          itemCode: 'DMC001032', 
-          itemDesc: '(C) TELMISARTAN 40MG TABLET', 
-          brandName: 'Telgio', 
+          itemCode: 'DMC001032',
+          itemDesc: '(C) TELMISARTAN 40MG TABLET',
+          brandName: 'Telgio',
           uom: 'Tablet',
-          expDate: 'Mar-29', 
-          unitPrice: 4.73, 
-          qtyOut: 0, 
-          previousQty: 0, 
-          remainingBalance: 0, 
-          remarks: 'File Injection: CONSUMPTION_COMBINED_CLEANED_2026-11-12.xlsx ⚠️ PARTIAL SHORTAGE (Deducted 2,000, Unfulfilled: 6,279 units - stock exhausted)' 
+          expDate: 'Mar-29',
+          unitPrice: 4.73,
+          qtyOut: 0,
+          previousQty: 0,
+          remainingBalance: 0,
+          remarks: 'File Injection: CONSUMPTION_COMBINED_CLEANED_2026-11-12.xlsx ⚠️ PARTIAL SHORTAGE (Deducted 2,000, Unfulfilled: 6,279 units - stock exhausted)'
         },
-        { 
-          timestamp: '2026-11-13 03:08:35', 
+        {
+          timestamp: '2026-11-13 03:08:35',
           dateOut: '2026-11-12',
-          itemCode: 'DMC000997', 
-          itemDesc: '(C) SODIUM BICARBONATE 1MEQ/ML 50ML AMPULE/VIAL (IV INFUSION)', 
-          brandName: 'Royaleriate', 
+          itemCode: 'DMC000997',
+          itemDesc: '(C) SODIUM BICARBONATE 1MEQ/ML 50ML AMPULE/VIAL (IV INFUSION)',
+          brandName: 'Royaleriate',
           uom: 'Vial',
-          expDate: 'Aug-28', 
-          unitPrice: 270.00, 
-          qtyOut: 2, 
-          previousQty: 446, 
-          remainingBalance: 444, 
-          remarks: 'File Injection: ISSUANCE_STORAGE_CLEANED_2026-11-12.xlsx' 
+          expDate: 'Aug-28',
+          unitPrice: 270.00,
+          qtyOut: 2,
+          previousQty: 446,
+          remainingBalance: 444,
+          remarks: 'File Injection: ISSUANCE_STORAGE_CLEANED_2026-11-12.xlsx'
         },
-        { 
-          timestamp: '2026-11-13 03:08:35', 
+        {
+          timestamp: '2026-11-13 03:08:35',
           dateOut: '2026-11-12',
-          itemCode: 'DMR000996', 
-          itemDesc: 'SODIUM BICARBONATE 1MEQ/ML 20ML AMPULE/VIAL (IV INFUSION)', 
-          brandName: 'SOLUNATE', 
+          itemCode: 'DMR000996',
+          itemDesc: 'SODIUM BICARBONATE 1MEQ/ML 20ML AMPULE/VIAL (IV INFUSION)',
+          brandName: 'SOLUNATE',
           uom: 'Vial',
-          expDate: 'Jun-29', 
-          unitPrice: 41.23, 
-          qtyOut: 316, 
-          previousQty: 2664, 
-          remainingBalance: 2348, 
-          remarks: 'File Injection: ISSUANCE_STORAGE_CLEANED_2026-11-12.xlsx' 
+          expDate: 'Jun-29',
+          unitPrice: 41.23,
+          qtyOut: 316,
+          previousQty: 2664,
+          remainingBalance: 2348,
+          remarks: 'File Injection: ISSUANCE_STORAGE_CLEANED_2026-11-12.xlsx'
         }
       ];
       updateAuditMetrics();
       filterLogsTable();
+      updateRecentFileInjectionRollbackBanner();
     }
   }
 
@@ -4672,19 +4875,19 @@
         tr.style.backgroundColor = '#fffbfb';
       }
 
-      const brandStr = log.brandName 
-        ? `<span class="badge badge-brand">${escapeHtml(log.brandName)}</span>` 
+      const brandStr = log.brandName
+        ? `<span class="badge badge-brand">${escapeHtml(log.brandName)}</span>`
         : '<span style="color:#94a3b8;">--</span>';
-      
+
       const resolvedUom = log.uom || detectUomFromText(log.itemDesc);
       const uomBadge = `<span class="badge badge-uom">${escapeHtml(resolvedUom)}</span>`;
 
-      const unitPriceFormatted = Number(log.unitPrice || 0) > 0 
-        ? `₱${Number(log.unitPrice).toFixed(2)}` 
+      const unitPriceFormatted = Number(log.unitPrice || 0) > 0
+        ? `₱${Number(log.unitPrice).toFixed(2)}`
         : '₱0.00';
 
-      const dateOutStr = log.dateOut 
-        ? `<span style="font-weight:600; color:#1e293b; font-size:12px;">${escapeHtml(log.dateOut)}</span>` 
+      const dateOutStr = log.dateOut
+        ? `<span style="font-weight:600; color:#1e293b; font-size:12px;">${escapeHtml(log.dateOut)}</span>`
         : '<span style="color:#94a3b8; font-style:italic;">--</span>';
 
       const cleanExp = formatExpiryForDisplay(log.expDate);
@@ -4771,7 +4974,7 @@
       // Offline / Preview Mock
       setTimeout(() => {
         const query = (itemCode || itemDesc || '').toUpperCase();
-        const activeBatches = (state.items || []).filter(i => 
+        const activeBatches = (state.items || []).filter(i =>
           i.itemCode.toUpperCase().includes(query) || i.itemDesc.toUpperCase().includes(query)
         ).map(i => ({
           rowIndex: i.rowIndex,
@@ -4783,7 +4986,7 @@
           dateOut: i.dateOut
         }));
 
-        const logs = (state.logs || []).filter(l => 
+        const logs = (state.logs || []).filter(l =>
           (l.itemCode || '').toUpperCase().includes(query) || (l.itemDesc || '').toUpperCase().includes(query)
         );
 
@@ -4845,8 +5048,8 @@
         data.activeBatches.forEach(b => {
           const tr = document.createElement('tr');
           const isZero = Number(b.qty) <= 0;
-          const qtyText = isZero 
-            ? '<span class="qty-zero">0 (Out of Stock)</span>' 
+          const qtyText = isZero
+            ? '<span class="qty-zero">0 (Out of Stock)</span>'
             : `<strong>${Number(b.qty).toLocaleString()}</strong>`;
 
           tr.innerHTML = `
@@ -5110,8 +5313,8 @@
       const matches = findCatalogMatches('desc', q);
 
       // Check for exact full match or normalized match
-      const exactMatch = matches.find(item => 
-        item.desc.toUpperCase() === q.toUpperCase() || 
+      const exactMatch = matches.find(item =>
+        item.desc.toUpperCase() === q.toUpperCase() ||
         normalizeMedText(item.desc) === qNorm
       );
 
@@ -5158,8 +5361,8 @@
     // Only auto-resolve on blur if there is an exact or normalized full match!
     const qNorm = normalizeMedText(q);
     const catalog = state.masterCatalog || [];
-    const exactMatch = catalog.find(item => 
-      item.desc.toUpperCase() === q.toUpperCase() || 
+    const exactMatch = catalog.find(item =>
+      item.desc.toUpperCase() === q.toUpperCase() ||
       normalizeMedText(item.desc) === qNorm
     );
 
@@ -5291,9 +5494,9 @@
     }
 
     // Check if there is an exact match
-    const hasExactMatch = matches.some(m => 
-      (type === 'code' ? m.code.toUpperCase() === (query || '').toUpperCase().trim() : 
-       m.desc.toUpperCase() === (query || '').toUpperCase().trim())
+    const hasExactMatch = matches.some(m =>
+    (type === 'code' ? m.code.toUpperCase() === (query || '').toUpperCase().trim() :
+      m.desc.toUpperCase() === (query || '').toUpperCase().trim())
     );
 
     // Render top 60 matches for optimal scrolling performance
@@ -5820,7 +6023,7 @@
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
       try {
         const text = e.target.result;
         const records = parseDciCsv(text);
@@ -5917,7 +6120,7 @@
             renderSnapshotStatusBanner(res);
           }
         })
-        .withFailureHandler(() => {})
+        .withFailureHandler(() => { })
         .getDciPreviousSnapshot(division);
     } else {
       // Mock for preview
@@ -6115,7 +6318,7 @@
     const toRender = filtered.slice(0, limit);
 
     if (counter) {
-      counter.textContent = filtered.length > limit 
+      counter.textContent = filtered.length > limit
         ? `Showing top ${limit.toLocaleString()} of ${filtered.length.toLocaleString()} matching items`
         : `Showing ${filtered.length.toLocaleString()} items`;
     }
@@ -6544,7 +6747,7 @@
     if (!fileList || fileList.length === 0) return;
     const dropLabel = document.getElementById('injection-dropzone-label');
     if (dropLabel) {
-      dropLabel.textContent = fileList.length === 1 
+      dropLabel.textContent = fileList.length === 1
         ? `Processing ${fileList[0].name}...`
         : `Processing ${fileList.length} files (${fileList.map(f => f.name).join(', ')})...`;
     }
@@ -6560,7 +6763,7 @@
             return;
           }
           const reader = new FileReader();
-          reader.onload = function(e) {
+          reader.onload = function (e) {
             try {
               const data = new Uint8Array(e.target.result);
               const workbook = XLSX.read(data, { type: 'array' });
@@ -6576,7 +6779,7 @@
           reader.readAsArrayBuffer(file);
         } else {
           const reader = new FileReader();
-          reader.onload = function(e) {
+          reader.onload = function (e) {
             resolve({ fileName: fname, csvText: e.target.result });
           };
           reader.onerror = () => reject(new Error(`Failed to read ${fname}`));
@@ -6914,6 +7117,50 @@
     });
 
     injectionState.previewItems = previewList;
+    injectionState.totalDeductUnits = totalDeductUnits;
+    injectionState.matchedCount = matchedCount;
+    injectionState.batchesImpactedCount = batchesImpactedCount;
+    injectionState.totalUniqueItems = aggregatedRecords.length;
+
+    // Check against state.logs for duplicate file injection
+    const logs = state.logs || [];
+    const duplicateMatchedFiles = [];
+    let duplicatePriorTimestamp = '';
+    fileNamesList.forEach(fname => {
+      const fUpper = String(fname || '').trim().toUpperCase();
+      if (!fUpper) return;
+      for (let i = 0; i < logs.length; i++) {
+        const rem = String(logs[i].remarks || '');
+        const remUpper = rem.toUpperCase();
+        if (!remUpper.includes('FILE INJECTION:') || remUpper.includes('[REVERTED')) continue;
+        if (remUpper.includes(fUpper)) {
+          if (!duplicateMatchedFiles.includes(fname)) {
+            duplicateMatchedFiles.push(fname);
+          }
+          if (!duplicatePriorTimestamp) {
+            duplicatePriorTimestamp = logs[i].timestamp || logs[i].dateOut || 'an earlier session';
+          }
+          break;
+        }
+      }
+    });
+
+    injectionState.duplicateDetected = duplicateMatchedFiles.length > 0;
+    injectionState.duplicateFiles = duplicateMatchedFiles;
+    injectionState.duplicateTimestamp = duplicatePriorTimestamp;
+
+    const dupWarnBanner = document.getElementById('injection-duplicate-warning');
+    const dupWarnDetail = document.getElementById('injection-duplicate-warning-detail');
+    if (dupWarnBanner) {
+      if (injectionState.duplicateDetected) {
+        dupWarnBanner.style.display = 'block';
+        if (dupWarnDetail) {
+          dupWarnDetail.innerHTML = `File(s) <strong>${escapeHtml(duplicateMatchedFiles.join(', '))}</strong> were ALREADY injected on <strong>${escapeHtml(duplicatePriorTimestamp)}</strong>. Re-injecting will subtract stocks twice! Click <strong>✕ Clear</strong> if this was a mistake.`;
+        }
+      } else {
+        dupWarnBanner.style.display = 'none';
+      }
+    }
 
     // Update UI elements
     const dropLabel = document.getElementById('injection-dropzone-label');
@@ -6943,7 +7190,11 @@
     if (previewCard) previewCard.style.display = 'block';
 
     renderInjectionPreviewTable(previewList);
-    showToast(`Aggregated ${aggregatedRecords.length.toLocaleString()} unique medicines from ${fileNamesList.length} file(s). Review FEFO plan below.`, 'success');
+    if (injectionState.duplicateDetected) {
+      showToast(`⚠️ WARNING: ${duplicateMatchedFiles.join(', ')} was already injected on ${duplicatePriorTimestamp}!`, 'error');
+    } else {
+      showToast(`Aggregated ${aggregatedRecords.length.toLocaleString()} unique medicines from ${fileNamesList.length} file(s). Review FEFO plan below.`, 'success');
+    }
   }
 
   function renderInjectionPreviewTable(items) {
@@ -6957,7 +7208,7 @@
     const filtered = (items || []).filter(item => {
       if (!query) return true;
       return (item.itemCode || '').toLowerCase().includes(query) ||
-             (item.medicine || '').toLowerCase().includes(query);
+        (item.medicine || '').toLowerCase().includes(query);
     });
 
     const limit = injectionState.previewRenderLimit || 150;
@@ -6997,8 +7248,8 @@
       if (item.planChips && item.planChips.length > 0) {
         planHtml = item.planChips.map(c => {
           const brandBadge = c.brand ? `<span style="opacity:0.75; font-size:10px;">(${escapeHtml(c.brand)})</span>` : '';
-          const arrow = c.deduct > 0 
-            ? `<strong>-${c.deduct.toLocaleString()}</strong> → ${c.remaining.toLocaleString()}` 
+          const arrow = c.deduct > 0
+            ? `<strong>-${c.deduct.toLocaleString()}</strong> → ${c.remaining.toLocaleString()}`
             : `${c.remaining.toLocaleString()}`;
           return `<span class="fefo-plan-chip ${c.state}">
             ${escapeHtml(c.exp)} ${brandBadge}: ${arrow}
@@ -7048,12 +7299,18 @@
     injectionState.fileType = '';
     injectionState.parsedRecords = [];
     injectionState.previewItems = [];
+    injectionState.duplicateDetected = false;
+    injectionState.duplicateFiles = [];
+    injectionState.duplicateTimestamp = '';
 
     const dropLabel = document.getElementById('injection-dropzone-label');
     if (dropLabel) dropLabel.textContent = 'Drag & drop your 3 cleaned HIS files here, or click to browse (Multi-select enabled)';
 
     const fileInput = document.getElementById('injection-file-input');
     if (fileInput) fileInput.value = '';
+
+    const dupWarnBanner = document.getElementById('injection-duplicate-warning');
+    if (dupWarnBanner) dupWarnBanner.style.display = 'none';
 
     const configBar = document.getElementById('injection-config-bar');
     if (configBar) configBar.style.display = 'none';
@@ -7064,11 +7321,138 @@
     showToast('File injection cleared.', 'info');
   }
 
+  function openConfirmInjectionModal() {
+    if (!injectionState.parsedRecords || injectionState.parsedRecords.length === 0) {
+      showToast('No parsed records to inject.', 'warning');
+      return;
+    }
+
+    const txInput = document.getElementById('injection-tx-date');
+    const cleanDate = txInput && txInput.value ? txInput.value : new Date().toISOString().split('T')[0];
+
+    const filesEl = document.getElementById('confirm-inj-files');
+    if (filesEl) filesEl.textContent = injectionState.sourceFileName || 'Cleaned HIS File';
+
+    const dateEl = document.getElementById('confirm-inj-date');
+    if (dateEl) dateEl.textContent = cleanDate;
+
+    const matchedEl = document.getElementById('confirm-inj-matched');
+    if (matchedEl) matchedEl.textContent = `${(injectionState.matchedCount || 0).toLocaleString()} of ${(injectionState.totalUniqueItems || 0).toLocaleString()} items`;
+
+    const unitsEl = document.getElementById('confirm-inj-units');
+    if (unitsEl) unitsEl.textContent = `-${(injectionState.totalDeductUnits || 0).toLocaleString()} units`;
+
+    const batchesEl = document.getElementById('confirm-inj-batches');
+    if (batchesEl) batchesEl.textContent = `${(injectionState.batchesImpactedCount || 0).toLocaleString()} batches`;
+
+    const safeBadge = document.getElementById('confirm-inj-safe-badge');
+    const dupBox = document.getElementById('confirm-inj-duplicate-box');
+    const dupMsg = document.getElementById('confirm-inj-duplicate-msg');
+    const forceChk = document.getElementById('chk-force-duplicate-injection');
+    const confirmBtn = document.getElementById('btn-modal-confirm-injection');
+
+    if (forceChk) forceChk.checked = false;
+
+    if (injectionState.duplicateDetected) {
+      if (safeBadge) safeBadge.style.display = 'none';
+      if (dupBox) dupBox.style.display = 'block';
+      if (dupMsg) {
+        dupMsg.innerHTML = `File(s) <strong>${escapeHtml((injectionState.duplicateFiles || []).join(', '))}</strong> were ALREADY injected on <strong>${escapeHtml(injectionState.duplicateTimestamp || 'an earlier session')}</strong>. Subtracting again will deduct stocks twice!`;
+      }
+      if (confirmBtn) confirmBtn.disabled = true;
+    } else {
+      if (safeBadge) safeBadge.style.display = 'flex';
+      if (dupBox) dupBox.style.display = 'none';
+      if (confirmBtn) confirmBtn.disabled = false;
+    }
+
+    const modal = document.getElementById('modal-confirm-injection');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function onToggleForceDuplicateCheckbox() {
+    const forceChk = document.getElementById('chk-force-duplicate-injection');
+    const confirmBtn = document.getElementById('btn-modal-confirm-injection');
+    if (confirmBtn && forceChk) {
+      confirmBtn.disabled = !forceChk.checked;
+    }
+  }
+
+  let _injProgressTimer = null;
+  function startInjectionProgress(totalItems) {
+    const modal = document.getElementById('modal-injection-progress');
+    const fill = document.getElementById('inj-progress-fill');
+    const pct = document.getElementById('inj-progress-pct');
+    const stage = document.getElementById('inj-progress-stage');
+    const timerEl = document.getElementById('inj-progress-timer');
+    if (modal) modal.style.display = 'flex';
+    if (fill) fill.style.width = '12%';
+    if (pct) pct.textContent = '12%';
+    if (stage) stage.textContent = '🛡️ Checking duplicate file guard...';
+    if (timerEl) timerEl.textContent = '00:00s';
+
+    const startMs = Date.now();
+    if (_injProgressTimer) clearInterval(_injProgressTimer);
+    _injProgressTimer = setInterval(() => {
+      const sec = Math.floor((Date.now() - startMs) / 1000);
+      const mins = String(Math.floor(sec / 60)).padStart(2, '0');
+      const remSec = String(sec % 60).padStart(2, '0');
+      if (timerEl) timerEl.textContent = `${mins}:${remSec}s`;
+
+      let p = 12;
+      let msg = '🛡️ Checking duplicate file guard...';
+      if (sec >= 1 && sec < 4) {
+        p = 35;
+        msg = `⚡ Calculating FEFO deductions across ${totalItems || 0} items...`;
+      } else if (sec >= 4 && sec < 10) {
+        p = 65;
+        msg = '📝 Updating Stocks sheet & writing Audit Log...';
+      } else if (sec >= 10) {
+        p = Math.min(92, 65 + Math.floor((sec - 10) * 1.5));
+        msg = '⏳ Finalizing Google Sheets batch write...';
+      }
+      if (fill) fill.style.width = p + '%';
+      if (pct) pct.textContent = p + '%';
+      if (stage) stage.textContent = msg;
+    }, 500);
+  }
+
+  function stopInjectionProgress(isSuccess) {
+    if (_injProgressTimer) {
+      clearInterval(_injProgressTimer);
+      _injProgressTimer = null;
+    }
+    const modal = document.getElementById('modal-injection-progress');
+    const fill = document.getElementById('inj-progress-fill');
+    const pct = document.getElementById('inj-progress-pct');
+    const stage = document.getElementById('inj-progress-stage');
+    if (isSuccess) {
+      if (fill) fill.style.width = '100%';
+      if (pct) pct.textContent = '100%';
+      if (stage) stage.textContent = '✅ Complete! Refreshing dashboard...';
+      setTimeout(() => {
+        if (modal) modal.style.display = 'none';
+      }, 450);
+    } else {
+      if (modal) modal.style.display = 'none';
+    }
+  }
+
   function executeInjectionFefoSync() {
     if (!injectionState.parsedRecords || injectionState.parsedRecords.length === 0) {
       showToast('No parsed records to inject.', 'warning');
       return;
     }
+
+    const forceChk = document.getElementById('chk-force-duplicate-injection');
+    const forceOverride = Boolean(forceChk && forceChk.checked);
+    if (injectionState.duplicateDetected && !forceOverride) {
+      showToast('Duplicate file injection blocked! Check the override box if you truly intend to deduct twice.', 'error');
+      return;
+    }
+
+    closeModal('modal-confirm-injection');
+    startInjectionProgress(injectionState.parsedRecords.length);
 
     const btn = document.getElementById('btn-execute-injection');
     const txInput = document.getElementById('injection-tx-date');
@@ -7083,7 +7467,8 @@
       sourceFileName: injectionState.sourceFileName,
       fileType: injectionState.fileType,
       transactionDate: cleanDate,
-      records: injectionState.parsedRecords
+      records: injectionState.parsedRecords,
+      forceOverrideDuplicate: forceOverride
     };
 
     if (typeof google !== 'undefined' && google.script && google.script.run) {
@@ -7094,10 +7479,12 @@
             btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
           }
           if (!res || !res.success) {
+            stopInjectionProgress(false);
             showToast(res ? res.error : 'File injection failed.', 'error');
             return;
           }
 
+          stopInjectionProgress(true);
           flashBtnSuccess('btn-execute-injection', 'Deducted!', () => {
             showToast(res.message || 'FEFO deductions executed successfully!', 'success');
             clearInjectionFile();
@@ -7106,6 +7493,7 @@
           });
         })
         .withFailureHandler((err) => {
+          stopInjectionProgress(false);
           if (btn) {
             btn.disabled = false;
             btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
@@ -7116,19 +7504,154 @@
     } else {
       // Offline / Preview mock
       setTimeout(() => {
+        stopInjectionProgress(true);
         if (btn) {
           btn.disabled = false;
           btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
         }
         showToast(`[Preview Mock] Successfully executed FEFO deductions for ${payload.records.length} items!`, 'success');
         clearInjectionFile();
-      }, 700);
+      }, 1500);
+    }
+  }
+
+  function getLatestActiveFileInjectionSession() {
+    const logs = state.logs || [];
+    let sessionKey = '';
+    let sessionFiles = '';
+    let sessionTimestamp = '';
+    let sessionInjId = '';
+    let totalUnits = 0;
+    let rowsCount = 0;
+
+    for (let i = 0; i < logs.length; i++) {
+      const l = logs[i];
+      const rem = String(l.remarks || '');
+      if (!rem.includes('File Injection:') || rem.includes('[REVERTED')) continue;
+
+      const idMatch = rem.match(/\[(INJ-\d{8}-\d{6})\]/);
+      const injId = idMatch ? idMatch[1] : '';
+      const tsPrefix = String(l.timestamp || '').substring(0, 16);
+      const filePart = rem.replace(/^File Injection:\s*/i, '').split(/\s*\(/)[0].trim();
+      const key = injId || (tsPrefix + '|' + filePart);
+
+      if (!sessionKey) {
+        sessionKey = key;
+        sessionFiles = filePart;
+        sessionTimestamp = l.timestamp || l.dateOut || '';
+        sessionInjId = injId;
+      }
+
+      if (key === sessionKey) {
+        const q = parseFloat(l.qtyOut) || 0;
+        if (q > 0) totalUnits += q;
+        rowsCount++;
+      }
+    }
+
+    if (!sessionKey) return null;
+    return {
+      sessionKey,
+      sourceFile: sessionFiles,
+      timestamp: sessionTimestamp,
+      injId: sessionInjId,
+      totalUnits,
+      rowsCount
+    };
+  }
+
+  function updateRecentFileInjectionRollbackBanner() {
+    const bar = document.getElementById('recent-injection-rollback-bar');
+    const summaryEl = document.getElementById('recent-injection-summary-text');
+    if (!bar || !summaryEl) return;
+
+    const latest = getLatestActiveFileInjectionSession();
+    if (!latest) {
+      bar.style.display = 'none';
+      return;
+    }
+
+    bar.style.display = 'flex';
+    summaryEl.innerHTML = `<strong>${escapeHtml(latest.sourceFile)}</strong> • Injected on <strong>${escapeHtml(latest.timestamp)}</strong> (Deducted <strong>-${latest.totalUnits.toLocaleString()} units</strong>)`;
+  }
+
+  function promptRevertLastFileInjection() {
+    const latest = getLatestActiveFileInjectionSession();
+    if (!latest) {
+      showToast('No active File Injection session found to revert.', 'warning');
+      return;
+    }
+
+    const filesEl = document.getElementById('revert-modal-files');
+    if (filesEl) filesEl.textContent = latest.sourceFile;
+
+    const tsEl = document.getElementById('revert-modal-ts');
+    if (tsEl) tsEl.textContent = latest.timestamp;
+
+    const unitsEl = document.getElementById('revert-modal-units');
+    if (unitsEl) unitsEl.textContent = `+${latest.totalUnits.toLocaleString()} units`;
+
+    const modal = document.getElementById('modal-revert-injection');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  function executeRevertLastFileInjection() {
+    const latest = getLatestActiveFileInjectionSession();
+    if (!latest) {
+      closeModal('modal-revert-injection');
+      return;
+    }
+
+    const btn = document.getElementById('btn-confirm-revert-injection');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Restoring Stocks...';
+    }
+
+    const payload = {
+      targetInjId: latest.injId || '',
+      targetSourceFile: latest.sourceFile || '',
+      targetTimestamp: latest.timestamp || ''
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(res => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '↩️ Confirm & Restore Stocks';
+          }
+          closeModal('modal-revert-injection');
+          if (!res || !res.success) {
+            showToast(res ? res.error : 'Failed to revert file injection.', 'error');
+            return;
+          }
+          showToast(res.message || 'File injection reverted and stocks restored!', 'success');
+          loadInventory();
+          loadLogs();
+        })
+        .withFailureHandler(err => {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '↩️ Confirm & Restore Stocks';
+          }
+          closeModal('modal-revert-injection');
+          showToast(`Error reverting injection: ${err.message || err}`, 'error');
+        })
+        .revertFileInjection(payload);
+    } else {
+      setTimeout(() => {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '↩️ Confirm & Restore Stocks';
+        }
+        closeModal('modal-revert-injection');
+        showToast(`[Preview Mock] Reverted ${latest.sourceFile} (+${latest.totalUnits.toLocaleString()} units restored)!`, 'success');
+      }, 600);
     }
   }
 
 </script>
-
-
 </body>
 </html>
 

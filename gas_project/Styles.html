@@ -453,25 +453,42 @@
     flex-shrink: 0;
   }
 
-  .dot-critical { background-color: #be123c; }
-  .dot-near { background-color: #b45309; }
-  .dot-safe { background-color: #047857; }
-  .dot-expired { background-color: #64748b; }
-  .dot-neutral { background-color: #94a3b8; }
+  .dot-critical {
+    background-color: #be123c;
+  }
 
-  .badge-danger, .badge-critical {
+  .dot-near {
+    background-color: #b45309;
+  }
+
+  .dot-safe {
+    background-color: #047857;
+  }
+
+  .dot-expired {
+    background-color: #64748b;
+  }
+
+  .dot-neutral {
+    background-color: #94a3b8;
+  }
+
+  .badge-danger,
+  .badge-critical {
     background: #fff1f2;
     color: #be123c;
     border: 1px solid #fecdd3;
   }
 
-  .badge-warning, .badge-near {
+  .badge-warning,
+  .badge-near {
     background: #fffbeb;
     color: #b45309;
     border: 1px solid #fde68a;
   }
 
-  .badge-success, .badge-safe {
+  .badge-success,
+  .badge-safe {
     background: #f0fdf4;
     color: #047857;
     border: 1px solid #bbf7d0;
@@ -1694,7 +1711,8 @@
     text-align: center;
   }
 
-  .dci-dropzone:hover, .dci-dropzone.dragover {
+  .dci-dropzone:hover,
+  .dci-dropzone.dragover {
     border-color: #2563eb;
     background: #eff6ff;
   }
@@ -1736,11 +1754,14 @@
     cursor: pointer;
     transition: all 0.2s ease;
   }
-  .injection-dropzone:hover, .injection-dropzone.dragover {
+
+  .injection-dropzone:hover,
+  .injection-dropzone.dragover {
     border-color: #2563eb;
     background: #e0f2fe;
     transform: translateY(-1px);
   }
+
   .fefo-plan-chip {
     display: inline-flex;
     align-items: center;
@@ -1754,29 +1775,34 @@
     line-height: 1.3;
     font-weight: 500;
   }
+
   .fefo-plan-chip.zeroed {
     background: #fef2f2;
     border-color: #fecaca;
     color: #b91c1c;
     font-weight: 600;
   }
+
   .fefo-plan-chip.partial {
     background: #fffbeb;
     border-color: #fde68a;
     color: #b45309;
     font-weight: 600;
   }
+
   .fefo-plan-chip.untouched {
     background: #f8fafc;
     border-color: #e2e8f0;
     color: #64748b;
   }
+
   .source-breakdown-cell {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
     align-items: center;
   }
+
   .source-badge {
     display: inline-flex;
     align-items: center;
@@ -1788,16 +1814,19 @@
     font-weight: 600;
     white-space: nowrap;
   }
+
   .source-badge-cons {
     background: #eff6ff;
     color: #1d4ed8;
     border: 1px solid #bfdbfe;
   }
+
   .source-badge-storage {
     background: #fdf4ff;
     color: #86198f;
     border: 1px solid #f5d0fe;
   }
+
   .source-badge-disp {
     background: #f0fdf4;
     color: #15803d;
@@ -1809,6 +1838,7 @@
     background: #f8fafc !important;
     transition: all 0.2s ease;
   }
+
   .sub-batch-table {
     width: 100%;
     border-collapse: collapse;
@@ -1817,8 +1847,9 @@
     border-radius: 8px;
     overflow: hidden;
     margin-top: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
+
   .sub-batch-table th {
     background: #f1f5f9;
     color: #475569;
@@ -1828,15 +1859,18 @@
     padding: 7px 10px;
     border-bottom: 1px solid #cbd5e1;
   }
+
   .sub-batch-table td {
     padding: 7px 10px;
     font-size: 11.5px;
     border-bottom: 1px solid #f1f5f9;
     color: #1e293b;
   }
+
   .sub-batch-table tr:last-child td {
     border-bottom: none;
   }
+
   .badge-consolidated {
     background: #eff6ff;
     color: #1d4ed8;
@@ -1847,8 +1881,67 @@
     transition: all 0.15s ease;
     user-select: none;
   }
+
   .badge-consolidated:hover {
     background: #dbeafe;
     border-color: #93c5fd;
+  }
+
+  /* Animated File Injection Progress Bar */
+  .inj-progress-track {
+    width: 100%;
+    height: 14px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  .inj-progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2563eb 0%, #3b82f6 50%, #1d4ed8 100%);
+    background-size: 200% 100%;
+    animation: injShimmer 1.4s linear infinite;
+    transition: width 0.35s ease;
+    position: relative;
+  }
+
+  .inj-progress-fill::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(-45deg,
+        rgba(255, 255, 255, 0.22) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.22) 50%,
+        rgba(255, 255, 255, 0.22) 75%,
+        transparent 75%,
+        transparent);
+    background-size: 24px 24px;
+    animation: injStripes 0.8s linear infinite;
+  }
+
+  @keyframes injShimmer {
+    0% {
+      background-position: 200% 0;
+    }
+
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  @keyframes injStripes {
+    0% {
+      background-position: 0 0;
+    }
+
+    100% {
+      background-position: 24px 0;
+    }
   }
 </style>

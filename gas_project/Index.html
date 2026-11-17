@@ -231,8 +231,37 @@
             </div>
           </div>
 
+          <!-- Recent File Injection & 1-Click Rollback Bar -->
+          <div id="recent-injection-rollback-bar" style="display:none; margin-top:12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:10px 14px; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:16px;">🛡️</span>
+              <div>
+                <div style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase;">Last File Injection Recorded</div>
+                <div id="recent-injection-summary-text" style="font-size:12px; color:#1e293b; font-weight:600;">--</div>
+              </div>
+            </div>
+            <button type="button" id="btn-revert-last-injection" class="btn btn-outline btn-sm" style="border-color:#fca5a5; color:#dc2626; background:#ffffff; font-weight:700;" onclick="promptRevertLastFileInjection()">
+              ↩️ Undo / Revert Last Injection
+            </button>
+          </div>
+
           <!-- Configuration & File Status Bar (Shown after file loaded) -->
           <div id="injection-config-bar" style="display:none; margin-top:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px;">
+            <!-- Duplicate File Alert Banner -->
+            <div id="injection-duplicate-warning" style="display:none; margin-bottom:12px; background:#fef2f2; border:2px solid #dc2626; border-radius:8px; padding:12px 14px; color:#991b1b;">
+              <div style="display:flex; align-items:flex-start; gap:10px;">
+                <span style="font-size:20px; line-height:1;">🛑</span>
+                <div style="flex:1;">
+                  <div style="font-weight:800; font-size:13px; color:#dc2626; text-transform:uppercase; letter-spacing:0.3px;">
+                    Duplicate File Injection Detected — Accidental Double-Subtraction Blocked!
+                  </div>
+                  <div id="injection-duplicate-warning-detail" style="font-size:12px; margin-top:4px; color:#7f1d1d; font-weight:500;">
+                    This file has already been injected and subtracted from your inventory sheet.
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
               <div>
                 <span style="font-size:11px; text-transform:uppercase; font-weight:700; color:#64748b; display:block;">Loaded Files & Mode</span>
@@ -244,7 +273,7 @@
               </div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <button type="button" class="btn btn-outline btn-sm" onclick="clearInjectionFile()">✕ Clear</button>
-                <button type="button" id="btn-execute-injection" class="btn btn-primary" onclick="executeInjectionFefoSync()">
+                <button type="button" id="btn-execute-injection" class="btn btn-primary" onclick="openConfirmInjectionModal()">
                   ⚡ Confirm & Apply FEFO Deductions
                 </button>
               </div>
@@ -1071,6 +1100,132 @@
         <button type="button" class="btn btn-primary btn-sm" onclick="closeModal('modal-medicine-audit')">
           Close Ledger
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: FILE INJECTION SAFETY CONFIRMATION -->
+  <div id="modal-confirm-injection" class="modal-backdrop" style="display:none;">
+    <div class="modal-card" style="max-width:540px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">🛡️</span>
+          <div class="modal-title" style="margin:0;">Confirm File Injection & Stock Deduction</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-confirm-injection')">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding:18px;">
+        <!-- Duplicate Status Box inside Modal -->
+        <div id="confirm-inj-safe-badge" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:10px 12px; margin-bottom:14px; display:flex; align-items:center; gap:8px; color:#166534; font-size:12px; font-weight:600;">
+          <span>✅</span>
+          <span>Verified New Injection — None of these files have been injected previously.</span>
+        </div>
+
+        <div id="confirm-inj-duplicate-box" style="display:none; background:#fef2f2; border:2px solid #dc2626; border-radius:8px; padding:12px; margin-bottom:14px; color:#991b1b;">
+          <div style="font-weight:800; font-size:13px; color:#dc2626; margin-bottom:4px;">
+            🛑 STOP! DUPLICATE FILE DETECTED!
+          </div>
+          <div id="confirm-inj-duplicate-msg" style="font-size:12px; color:#7f1d1d; margin-bottom:10px;">
+            This file was already injected previously. Subtracting it again will cause double stock deduction!
+          </div>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12px; font-weight:700; color:#991b1b; cursor:pointer; background:#fee2e2; padding:8px; border-radius:6px;">
+            <input type="checkbox" id="chk-force-duplicate-injection" onchange="onToggleForceDuplicateCheckbox()" style="margin-top:2px;">
+            <span>I understand this file was already injected and I intentionally want to subtract these quantities again.</span>
+          </label>
+        </div>
+
+        <!-- Summary Breakdown -->
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px; color:#64748b; text-transform:uppercase; font-weight:700;">File(s) to Inject</div>
+            <div id="confirm-inj-files" style="font-size:12.5px; font-weight:700; color:#0f172a; word-break:break-all; margin-top:2px;">--</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; border-top:1px solid #e2e8f0; padding-top:10px;">
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Transaction Date</div>
+              <div id="confirm-inj-date" style="font-size:14px; font-weight:700; color:#1e293b;">--</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Matched Medicines</div>
+              <div id="confirm-inj-matched" style="font-size:14px; font-weight:700; color:#15803d;">0</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Total Stock to Subtract</div>
+              <div id="confirm-inj-units" style="font-size:16px; font-weight:800; color:#dc2626;">-0 units</div>
+            </div>
+            <div>
+              <div style="font-size:11px; color:#64748b; font-weight:600;">Sheet Batches Impacted</div>
+              <div id="confirm-inj-batches" style="font-size:14px; font-weight:700; color:#2563eb;">0 batches</div>
+            </div>
+          </div>
+        </div>
+
+        <p style="font-size:12px; color:#475569; margin:12px 0 0 0;">
+          Please verify the above numbers before proceeding. Once confirmed, quantities will be deducted in FEFO order from the <strong>STORAGE</strong> sheet.
+        </p>
+      </div>
+
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-confirm-injection')">Cancel</button>
+        <button type="button" id="btn-modal-confirm-injection" class="btn btn-primary" onclick="executeInjectionFefoSync()">
+          ⚡ Yes, Subtract Stocks Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRM REVERT / UNDO LAST FILE INJECTION -->
+  <div id="modal-revert-injection" class="modal-backdrop" style="display:none;">
+    <div class="modal-card" style="max-width:500px;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:18px;">↩️</span>
+          <div class="modal-title" style="margin:0;">Undo / Revert Last File Injection</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="closeModal('modal-revert-injection')">✕</button>
+      </div>
+      <div class="modal-body" style="padding:18px;">
+        <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px; margin-bottom:14px; color:#9a3412; font-size:12px;">
+          <strong>How Rollback Works:</strong> This will restore the exact subtracted quantities from the last File Injection back into their original rows in the <strong>STORAGE</strong> sheet and mark the log entries as <code>[REVERTED]</code>.
+        </div>
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px; font-size:12.5px;">
+          <div style="margin-bottom:6px;"><strong>Injected File(s):</strong> <span id="revert-modal-files">--</span></div>
+          <div style="margin-bottom:6px;"><strong>Injected Timestamp:</strong> <span id="revert-modal-ts">--</span></div>
+          <div><strong>Total Units to Restore:</strong> <span id="revert-modal-units" style="font-weight:800; color:#15803d;">+0 units</span></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('modal-revert-injection')">Cancel</button>
+        <button type="button" id="btn-confirm-revert-injection" class="btn btn-primary" style="background:#dc2626; border-color:#dc2626;" onclick="executeRevertLastFileInjection()">
+          ↩️ Confirm & Restore Stocks
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ANIMATED FILE INJECTION PROGRESS -->
+  <div id="modal-injection-progress" class="modal-backdrop" style="display:none; z-index:9999;">
+    <div class="modal-card" style="max-width:460px; padding:24px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="spinner" style="width:20px; height:20px; border-width:2.5px;"></div>
+          <h3 style="margin:0; font-size:15px; font-weight:700; color:#0f172a;">Executing FEFO File Injection...</h3>
+        </div>
+        <span id="inj-progress-timer" style="font-family:monospace; font-size:12px; font-weight:700; color:#2563eb; background:#eff6ff; padding:3px 8px; border-radius:6px;">00:00s</span>
+      </div>
+
+      <div class="inj-progress-track" style="margin-bottom:10px;">
+        <div id="inj-progress-fill" class="inj-progress-fill"></div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-bottom:12px;">
+        <span id="inj-progress-stage" style="color:#334155; font-weight:600;">🛡️ Validating duplicate file guard...</span>
+        <span id="inj-progress-pct" style="font-weight:800; color:#1d4ed8;">10%</span>
+      </div>
+
+      <div style="font-size:11px; color:#64748b; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:8px 10px;">
+        Please wait and do not close this tab while Google Sheets updates your inventory balances and audit log.
       </div>
     </div>
   </div>

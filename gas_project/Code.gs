@@ -8,8 +8,8 @@
 
 // Target or active sheet configuration
 const CONFIG = {
-  TARGET_SHEET_GID: '374732397', // Target active inventory sheet GID (from user sheet URL)
-  MAIN_SHEET_NAME: 'STORAGE', // Primary inventory sheet name (supports 'STORAGE', 'Stocks', etc.)
+  TARGET_SHEET_GID: '1609045579', // Target active inventory sheet GID ('Stocks' tab)
+  MAIN_SHEET_NAME: 'Stocks', // Primary inventory sheet name (supports 'Stocks', 'STORAGE', etc.)
   STORAGE_SHEET_ALIASES: ['STORAGE', 'Storage', 'Stocks', 'STOCKS', 'stocks', 'Stock', 'Inventory', 'INVENTORY', 'Sheet1'],
   MASTER_DCI_SHEET_NAME: 'Medicine', // Master catalog tab with Col A: DCI Code, Col B: Generic Description (supports 'Medicine', 'Sheet1', etc.)
   LOG_SHEET_NAME: 'STOCK_OUT_LOG',
@@ -496,20 +496,20 @@ function getInventoryData() {
 
       // Clean quantity
       let cleanQty = 0;
-      if (typeof rawQty === 'number') {
+      if (typeof rawQty === 'number' && !isNaN(rawQty)) {
         cleanQty = rawQty;
       } else {
-        const parsed = String(rawQty).replace(/[^0-9.-]/g, '');
-        cleanQty = parsed ? parseFloat(parsed) : 0;
+        const parsed = parseFloat(String(rawQty || '').replace(/[^0-9.-]/g, ''));
+        cleanQty = isNaN(parsed) ? 0 : parsed;
       }
 
       // Clean acquisition price
       let cleanPrice = 0;
-      if (typeof rawPrice === 'number') {
+      if (typeof rawPrice === 'number' && !isNaN(rawPrice)) {
         cleanPrice = rawPrice;
       } else {
-        const parsedPrice = String(rawPrice).replace(/[^0-9.-]/g, '');
-        cleanPrice = parsedPrice ? parseFloat(parsedPrice) : 0;
+        const parsedPrice = parseFloat(String(rawPrice || '').replace(/[^0-9.-]/g, ''));
+        cleanPrice = isNaN(parsedPrice) ? 0 : parsedPrice;
       }
 
       // Parse expiration robustly (handles Date objects, timestamps, strings like 'Feb-27' or '2027-02-01', and 'PENDING COUNT')
@@ -2944,15 +2944,56 @@ function executeFileInjectionDeduction(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(45000); // 45-second atomic lock to guarantee concurrency safety
   try {
-    const { sourceFileName, fileType, transactionDate, records } = payload || {};
+    const { sourceFileName, fileType, transactionDate, records, forceOverrideDuplicate } = payload || {};
     if (!records || !Array.isArray(records) || records.length === 0) {
       throw new Error("No deduction records provided in file injection payload.");
     }
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const ssTz = ss.getSpreadsheetTimeZone();
-    const cleanDate = String(transactionDate || Utilities.formatDate(new Date(), ssTz, 'yyyy-MM-dd')).trim();
+    const nowObj = new Date();
+    const cleanDate = String(transactionDate || Utilities.formatDate(nowObj, ssTz, 'yyyy-MM-dd')).trim();
     const cleanSource = String(sourceFileName || 'Cleaned HIS File').trim();
+    const injBatchId = 'INJ-' + Utilities.formatDate(nowObj, ssTz, 'yyyyMMdd-HHmmss');
+
+    // 0. DUPLICATE FILE INJECTION GUARD: Check STOCK_OUT_LOG before touching any stock
+    if (!forceOverrideDuplicate) {
+      const logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+      if (logSheet && logSheet.getLastRow() > 1) {
+        const logData = logSheet.getDataRange().getValues();
+        const uploadedNames = cleanSource.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+        const duplicateMatches = [];
+        let priorTimestamp = '';
+
+        for (let lr = logData.length - 1; lr >= 1; lr--) {
+          const remarkStr = String(logData[lr][11] || '');
+          const remarkUpper = remarkStr.toUpperCase();
+          if (!remarkUpper.includes('FILE INJECTION:') || remarkUpper.includes('[REVERTED')) continue;
+
+          for (let u = 0; u < uploadedNames.length; u++) {
+            const uName = uploadedNames[u];
+            if (uName && remarkUpper.includes(uName)) {
+              if (!duplicateMatches.includes(uName)) {
+                duplicateMatches.push(uName);
+              }
+              if (!priorTimestamp) {
+                const rawTs = logData[lr][0];
+                priorTimestamp = rawTs instanceof Date
+                  ? Utilities.formatDate(rawTs, ssTz, 'yyyy-MM-dd HH:mm:ss')
+                  : String(rawTs || '');
+              }
+            }
+          }
+        }
+
+        if (duplicateMatches.length > 0) {
+          throw new Error(
+            '🛑 DUPLICATE FILE BLOCKED: File(s) [' + duplicateMatches.join(', ') + '] were ALREADY injected on ' +
+            (priorTimestamp || 'an earlier session') + '. Deduction aborted to prevent subtracting stocks twice!'
+          );
+        }
+      }
+    }
 
     // 1. Fetch active inventory from sheet
     const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
@@ -2995,6 +3036,23 @@ function executeFileInjectionDeduction(payload) {
     let matchedMedicinesCount = 0;
     const unmatchedMedicines = [];
     const shortageWarnings = [];
+    const pendingLogRows = [];
+    const queueLogRow = (entry) => {
+      pendingLogRows.push([
+        entry.timestamp || nowObj,
+        entry.dateOut || '',
+        entry.itemCode || '',
+        entry.itemDesc || '',
+        entry.brandName || '',
+        entry.uom || '',
+        entry.expDate || '',
+        entry.unitPrice || 0,
+        entry.qtyOut || 0,
+        entry.previousQty || 0,
+        entry.remainingBalance || 0,
+        entry.remarks || ''
+      ]);
+    };
 
     // 2. Process each injected record
     for (let i = 0; i < records.length; i++) {
@@ -3042,8 +3100,8 @@ function executeFileInjectionDeduction(payload) {
           sourceDetail += ' [' + breakdown.join(', ') + ']';
         }
 
-        logStockOutTransaction({
-          timestamp: new Date(),
+        queueLogRow({
+          timestamp: nowObj,
           dateOut: cleanDate,
           itemCode: rawCode,
           itemDesc: rawDesc,
@@ -3054,7 +3112,7 @@ function executeFileInjectionDeduction(payload) {
           qtyOut: 0,
           previousQty: 0,
           remainingBalance: 0,
-          remarks: 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') ⚠️ UNMATCHED: Demanded ' + toDeduct.toLocaleString() + ' units - not found in sheet'
+          remarks: 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') [' + injBatchId + '] ⚠️ UNMATCHED: Demanded ' + toDeduct.toLocaleString() + ' units - not found in sheet'
         });
         continue;
       }
@@ -3098,8 +3156,8 @@ function executeFileInjectionDeduction(payload) {
           sourceDetail += ' [' + breakdown.join(', ') + ']';
         }
 
-        logStockOutTransaction({
-          timestamp: new Date(),
+        queueLogRow({
+          timestamp: nowObj,
           dateOut: cleanDate,
           itemCode: b.itemCode,
           itemDesc: b.desc,
@@ -3110,7 +3168,7 @@ function executeFileInjectionDeduction(payload) {
           qtyOut: deductFromBatch,
           previousQty: b.qty,
           remainingBalance: newBal,
-          remarks: 'File Injection: ' + cleanSource + ' (' + sourceDetail + ')'
+          remarks: 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') [' + injBatchId + ']'
         });
 
         // Update in-memory batch qty for any subsequent items in file
@@ -3146,11 +3204,11 @@ function executeFileInjectionDeduction(payload) {
 
         const fulfilled = toDeduct - needed;
         const shortageRemark = (fulfilled > 0)
-          ? 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') ⚠️ PARTIAL SHORTAGE (Deducted ' + fulfilled.toLocaleString() + ', Unfulfilled: ' + needed.toLocaleString() + ' units - stock exhausted)'
-          : 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') ⚠️ OUT OF STOCK / SHORTAGE (Demanded ' + toDeduct.toLocaleString() + ' units, 0 available in sheet)';
+          ? 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') [' + injBatchId + '] ⚠️ PARTIAL SHORTAGE (Deducted ' + fulfilled.toLocaleString() + ', Unfulfilled: ' + needed.toLocaleString() + ' units - stock exhausted)'
+          : 'File Injection: ' + cleanSource + ' (' + sourceDetail + ') [' + injBatchId + '] ⚠️ OUT OF STOCK / SHORTAGE (Demanded ' + toDeduct.toLocaleString() + ' units, 0 available in sheet)';
 
-        logStockOutTransaction({
-          timestamp: new Date(),
+        queueLogRow({
+          timestamp: nowObj,
           dateOut: cleanDate,
           itemCode: repBatch ? repBatch.itemCode : rawCode,
           itemDesc: repBatch ? repBatch.desc : rawDesc,
@@ -3166,8 +3224,24 @@ function executeFileInjectionDeduction(payload) {
       }
     }
 
+    // Batch-write all queued audit log rows in ONE single Sheets API call (10x-20x faster)
+    if (pendingLogRows.length > 0) {
+      let logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+      if (!logSheet) {
+        logSheet = ss.insertSheet(CONFIG.LOG_SHEET_NAME);
+        logSheet.getRange(1, 1, 1, 12).setValues([[
+          'TIMESTAMP', 'DATE OUT', 'ITEM CODE', 'GENERIC NAME', 'BRAND NAME', 'UOM',
+          'BATCH EXPIRY', 'UNIT PRICE', 'QTY OUT', 'PREVIOUS QTY', 'REMAINING BALANCE', 'REMARKS'
+        ]]).setFontWeight('bold').setBackground('#f3f4f6');
+        logSheet.setFrozenRows(1);
+      }
+      const startRow = logSheet.getLastRow() + 1;
+      logSheet.getRange(startRow, 1, pendingLogRows.length, 12).setValues(pendingLogRows);
+    }
+
     return {
       success: true,
+      injBatchId: injBatchId,
       totalDeductedUnits: totalDeductedUnits,
       executedBatchesCount: executedBatchesCount,
       matchedMedicinesCount: matchedMedicinesCount,
@@ -3177,6 +3251,167 @@ function executeFileInjectionDeduction(payload) {
       sheetName: sheet.getName(),
       sheetGid: sheet.getSheetId(),
       message: 'File Injection Successful on tab [' + sheet.getName() + '] (gid: ' + sheet.getSheetId() + ')! Deducted ' + totalDeductedUnits.toLocaleString() + ' unit(s) across ' + executedBatchesCount + ' batch(es) via FEFO.'
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Reverts / Rolls back a File Injection session and restores the exact subtracted quantities
+ * back to their matching inventory batches in the STORAGE sheet.
+ */
+function revertFileInjection(payload) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(45000);
+  try {
+    const { targetSourceFile, targetTimestamp, targetInjId } = payload || {};
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssTz = ss.getSpreadsheetTimeZone();
+    const logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+    if (!logSheet || logSheet.getLastRow() <= 1) {
+      throw new Error('No Stock-Out Audit Log found to revert from.');
+    }
+
+    const logData = logSheet.getDataRange().getValues();
+    const rowsToRevert = [];
+
+    // Identify target injection rows (either by injId, or by sourceFile + timestamp, or most recent active injection)
+    let resolvedMatchKey = '';
+    for (let r = logData.length - 1; r >= 1; r--) {
+      const row = logData[r];
+      const remarkStr = String(row[11] || '');
+      if (!remarkStr.includes('File Injection:') || remarkStr.includes('[REVERTED')) continue;
+
+      const rawTs = row[0];
+      const tsStr = rawTs instanceof Date
+        ? Utilities.formatDate(rawTs, ssTz, 'yyyy-MM-dd HH:mm:ss')
+        : String(rawTs || '').trim();
+
+      const idMatch = remarkStr.match(/\[(INJ-\d{8}-\d{6})\]/);
+      const rowInjId = idMatch ? idMatch[1] : '';
+
+      if (targetInjId && rowInjId === targetInjId) {
+        rowsToRevert.push({ logRowIndex: r + 1, row: row, tsStr: tsStr, remarkStr: remarkStr });
+      } else if (!targetInjId && targetSourceFile && remarkStr.includes(targetSourceFile)) {
+        if (!targetTimestamp || tsStr.substring(0, 16) === String(targetTimestamp).substring(0, 16)) {
+          rowsToRevert.push({ logRowIndex: r + 1, row: row, tsStr: tsStr, remarkStr: remarkStr });
+        }
+      } else if (!targetInjId && !targetSourceFile) {
+        // Default to the most recent active file injection session
+        const sessionKey = rowInjId || (tsStr.substring(0, 16) + '|' + remarkStr.split('(')[0]);
+        if (!resolvedMatchKey) resolvedMatchKey = sessionKey;
+        if (sessionKey === resolvedMatchKey) {
+          rowsToRevert.push({ logRowIndex: r + 1, row: row, tsStr: tsStr, remarkStr: remarkStr });
+        }
+      }
+    }
+
+    if (rowsToRevert.length === 0) {
+      throw new Error('Could not find any active (non-reverted) File Injection records matching your request.');
+    }
+
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const info = getInventorySheetInfo(targetGid);
+    const sheet = info.sheet;
+    const invValues = sheet.getDataRange().getValues();
+
+    let totalRestoredUnits = 0;
+    let restoredBatchesCount = 0;
+    const revertNow = new Date();
+    const revertStamp = Utilities.formatDate(revertNow, ssTz, 'yyyy-MM-dd HH:mm');
+
+    for (let i = 0; i < rowsToRevert.length; i++) {
+      const item = rowsToRevert[i];
+      const lRow = item.row;
+      const code = String(lRow[2] || '').trim().toUpperCase();
+      const desc = String(lRow[3] || '').trim();
+      const brand = String(lRow[4] || '').trim().toUpperCase();
+      const uom = String(lRow[5] || '').trim();
+      const exp = normalizeExpiryString(lRow[6], ssTz);
+      const price = parseFloat(String(lRow[7] || '0').replace(/[^0-9.-]/g, '')) || 0;
+      const qtyOut = parseFloat(String(lRow[8] || '0').replace(/[^0-9.-]/g, '')) || 0;
+
+      // Mark the original log row as [REVERTED] so it cannot be reverted again and unblocks the file for re-injection
+      const updatedRemark = item.remarkStr + ' [REVERTED on ' + revertStamp + ']';
+      logSheet.getRange(item.logRowIndex, 12).setValue(updatedRemark);
+
+      if (qtyOut <= 0) continue; // Shortage/unmatched audit line had 0 deducted
+
+      // Find matching row in STORAGE sheet
+      let targetInvRow = -1;
+      for (let r = 1; r < invValues.length; r++) {
+        const iCode = String(invValues[r][info.colCode] || '').trim().toUpperCase();
+        if (iCode !== code) continue;
+        const iBrand = info.colBrand !== -1 ? String(invValues[r][info.colBrand] || '').trim().toUpperCase() : '';
+        const iExp = normalizeExpiryString(invValues[r][info.colExp], ssTz);
+        if (iExp === exp && (!brand || brand === 'STANDARD' || iBrand === brand)) {
+          targetInvRow = r;
+          break;
+        }
+      }
+      // Fallback: match by Item Code + Expiry, or Item Code alone
+      if (targetInvRow === -1) {
+        for (let r = 1; r < invValues.length; r++) {
+          const iCode = String(invValues[r][info.colCode] || '').trim().toUpperCase();
+          const iExp = normalizeExpiryString(invValues[r][info.colExp], ssTz);
+          if (iCode === code && iExp === exp) {
+            targetInvRow = r;
+            break;
+          }
+        }
+      }
+      if (targetInvRow === -1) {
+        for (let r = 1; r < invValues.length; r++) {
+          const iCode = String(invValues[r][info.colCode] || '').trim().toUpperCase();
+          if (iCode === code) {
+            targetInvRow = r;
+            break;
+          }
+        }
+      }
+
+      if (targetInvRow !== -1) {
+        const curQtyRaw = invValues[targetInvRow][info.colQty];
+        const curQty = typeof curQtyRaw === 'number' ? curQtyRaw : (parseFloat(String(curQtyRaw).replace(/[^0-9.-]/g, '')) || 0);
+        const restoredQty = curQty + qtyOut;
+
+        // Update both in-memory array and sheet cell
+        invValues[targetInvRow][info.colQty] = restoredQty;
+        sheet.getRange(targetInvRow + 1, info.colQty + 1)
+          .setValue(restoredQty)
+          .setNumberFormat('#,##0')
+          .setHorizontalAlignment('right');
+
+        totalRestoredUnits += qtyOut;
+        restoredBatchesCount++;
+
+        // Write audit trail entry for the restoration
+        logStockOutTransaction({
+          timestamp: revertNow,
+          dateOut: Utilities.formatDate(revertNow, ssTz, 'yyyy-MM-dd'),
+          itemCode: code,
+          itemDesc: desc,
+          brandName: String(lRow[4] || 'Standard'),
+          uom: uom,
+          expDate: exp,
+          unitPrice: price,
+          qtyOut: -qtyOut, // Negative qtyOut signifies stock restored (+qty)
+          previousQty: curQty,
+          remainingBalance: restoredQty,
+          remarks: '↩️ REVERTED File Injection: Restored +' + qtyOut.toLocaleString() + ' units (from ' + item.tsStr + ')'
+        });
+      }
+    }
+
+    return {
+      success: true,
+      restoredUnits: totalRestoredUnits,
+      restoredBatchesCount: restoredBatchesCount,
+      revertedLogRows: rowsToRevert.length,
+      message: 'Successfully reverted File Injection! Restored +' + totalRestoredUnits.toLocaleString() + ' unit(s) across ' + restoredBatchesCount + ' batch(es).'
     };
   } catch (err) {
     return { success: false, error: err.message };
