@@ -33,6 +33,23 @@
     onUomSelectionChange();
   });
 
+  // Theme Mode Switcher (Always opens in Soft Eye-Comfort Light Mode by default)
+  function toggleThemeMode() {
+    const root = document.documentElement;
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    const iconEl = document.getElementById('theme-toggle-icon');
+    const labelEl = document.getElementById('theme-toggle-label');
+    if (isDark) {
+      root.removeAttribute('data-theme');
+      if (iconEl) iconEl.textContent = '🌙';
+      if (labelEl) labelEl.textContent = 'Dark';
+    } else {
+      root.setAttribute('data-theme', 'dark');
+      if (iconEl) iconEl.textContent = '☀️';
+      if (labelEl) labelEl.textContent = 'Light';
+    }
+  }
+
   // Tab Navigation Handling
   function initTabs() {
     const tabBtns = document.querySelectorAll('.tab-btn');
@@ -1475,12 +1492,22 @@
 
   // --- RESTOCK TAB FILTER ---
   function filterRestockTable() {
-    const zeroItems = state.items.filter(i => i.isZeroStock);
+    const query = (document.getElementById('restock-search-input')?.value || '').toLowerCase().trim();
+    const zeroItems = state.items.filter(i => {
+      if (!i.isZeroStock) return false;
+      if (!query) return true;
+      return (i.itemCode || '').toLowerCase().includes(query) ||
+             (i.itemDesc || '').toLowerCase().includes(query) ||
+             (i.brandName || '').toLowerCase().includes(query);
+    });
     const tbody = document.getElementById('restock-table-body');
     tbody.innerHTML = '';
 
     if (zeroItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--success); font-weight:600;">No 0-quantity items. All inventory lines currently have stock.</td></tr>`;
+      const msg = query
+        ? `No 0-quantity items matching "${escapeHtml(query)}".`
+        : 'No 0-quantity items. All inventory lines currently have stock.';
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px; color:var(--text-secondary); font-weight:600;">${msg}</td></tr>`;
       return;
     }
 
@@ -1765,22 +1792,43 @@
         qtyOutHtml = '<span class="badge badge-warning" style="font-size:10px; font-weight:700;">0 (Shortage)</span>';
       }
 
-      let remarksHtml = escapeHtml(log.remarks || '');
-      if (remarksHtml.includes('File Injection')) {
-        remarksHtml = `<span class="badge badge-brand" style="font-size:10px; margin-right:4px; background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe;">⚡ INJECTION</span>${remarksHtml}`;
-      }
+      const rawRemark = String(log.remarks || '');
+      let remarksHtml = '';
+      const badges = [];
       if (isShortage) {
-        remarksHtml = `<span class="badge badge-critical" style="font-size:10px; margin-right:4px;">⚠️ WARNING</span>${remarksHtml}`;
+        badges.push('<span class="badge badge-critical" style="font-size:10px; margin-right:4px;">⚠️ WARNING</span>');
+      }
+      if (rawRemark.includes('File Injection')) {
+        badges.push('<span class="badge badge-brand" style="font-size:10px; margin-right:4px; background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe;">⚡ INJECTION</span>');
+      }
+
+      if (rawRemark.includes('File Injection:') && rawRemark.length > 90) {
+        const breakdownMatch = rawRemark.match(/\[(Cons:[^\]]+|Storage:[^\]]+|Disp:[^\]]+)\]/i);
+        const injIdMatch = rawRemark.match(/\[(INJ-\d{8}-\d{6})\]/);
+        const warnMatch = rawRemark.match(/(⚠️.*)/);
+        const summaryParts = [];
+        if (injIdMatch) summaryParts.push(`<strong>${escapeHtml(injIdMatch[1])}</strong>`);
+        if (breakdownMatch) summaryParts.push(`[${escapeHtml(breakdownMatch[1])}]`);
+        if (warnMatch) summaryParts.push(`<span style="color:#b45309; font-weight:600;">${escapeHtml(warnMatch[1])}</span>`);
+        const compactText = summaryParts.length > 0 ? summaryParts.join(' • ') : 'Daily 3-File HIS Injection';
+        remarksHtml = `
+          <div>${badges.join('')}</div>
+          <div class="audit-remarks-compact" title="${escapeHtml(rawRemark)}">${compactText}</div>
+          <button type="button" class="audit-remarks-toggle" onclick="const d=this.nextElementSibling; d.style.display=d.style.display==='none'?'block':'none'; this.textContent=d.style.display==='none'?'Show file names':'Hide file names';">Show file names</button>
+          <div style="display:none; font-size:10.5px; color:#64748b; margin-top:4px; word-break:break-all;">${escapeHtml(rawRemark)}</div>
+        `;
+      } else {
+        remarksHtml = `${badges.join('')}<span class="audit-remarks-compact">${escapeHtml(rawRemark)}</span>`;
       }
 
       tr.innerHTML = `
         <td style="font-size:11px; color:#64748b; white-space:nowrap; font-family:monospace;">${escapeHtml(log.timestamp || '')}</td>
-        <td style="text-align:center;">${dateOutStr}</td>
-        <td style="font-family:monospace; font-weight:700;">
+        <td style="text-align:center; white-space:nowrap;">${dateOutStr}</td>
+        <td style="font-family:monospace; font-weight:700; white-space:nowrap;">
           <a href="javascript:void(0)" onclick="quickFilterLogs('${escapeHtml(log.itemCode)}')" style="color:#2563eb; text-decoration:none;" title="Filter by this code">${escapeHtml(log.itemCode)}</a>
         </td>
         <td>
-          <a href="javascript:void(0)" onclick="openMedicineAuditModal('${escapeHtml(log.itemCode)}', '${escapeHtml(log.itemDesc)}')" style="color:#0f172a; text-decoration:none; font-weight:600;" title="View lifetime ledger">${escapeHtml(log.itemDesc)}</a>
+          <a href="javascript:void(0)" onclick="openMedicineAuditModal('${escapeHtml(log.itemCode)}', '${escapeHtml(log.itemDesc)}')" style="color:var(--text-primary); text-decoration:none; font-weight:600;" title="View lifetime ledger">${escapeHtml(log.itemDesc)}</a>
         </td>
         <td>${brandStr}</td>
         <td style="text-align:center;">${uomBadge}</td>
@@ -1788,7 +1836,7 @@
         <td style="text-align:right; font-family:monospace;">${unitPriceFormatted}</td>
         <td style="text-align:right;">${qtyOutHtml}</td>
         <td style="text-align:right; font-family:monospace; font-weight:600;">${Number(log.remainingBalance || 0).toLocaleString()}</td>
-        <td style="font-size:11.5px; color:#475569; max-width:280px; word-break:break-word;">${remarksHtml}</td>
+        <td class="audit-remarks-cell">${remarksHtml}</td>
         <td style="text-align:center;">
           <button class="btn btn-outline btn-sm" style="font-size:10.5px; padding:3px 7px;" onclick="openMedicineAuditModal('${escapeHtml(log.itemCode)}', '${escapeHtml(log.itemDesc)}')" title="View complete audit trail & active batches">
             📜 Trace
