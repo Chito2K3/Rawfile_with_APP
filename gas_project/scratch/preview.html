@@ -8249,7 +8249,8 @@
         ? duplicateFiles.join(', ')
         : (injectionState.sourceFileName || 'Uploaded file(s)');
     }
-    openModal('modal-duplicate-override');
+    const modal = document.getElementById('modal-duplicate-override');
+    if (modal) modal.style.display = 'flex';
   }
 
   function confirmDuplicateOverride() {
@@ -8264,7 +8265,8 @@
     if (msgEl) {
       msgEl.textContent = (res && res.message) ? res.message : 'FEFO deductions executed successfully!';
     }
-    openModal('modal-injection-summary');
+    const modal = document.getElementById('modal-injection-summary');
+    if (modal) modal.style.display = 'flex';
   }
 
   function getLatestActiveFileInjectionSession() {
@@ -8442,7 +8444,8 @@
       if (codeEl) codeEl.value = item.itemCode || '';
     }
 
-    openModal('modal-admin-delete');
+    const modal = document.getElementById('modal-admin-delete');
+    if (modal) modal.style.display = 'flex';
     setTimeout(() => { if (pwdEl) pwdEl.focus(); }, 100);
   }
 
