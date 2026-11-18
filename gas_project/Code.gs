@@ -33,7 +33,8 @@ const CONFIG = {
     'Nebule',
     'Syringe',
     'Sachet'
-  ]
+  ],
+  ADMIN_DELETE_PASSWORDS: ['Ph@rmacy123', 'Stor@age321']
 };
 
 // DCI Integration and Provisional Baseline configuration
@@ -2940,6 +2941,60 @@ function openDciSnapshotSheet() {
  * ISSUANCE_STORAGE_CLEANED, or ISSUANCE_DISPENSING_CLEANED) and automatically
  * executes cascading FEFO deductions against active batches in the 'Stocks' sheet.
  */
+/**
+ * Pre-flight check: Inspects STOCK_OUT_LOG for any non-reverted FILE INJECTION matching sourceFileName
+ */
+function checkDuplicateInjectionFiles(sourceFileName) {
+  try {
+    const cleanSource = String(sourceFileName || '').trim();
+    if (!cleanSource) {
+      return { success: true, isDuplicate: false, duplicateFiles: [], priorTimestamp: '' };
+    }
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssTz = ss.getSpreadsheetTimeZone();
+    const logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+    if (!logSheet || logSheet.getLastRow() <= 1) {
+      return { success: true, isDuplicate: false, duplicateFiles: [], priorTimestamp: '' };
+    }
+
+    const logData = logSheet.getDataRange().getValues();
+    const uploadedNames = cleanSource.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+    const duplicateMatches = [];
+    let priorTimestamp = '';
+
+    for (let lr = logData.length - 1; lr >= 1; lr--) {
+      const remarkStr = String(logData[lr][11] || '');
+      const remarkUpper = remarkStr.toUpperCase();
+      if (!remarkUpper.includes('FILE INJECTION:') || remarkUpper.includes('[REVERTED')) continue;
+
+      for (let u = 0; u < uploadedNames.length; u++) {
+        const uName = uploadedNames[u];
+        if (uName && remarkUpper.includes(uName)) {
+          if (!duplicateMatches.includes(uName)) {
+            duplicateMatches.push(uName);
+          }
+          if (!priorTimestamp) {
+            const rawTs = logData[lr][0];
+            priorTimestamp = rawTs instanceof Date
+              ? Utilities.formatDate(rawTs, ssTz, 'yyyy-MM-dd HH:mm:ss')
+              : String(rawTs || '');
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      isDuplicate: duplicateMatches.length > 0,
+      duplicateFiles: duplicateMatches,
+      priorTimestamp: priorTimestamp || 'an earlier session'
+    };
+  } catch (err) {
+    return { success: false, isDuplicate: false, error: err.message };
+  }
+}
+
 function executeFileInjectionDeduction(payload) {
   const lock = LockService.getScriptLock();
   lock.waitLock(45000); // 45-second atomic lock to guarantee concurrency safety
@@ -2987,10 +3042,14 @@ function executeFileInjectionDeduction(payload) {
         }
 
         if (duplicateMatches.length > 0) {
-          throw new Error(
-            '🛑 DUPLICATE FILE BLOCKED: File(s) [' + duplicateMatches.join(', ') + '] were ALREADY injected on ' +
-            (priorTimestamp || 'an earlier session') + '. Deduction aborted to prevent subtracting stocks twice!'
-          );
+          return {
+            success: false,
+            isDuplicateBlocked: true,
+            duplicateFiles: duplicateMatches,
+            priorTimestamp: priorTimestamp || 'an earlier session',
+            error: '🛑 DUPLICATE FILE BLOCKED: File(s) [' + duplicateMatches.join(', ') + '] were ALREADY injected on ' +
+              (priorTimestamp || 'an earlier session') + '. Deduction aborted to prevent subtracting stocks twice!'
+          };
         }
       }
     }
@@ -3444,4 +3503,112 @@ function showMedicineAuditTrailDialog() {
     .setHeight(720)
     .setTitle('📜 Medicine Audit Ledger & Transaction Tracker - ARMMC');
   SpreadsheetApp.getUi().showModalDialog(html, '📜 Medicine Audit Ledger - ARMMC');
+}
+
+/**
+ * ============================================================================
+ * ADMIN PASSWORD-PROTECTED DELETE HANDLERS
+ * ============================================================================
+ */
+function isValidAdminPassword_(pwd) {
+  const clean = String(pwd || '').trim();
+  const allowed = CONFIG.ADMIN_DELETE_PASSWORDS || ['Ph@rmacy123', 'Stor@age321'];
+  return allowed.indexOf(clean) !== -1;
+}
+
+/**
+ * Clears all data rows (preserving Row 1 headers) in Stocks, and optionally STOCK_OUT_LOG & snapshot
+ */
+function clearAllDataAdmin(password, clearLogsToo) {
+  if (!isValidAdminPassword_(password)) {
+    return { success: false, error: 'Invalid Admin Password. Deletion aborted.' };
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const info = getInventorySheetInfo(targetGid);
+    const sheet = info.sheet;
+    let clearedSheets = [];
+
+    if (sheet && sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getMaxColumns()).clearContent();
+      clearedSheets.push(sheet.getName());
+    }
+
+    if (clearLogsToo) {
+      const logSheet = ss.getSheetByName(CONFIG.LOG_SHEET_NAME);
+      if (logSheet && logSheet.getLastRow() > 1) {
+        logSheet.getRange(2, 1, logSheet.getLastRow() - 1, logSheet.getMaxColumns()).clearContent();
+        clearedSheets.push(logSheet.getName());
+      }
+      if (typeof DCI_CONFIG !== 'undefined' && DCI_CONFIG.SNAPSHOT_SHEET_NAME) {
+        const snapSheet = ss.getSheetByName(DCI_CONFIG.SNAPSHOT_SHEET_NAME);
+        if (snapSheet && snapSheet.getLastRow() > 1) {
+          snapSheet.getRange(2, 1, snapSheet.getLastRow() - 1, snapSheet.getMaxColumns()).clearContent();
+          clearedSheets.push(snapSheet.getName());
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: clearedSheets.length > 0
+        ? `Cleared all data from: ${clearedSheets.join(', ')} (headers preserved).`
+        : 'Sheets are already empty (headers preserved).'
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Deletes a single batch row from Stocks after verifying Admin Password
+ */
+function deleteInventoryBatchAdmin(password, payload) {
+  if (!isValidAdminPassword_(password)) {
+    return { success: false, error: 'Invalid Admin Password. Deletion aborted.' };
+  }
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const { batchId, rowIndex, itemCode } = payload || {};
+    const targetGid = CONFIG.TARGET_SHEET_GID || '374732397';
+    const info = getInventorySheetInfo(targetGid);
+    const sheet = info.sheet;
+    const values = sheet.getDataRange().getValues();
+
+    let targetRowIndex = -1;
+    if (batchId && info.colBatchId !== -1) {
+      for (let r = 1; r < values.length; r++) {
+        if (String(values[r][info.colBatchId] || '').trim() === String(batchId).trim()) {
+          targetRowIndex = r + 1;
+          break;
+        }
+      }
+    }
+    if (targetRowIndex === -1 && rowIndex && rowIndex <= values.length) {
+      const codeAtRow = String(values[rowIndex - 1][info.colCode] || '').trim().toUpperCase();
+      if (codeAtRow === String(itemCode || '').trim().toUpperCase()) {
+        targetRowIndex = rowIndex;
+      }
+    }
+
+    if (targetRowIndex === -1) {
+      return { success: false, error: `Could not locate row for [${itemCode || batchId}]. Please refresh.` };
+    }
+
+    sheet.deleteRow(targetRowIndex);
+    return {
+      success: true,
+      message: `Deleted [${itemCode || batchId}] (Row ${targetRowIndex}) from ${sheet.getName()}.`
+    };
+  } catch (err) {
+    return { success: false, error: err.message };
+  } finally {
+    lock.releaseLock();
+  }
 }

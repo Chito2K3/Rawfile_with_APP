@@ -507,6 +507,9 @@
             <button class="btn btn-sm btn-outline" onclick="openEditBatchModal(${item.rowIndex})" title="Edit Batch Details">
               Edit
             </button>
+            <button class="btn btn-sm btn-outline" style="border-color:#fecaca; color:#b91c1c;" onclick="openAdminDeleteModal('SINGLE', ${item.rowIndex})" title="Admin: Delete Batch">
+              🗑️
+            </button>
           </div>
         </td>
       `;
@@ -4038,6 +4041,23 @@
 
     // Check against state.logs for duplicate file injection
     const logs = state.logs || [];
+    if (logs.length === 0 && typeof google !== 'undefined' && google.script && google.script.run && !injectionState._fetchingLogsForDupCheck) {
+      injectionState._fetchingLogsForDupCheck = true;
+      google.script.run
+        .withSuccessHandler((res) => {
+          injectionState._fetchingLogsForDupCheck = false;
+          if (res && res.success && Array.isArray(res.logs)) {
+            state.logs = res.logs;
+            if (typeof runDuplicateFileCheckOnLoadedFiles === 'function') {
+              runDuplicateFileCheckOnLoadedFiles();
+            }
+          }
+        })
+        .withFailureHandler(() => {
+          injectionState._fetchingLogsForDupCheck = false;
+        })
+        .getRecentLogs();
+    }
     const duplicateMatchedFiles = [];
     let duplicatePriorTimestamp = '';
     fileNamesList.forEach(fname => {
@@ -4259,6 +4279,7 @@
     const batchesEl = document.getElementById('confirm-inj-batches');
     if (batchesEl) batchesEl.textContent = `${(injectionState.batchesImpactedCount || 0).toLocaleString()} batches`;
 
+    const checkingBadge = document.getElementById('confirm-inj-checking-badge');
     const safeBadge = document.getElementById('confirm-inj-safe-badge');
     const dupBox = document.getElementById('confirm-inj-duplicate-box');
     const dupMsg = document.getElementById('confirm-inj-duplicate-msg');
@@ -4267,21 +4288,50 @@
 
     if (forceChk) forceChk.checked = false;
 
-    if (injectionState.duplicateDetected) {
-      if (safeBadge) safeBadge.style.display = 'none';
-      if (dupBox) dupBox.style.display = 'block';
-      if (dupMsg) {
-        dupMsg.innerHTML = `File(s) <strong>${escapeHtml((injectionState.duplicateFiles || []).join(', '))}</strong> were ALREADY injected on <strong>${escapeHtml(injectionState.duplicateTimestamp || 'an earlier session')}</strong>. Subtracting again will deduct stocks twice!`;
+    function renderConfirmDupState(isDup, dupFiles, dupTs) {
+      if (checkingBadge) checkingBadge.style.display = 'none';
+      if (isDup) {
+        if (safeBadge) safeBadge.style.display = 'none';
+        if (dupBox) dupBox.style.display = 'block';
+        if (dupMsg) {
+          dupMsg.innerHTML = `File(s) <strong>${escapeHtml((dupFiles || []).join(', '))}</strong> were ALREADY injected on <strong>${escapeHtml(dupTs || 'an earlier session')}</strong>. Subtracting again will deduct stocks twice!`;
+        }
+        if (confirmBtn) confirmBtn.disabled = true;
+      } else {
+        if (safeBadge) safeBadge.style.display = 'flex';
+        if (dupBox) dupBox.style.display = 'none';
+        if (confirmBtn) confirmBtn.disabled = false;
       }
-      if (confirmBtn) confirmBtn.disabled = true;
-    } else {
-      if (safeBadge) safeBadge.style.display = 'flex';
-      if (dupBox) dupBox.style.display = 'none';
-      if (confirmBtn) confirmBtn.disabled = false;
     }
 
     const modal = document.getElementById('modal-confirm-injection');
     if (modal) modal.style.display = 'flex';
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      if (checkingBadge) checkingBadge.style.display = 'flex';
+      if (safeBadge) safeBadge.style.display = 'none';
+      if (dupBox) dupBox.style.display = 'none';
+      if (confirmBtn) confirmBtn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler((res) => {
+          if (res && res.success && res.isDuplicate) {
+            injectionState.duplicateDetected = true;
+            injectionState.duplicateFiles = res.duplicateFiles || [];
+            injectionState.duplicateTimestamp = res.priorTimestamp || 'an earlier session';
+            renderConfirmDupState(true, injectionState.duplicateFiles, injectionState.duplicateTimestamp);
+          } else {
+            injectionState.duplicateDetected = false;
+            renderConfirmDupState(false);
+          }
+        })
+        .withFailureHandler(() => {
+          renderConfirmDupState(injectionState.duplicateDetected, injectionState.duplicateFiles, injectionState.duplicateTimestamp);
+        })
+        .checkDuplicateInjectionFiles(injectionState.sourceFileName);
+    } else {
+      renderConfirmDupState(injectionState.duplicateDetected, injectionState.duplicateFiles, injectionState.duplicateTimestamp);
+    }
   }
 
   function onToggleForceDuplicateCheckbox() {
@@ -4343,10 +4393,10 @@
     if (isSuccess) {
       if (fill) fill.style.width = '100%';
       if (pct) pct.textContent = '100%';
-      if (stage) stage.textContent = '✅ Complete! Refreshing dashboard...';
+      if (stage) stage.textContent = '✅ 100% Complete! Finalizing summary...';
       setTimeout(() => {
         if (modal) modal.style.display = 'none';
-      }, 450);
+      }, 800);
     } else {
       if (modal) modal.style.display = 'none';
     }
@@ -4392,6 +4442,11 @@
             btn.disabled = false;
             btn.textContent = '⚡ Confirm & Apply FEFO Deductions';
           }
+          if (res && res.isDuplicateBlocked) {
+            stopInjectionProgress(false);
+            openDuplicateOverrideModal(res.duplicateFiles || [], res.priorTimestamp || 'an earlier session');
+            return;
+          }
           if (!res || !res.success) {
             stopInjectionProgress(false);
             showToast(res ? res.error : 'File injection failed.', 'error');
@@ -4399,11 +4454,12 @@
           }
 
           stopInjectionProgress(true);
+          loadInventory();
+          loadLogs();
           flashBtnSuccess('btn-execute-injection', 'Deducted!', () => {
             showToast(res.message || 'FEFO deductions executed successfully!', 'success');
+            openInjectionSummaryModal(res);
             clearInjectionFile();
-            loadInventory();
-            loadLogs();
           });
         })
         .withFailureHandler((err) => {
@@ -4427,6 +4483,33 @@
         clearInjectionFile();
       }, 1500);
     }
+  }
+
+  function openDuplicateOverrideModal(duplicateFiles, priorTimestamp) {
+    const tsEl = document.getElementById('dup-override-timestamp');
+    const filesEl = document.getElementById('dup-override-files');
+    if (tsEl) tsEl.textContent = priorTimestamp || 'an earlier session';
+    if (filesEl) {
+      filesEl.textContent = (duplicateFiles && duplicateFiles.length > 0)
+        ? duplicateFiles.join(', ')
+        : (injectionState.sourceFileName || 'Uploaded file(s)');
+    }
+    openModal('modal-duplicate-override');
+  }
+
+  function confirmDuplicateOverride() {
+    closeModal('modal-duplicate-override');
+    const forceChk = document.getElementById('chk-force-duplicate-injection');
+    if (forceChk) forceChk.checked = true;
+    executeInjectionFefoSync();
+  }
+
+  function openInjectionSummaryModal(res) {
+    const msgEl = document.getElementById('inj-summary-message');
+    if (msgEl) {
+      msgEl.textContent = (res && res.message) ? res.message : 'FEFO deductions executed successfully!';
+    }
+    openModal('modal-injection-summary');
   }
 
   function getLatestActiveFileInjectionSession() {
@@ -4562,6 +4645,128 @@
         closeModal('modal-revert-injection');
         showToast(`[Preview Mock] Reverted ${latest.sourceFile} (+${latest.totalUnits.toLocaleString()} units restored)!`, 'success');
       }, 600);
+    }
+  }
+
+  // ============================================================================
+  // ADMIN PASSWORD-PROTECTED DELETE (ALL OR SINGLE ENTRY)
+  // ============================================================================
+  function openAdminDeleteModal(mode, rowIndex) {
+    const modeEl = document.getElementById('admin-del-mode');
+    const rowEl = document.getElementById('admin-del-row-index');
+    const batchEl = document.getElementById('admin-del-batch-id');
+    const codeEl = document.getElementById('admin-del-item-code');
+    const titleEl = document.getElementById('admin-del-title');
+    const descEl = document.getElementById('admin-del-desc');
+    const logsWrap = document.getElementById('admin-del-clear-logs-wrap');
+    const pwdEl = document.getElementById('admin-del-password');
+    const errEl = document.getElementById('admin-del-error');
+
+    if (modeEl) modeEl.value = mode;
+    if (pwdEl) pwdEl.value = '';
+    if (errEl) errEl.style.display = 'none';
+
+    if (mode === 'ALL') {
+      if (titleEl) titleEl.textContent = 'Clear All Test Data';
+      if (descEl) descEl.innerHTML = '⚠️ This will permanently delete <strong>ALL inventory rows</strong> from the sheet (Row 1 headers will be kept). Enter Admin Password to confirm:';
+      if (logsWrap) logsWrap.style.display = 'block';
+      if (rowEl) rowEl.value = '';
+      if (batchEl) batchEl.value = '';
+      if (codeEl) codeEl.value = '';
+    } else {
+      const item = (state.items || []).find(i => i.rowIndex === rowIndex);
+      if (!item) {
+        showToast('Item row not found.', 'error');
+        return;
+      }
+      if (titleEl) titleEl.textContent = 'Delete Individual Batch';
+      if (descEl) descEl.innerHTML = `Are you sure you want to delete <strong>[${escapeHtml(item.itemCode)}] ${escapeHtml(item.itemDesc)}</strong> (${escapeHtml(item.brandName || 'No Brand')}, Qty: ${item.qty.toLocaleString()})? Enter Admin Password:`;
+      if (logsWrap) logsWrap.style.display = 'none';
+      if (rowEl) rowEl.value = item.rowIndex;
+      if (batchEl) batchEl.value = item.batchId || '';
+      if (codeEl) codeEl.value = item.itemCode || '';
+    }
+
+    openModal('modal-admin-delete');
+    setTimeout(() => { if (pwdEl) pwdEl.focus(); }, 100);
+  }
+
+  function submitAdminDelete() {
+    const mode = document.getElementById('admin-del-mode').value;
+    const pwd = (document.getElementById('admin-del-password').value || '').trim();
+    const errEl = document.getElementById('admin-del-error');
+    const btn = document.getElementById('btn-confirm-admin-delete');
+
+    if (!pwd) {
+      if (errEl) {
+        errEl.textContent = 'Please enter the Admin Password.';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+    if (errEl) errEl.style.display = 'none';
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+    }
+
+    const onDone = (res) => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🗑️ Confirm Delete';
+      }
+      if (!res || !res.success) {
+        if (errEl) {
+          errEl.textContent = (res && res.error) ? res.error : 'Deletion failed.';
+          errEl.style.display = 'block';
+        }
+        return;
+      }
+      closeModal('modal-admin-delete');
+      showToast(res.message || 'Deleted successfully.', 'success');
+      loadInventory();
+      loadLogs();
+    };
+
+    const onFail = (err) => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🗑️ Confirm Delete';
+      }
+      if (errEl) {
+        errEl.textContent = err.message || 'Server error.';
+        errEl.style.display = 'block';
+      }
+    };
+
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      if (mode === 'ALL') {
+        const clearLogsToo = Boolean(document.getElementById('chk-admin-clear-logs').checked);
+        google.script.run
+          .withSuccessHandler(onDone)
+          .withFailureHandler(onFail)
+          .clearAllDataAdmin(pwd, clearLogsToo);
+      } else {
+        const payload = {
+          rowIndex: parseInt(document.getElementById('admin-del-row-index').value, 10),
+          batchId: document.getElementById('admin-del-batch-id').value,
+          itemCode: document.getElementById('admin-del-item-code').value
+        };
+        google.script.run
+          .withSuccessHandler(onDone)
+          .withFailureHandler(onFail)
+          .deleteInventoryBatchAdmin(pwd, payload);
+      }
+    } else {
+      // Preview mock
+      setTimeout(() => {
+        if (pwd !== 'Ph@rmacy123' && pwd !== 'Stor@age321') {
+          onDone({ success: false, error: 'Invalid Admin Password. Deletion aborted.' });
+        } else {
+          onDone({ success: true, message: mode === 'ALL' ? '[Preview Mock] Cleared all test data.' : '[Preview Mock] Deleted selected batch.' });
+        }
+      }, 300);
     }
   }
 
